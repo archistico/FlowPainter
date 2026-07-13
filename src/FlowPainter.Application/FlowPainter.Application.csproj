@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Application use cases and orchestration for FlowPainter.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FlowPainter.Domain\FlowPainter.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,15 @@
+{
+  "version": "legacy-flow-fixture-v1",
+  "width": 4,
+  "height": 3,
+  "pixelsRgba": [
+    "FF0000FF", "00FF00FF", "0000FFFF", "FFFFFFFF",
+    "000000FF", "FFFF00FF", "00FFFFFF", "FF00FFFF",
+    "808080FF", "FF8000FF", "800080FF", "008080FF"
+  ],
+  "density": [
+    1, 2, 4, 8,
+    16, 1, 2, 4,
+    8, 16, 1, 2
+  ]
+}

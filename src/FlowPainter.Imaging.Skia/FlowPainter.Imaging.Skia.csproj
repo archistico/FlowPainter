@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>SkiaSharp image loading, proxy generation, pixel sampling and PNG encoding for FlowPainter.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FlowPainter.Domain\FlowPainter.Domain.csproj" />
+  </ItemGroup>
+</Project>

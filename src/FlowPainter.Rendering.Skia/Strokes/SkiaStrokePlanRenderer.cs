@@ -1,0 +1,194 @@
+using System.Diagnostics.CodeAnalysis;
+using FlowPainter.Domain.Geometry;
+using FlowPainter.Domain.Images;
+using FlowPainter.Domain.Strokes;
+using FlowPainter.Imaging.Skia.Images;
+using SkiaSharp;
+
+namespace FlowPainter.Rendering.Skia.Strokes;
+
+public sealed class SkiaStrokePlanRenderer
+{
+    private const int ProgressBatchSize = 256;
+    private static readonly SKSamplingOptions BackgroundSampling = new(SKFilterMode.Linear, SKMipmapMode.Linear);
+
+    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "The renderer is an application service with instance semantics so future brush renderers and decorators can replace it without changing call sites.")]
+    public Task<SkiaImage> RenderAsync(
+        StrokePlan plan,
+        ImageSize outputSize,
+        SkiaImage? sourceBackground = null,
+        IProgress<StrokeRenderProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ValidateBackground(plan, sourceBackground);
+
+        return Task.Run(
+            () => Render(plan, outputSize, sourceBackground, progress, cancellationToken),
+            cancellationToken);
+    }
+
+    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "The rendered SKBitmap ownership is transferred to the returned SkiaImage; every failure path disposes that wrapper.")]
+    private static SkiaImage Render(
+        StrokePlan plan,
+        ImageSize outputSize,
+        SkiaImage? sourceBackground,
+        IProgress<StrokeRenderProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new StrokeRenderProgress(
+            StrokeRenderStage.Preparing,
+            0,
+            plan.Strokes.Count,
+            0d));
+
+        SKImageInfo imageInfo = new(
+            outputSize.Width,
+            outputSize.Height,
+            SKColorType.Rgba8888,
+            SKAlphaType.Premul);
+        using SKSurface surface = SKSurface.Create(imageInfo)
+            ?? throw new InvalidOperationException("SkiaSharp could not create the render surface.");
+
+        SKCanvas canvas = surface.Canvas;
+        DrawBackground(canvas, plan, outputSize, sourceBackground, progress);
+
+        using SKPaint paint = new()
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round
+        };
+
+        int maximumOutputDimension = Math.Max(outputSize.Width, outputSize.Height);
+        for (int index = 0; index < plan.Strokes.Count; index++)
+        {
+            if (index % ProgressBatchSize == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(new StrokeRenderProgress(
+                    StrokeRenderStage.DrawingStrokes,
+                    index,
+                    plan.Strokes.Count,
+                    CalculateFraction(index, plan.Strokes.Count)));
+            }
+
+            DrawStroke(canvas, plan.Strokes[index], outputSize, maximumOutputDimension, paint);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new StrokeRenderProgress(
+            StrokeRenderStage.Finalizing,
+            plan.Strokes.Count,
+            plan.Strokes.Count,
+            0.98d));
+
+        using SKImage snapshot = surface.Snapshot();
+        SKBitmap bitmap = SKBitmap.FromImage(snapshot)
+            ?? throw new InvalidOperationException("SkiaSharp could not copy the rendered pixels.");
+        SkiaImage result = new(bitmap, sourceBackground?.SourceName);
+        bool completed = false;
+
+        try
+        {
+            progress?.Report(new StrokeRenderProgress(
+                StrokeRenderStage.Completed,
+                plan.Strokes.Count,
+                plan.Strokes.Count,
+                1d));
+
+            completed = true;
+            return result;
+        }
+        finally
+        {
+            if (!completed)
+            {
+                result.Dispose();
+            }
+        }
+    }
+
+    private static void DrawBackground(
+        SKCanvas canvas,
+        StrokePlan plan,
+        ImageSize outputSize,
+        SkiaImage? sourceBackground,
+        IProgress<StrokeRenderProgress>? progress)
+    {
+        progress?.Report(new StrokeRenderProgress(
+            StrokeRenderStage.DrawingBackground,
+            0,
+            plan.Strokes.Count,
+            0.02d));
+
+        if (plan.BackgroundMode == StrokePlanBackgroundMode.Transparent)
+        {
+            canvas.Clear(SKColors.Transparent);
+            return;
+        }
+
+        using SKImage sourceImage = sourceBackground!.CreateSnapshot();
+        canvas.Clear(SKColors.Transparent);
+        canvas.DrawImage(
+            sourceImage,
+            new SKRect(0f, 0f, outputSize.Width, outputSize.Height),
+            BackgroundSampling);
+    }
+
+    private static void DrawStroke(
+        SKCanvas canvas,
+        FlowStroke stroke,
+        ImageSize outputSize,
+        int maximumOutputDimension,
+        SKPaint paint)
+    {
+        paint.Color = new SKColor(
+            stroke.Color.Red,
+            stroke.Color.Green,
+            stroke.Color.Blue,
+            stroke.Color.Alpha);
+        paint.StrokeWidth = Math.Max(0.5f, (float)(stroke.WidthRelativeToReference * maximumOutputDimension));
+
+        using SKPathBuilder pathBuilder = new();
+        RelativePoint first = stroke.Points[0];
+        pathBuilder.MoveTo((float)(first.X * outputSize.Width), (float)(first.Y * outputSize.Height));
+
+        for (int index = 1; index < stroke.Points.Count; index++)
+        {
+            RelativePoint point = stroke.Points[index];
+            pathBuilder.LineTo((float)(point.X * outputSize.Width), (float)(point.Y * outputSize.Height));
+        }
+
+        using SKPath path = pathBuilder.Detach();
+        canvas.DrawPath(path, paint);
+    }
+
+    private static void ValidateBackground(StrokePlan plan, SkiaImage? sourceBackground)
+    {
+        if (plan.BackgroundMode == StrokePlanBackgroundMode.SourceImage && sourceBackground is null)
+        {
+            throw new ArgumentNullException(
+                nameof(sourceBackground),
+                "A source image is required when the plan uses the source-image background mode.");
+        }
+
+        if (sourceBackground is not null)
+        {
+            double aspectDifference = Math.Abs(sourceBackground.Size.AspectRatio - plan.SourceSize.AspectRatio);
+            if (aspectDifference > 1e-6d)
+            {
+                throw new ArgumentException(
+                    "The source background must have the same aspect ratio as the stroke plan.",
+                    nameof(sourceBackground));
+            }
+        }
+    }
+
+    private static double CalculateFraction(int completed, int total)
+    {
+        return total == 0 ? 0.95d : 0.05d + (0.9d * completed / total);
+    }
+}

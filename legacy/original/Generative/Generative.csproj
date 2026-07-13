@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.Net.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LibNoiseCore" Version="1.0.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+  </ItemGroup>
+</Project>

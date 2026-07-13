@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <Description>Avalonia desktop shell for FlowPainter.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FlowPainter.Application\FlowPainter.Application.csproj" />
+    <ProjectReference Include="..\FlowPainter.Domain\FlowPainter.Domain.csproj" />
+    <ProjectReference Include="..\FlowPainter.Imaging.Skia\FlowPainter.Imaging.Skia.csproj" />
+    <ProjectReference Include="..\FlowPainter.Rendering.Skia\FlowPainter.Rendering.Skia.csproj" />
+  </ItemGroup>
+</Project>

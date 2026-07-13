@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 2,
+  "preset": {
+    "name": "Fine detail",
+    "settings": {
+      "field": {
+        "kind": "CoherentNoise",
+        "scale": 10,
+        "octaves": 5,
+        "persistence": 0.5,
+        "lacunarity": 2,
+        "angleOffsetRadians": 0
+      },
+      "strokeCount": 40000,
+      "segmentCount": 28,
+      "referenceMaximumDimension": 1024,
+      "uniformDensity": 5,
+      "lengthScale": 0.004,
+      "maximumCurveRadians": 0.4200000000786345,
+      "minimumStrokeWidthPixels": 1.5,
+      "maximumStrokeWidthPixels": 4,
+      "strokeOpacity": 0.72,
+      "backgroundMode": "SourceImage",
+      "detailAnalysis": {
+        "baseDetail": 0.12,
+        "edgeWeight": 0.75,
+        "contrastWeight": 0.45,
+        "smoothingRadius": 1
+      },
+      "detailInfluence": {
+        "placementBias": 6,
+        "detailedLengthMultiplier": 0.45,
+        "backgroundLengthMultiplier": 1.25,
+        "detailedWidthMultiplier": 0.55,
+        "backgroundWidthMultiplier": 1.3
+      }
+    }
+  }
+}

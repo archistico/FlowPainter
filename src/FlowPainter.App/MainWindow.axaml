@@ -1,0 +1,254 @@
+<Window
+    x:Class="FlowPainter.App.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="FlowPainter"
+    Width="1660"
+    Height="940"
+    MinWidth="1280"
+    MinHeight="760"
+    WindowStartupLocation="CenterScreen">
+    <Grid RowDefinitions="Auto,*,Auto" Background="#17191D">
+        <Border Padding="22,16" Background="#202329">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="3">
+                    <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="White" Text="FlowPainter" />
+                    <TextBlock Foreground="#AEB4BF" Text="M5.1 · project workflow, preview quality and editable detail regions" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button x:Name="OpenProjectButton" Padding="16,9" Click="OpenProjectClick" Content="Open project" />
+                    <Button x:Name="SaveProjectButton" Padding="16,9" Click="SaveProjectClick" Content="Save project" IsEnabled="False" />
+                    <Button x:Name="OpenButton" Padding="16,9" Click="OpenImageClick" Content="Open image" />
+                    <Button x:Name="RenderButton" Padding="16,9" Click="RenderPreviewClick" Content="Render preview" IsEnabled="False" />
+                    <Button x:Name="CancelButton" Padding="16,9" Click="CancelClick" Content="Cancel" IsEnabled="False" />
+                    <Button x:Name="SaveButton" Padding="16,9" Click="SavePngClick" Content="Save PNG" IsEnabled="False" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="20" ColumnDefinitions="370,*,*" ColumnSpacing="18">
+            <Border Background="#202329" CornerRadius="10" Padding="14">
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Margin="2,0,2,12" FontSize="17" FontWeight="SemiBold" Foreground="White" Text="Flow and detail parameters" />
+                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="SettingsPanel" Margin="0,0,18,0" Spacing="10">
+                            <TextBlock Foreground="#AEB4BF" Text="Project name" />
+                            <TextBox x:Name="ProjectNameTextBox" />
+
+                            <TextBlock Foreground="#AEB4BF" Text="Recent projects" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <ComboBox x:Name="RecentProjectComboBox" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="1" Click="OpenRecentProjectClick" Content="Open" />
+                            </Grid>
+
+                            <TextBlock Foreground="#AEB4BF" Text="Preview quality" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <ComboBox x:Name="PreviewQualityComboBox" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="1" Click="RebuildPreviewClick" Content="Rebuild" />
+                            </Grid>
+
+                            <TextBlock Foreground="#AEB4BF" Text="Built-in preset" />
+                            <ComboBox x:Name="PresetComboBox" HorizontalAlignment="Stretch" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Click="LoadPresetClick" Content="Load preset" />
+                                <Button Grid.Column="1" Click="SavePresetClick" Content="Save preset" />
+                            </Grid>
+                            <TextBlock Foreground="#AEB4BF" Text="Recent presets" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <ComboBox x:Name="RecentPresetComboBox" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="1" Click="LoadRecentPresetClick" Content="Load" />
+                            </Grid>
+
+                            <TextBlock Margin="0,8,0,0" Foreground="#AEB4BF" Text="Preset name" />
+                            <TextBox x:Name="PresetNameTextBox" />
+
+                            <TextBlock Margin="0,8,0,0" FontWeight="SemiBold" Foreground="White" Text="Flow field" />
+                            <ComboBox x:Name="FlowFieldComboBox" HorizontalAlignment="Stretch" />
+
+                            <TextBlock Foreground="#AEB4BF" Text="Background" />
+                            <ComboBox x:Name="BackgroundComboBox" HorizontalAlignment="Stretch" />
+
+                            <TextBlock Foreground="#AEB4BF" Text="Seed" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBox x:Name="SeedTextBox" />
+                                <Button Grid.Column="1" Click="NewSeedClick" Content="New" />
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Strokes" />
+                                <TextBox x:Name="StrokeCountTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Segments" />
+                                <TextBox x:Name="SegmentCountTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Field scale" />
+                                <TextBox x:Name="FieldScaleTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Octaves" />
+                                <TextBox x:Name="OctavesTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Persistence" />
+                                <TextBox x:Name="PersistenceTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Lacunarity" />
+                                <TextBox x:Name="LacunarityTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Field rotation (°)" />
+                                <TextBox x:Name="AngleOffsetTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Uniform density" />
+                                <TextBox x:Name="DensityTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Length scale" />
+                                <TextBox x:Name="LengthScaleTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Max curve (°)" />
+                                <TextBox x:Name="MaximumCurveTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Min width (px)" />
+                                <TextBox x:Name="MinimumWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Max width (px)" />
+                                <TextBox x:Name="MaximumWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Opacity (%)" />
+                                <TextBox x:Name="OpacityTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Automatic detail analysis" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Base detail (%)" />
+                                <TextBox x:Name="BaseDetailTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Edge weight" />
+                                <TextBox x:Name="EdgeWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Contrast weight" />
+                                <TextBox x:Name="ContrastWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Smoothing radius" />
+                                <TextBox x:Name="SmoothingRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Button Click="ReanalyzeDetailClick" Content="Reanalyze detail map" />
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Detail influence" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Placement bias" />
+                                <TextBox x:Name="PlacementBiasTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detailed length (%)" />
+                                <TextBox x:Name="DetailedLengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Background length (%)" />
+                                <TextBox x:Name="BackgroundLengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detailed width (%)" />
+                                <TextBox x:Name="DetailedWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Background width (%)" />
+                                <TextBox x:Name="BackgroundWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Manual detail regions" />
+                            <TextBlock TextWrapping="Wrap" Foreground="#7F8794" Text="Drag on the source image to add a rectangular focus or background region." />
+                            <ComboBox x:Name="DetailIntentComboBox" HorizontalAlignment="Stretch" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Region strength (%)" />
+                                <TextBox x:Name="RegionStrengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <CheckBox x:Name="ShowDetailOverlayCheckBox" Click="DetailOverlayVisibilityClick" Content="Show heat-map overlay" IsChecked="True" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Click="RemoveLastRegionClick" Content="Remove last" />
+                                <Button Grid.Column="1" Click="ClearRegionsClick" Content="Clear regions" />
+                            </Grid>
+                            <TextBlock x:Name="RegionCountText" Foreground="#AEB4BF" Text="0 manual regions" />
+                            <ListBox x:Name="RegionListBox" Height="105" SelectionChanged="RegionSelectionChanged" />
+                            <TextBlock Foreground="#AEB4BF" Text="Selected region label" />
+                            <TextBox x:Name="RegionLabelTextBox" />
+                            <Grid ColumnDefinitions="*,70,*,70" ColumnSpacing="6">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Left %" />
+                                <TextBox x:Name="RegionLeftTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="#AEB4BF" Text="Top %" />
+                                <TextBox x:Name="RegionTopTextBox" Grid.Column="3" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,70,*,70" ColumnSpacing="6">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Width %" />
+                                <TextBox x:Name="RegionWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="#AEB4BF" Text="Height %" />
+                                <TextBox x:Name="RegionHeightTextBox" Grid.Column="3" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Button Click="ApplyRegionChangesClick" Content="Apply selected region" />
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                                <Button Click="MoveRegionEarlierClick" Content="Earlier" />
+                                <Button Grid.Column="1" Click="MoveRegionLaterClick" Content="Later" />
+                                <Button Grid.Column="2" Click="DeleteSelectedRegionClick" Content="Delete" />
+                            </Grid>
+
+                            <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#7F8794" Text="Blue areas receive broader, longer and fewer strokes. Red areas receive shorter, thinner and more numerous strokes." />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Background="#202329" CornerRadius="10" Padding="14">
+                <Grid RowDefinitions="Auto,*">
+                    <Grid ColumnDefinitions="*,Auto" Margin="2,0,2,12">
+                        <TextBlock FontSize="17" FontWeight="SemiBold" Foreground="White" Text="Source / detail map" />
+                        <TextBlock x:Name="SourceInfoText" Grid.Column="1" Foreground="#AEB4BF" Text="No image" />
+                    </Grid>
+                    <Border Grid.Row="1" Background="#111318" CornerRadius="7" ClipToBounds="True">
+                        <Grid>
+                            <Image x:Name="SourceImageView" Stretch="Uniform" />
+                            <Canvas x:Name="SelectionCanvas"
+                                    Background="Transparent"
+                                    IsEnabled="False"
+                                    PointerPressed="SourcePointerPressed"
+                                    PointerMoved="SourcePointerMoved"
+                                    PointerReleased="SourcePointerReleased"
+                                    SizeChanged="SourceCanvasSizeChanged" />
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Background="#202329" CornerRadius="10" Padding="14">
+                <Grid RowDefinitions="Auto,*">
+                    <Grid ColumnDefinitions="*,Auto" Margin="2,0,2,12">
+                        <TextBlock FontSize="17" FontWeight="SemiBold" Foreground="White" Text="Rendered preview" />
+                        <TextBlock x:Name="ResultInfoText" Grid.Column="1" Foreground="#AEB4BF" Text="Not rendered" />
+                    </Grid>
+                    <Border Grid.Row="1" Background="#111318" CornerRadius="7" ClipToBounds="True">
+                        <Image x:Name="ResultImageView" Stretch="Uniform" />
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Padding="20,12" Background="#202329">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                <ProgressBar x:Name="OperationProgressBar" Width="190" Minimum="0" Maximum="100" Value="0" />
+                <TextBlock x:Name="StatusText" Grid.Column="1" VerticalAlignment="Center" Foreground="#DCE4F2" Text="Open a local PNG, JPEG, WebP or BMP image." />
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="#8FD19E" Text="Max 10,000 × 10,000 RGBA" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

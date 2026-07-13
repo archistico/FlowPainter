@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>SkiaSharp rasterization of FlowPainter generative plans.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FlowPainter.Domain\FlowPainter.Domain.csproj" />
+    <ProjectReference Include="..\FlowPainter.Imaging.Skia\FlowPainter.Imaging.Skia.csproj" />
+  </ItemGroup>
+</Project>

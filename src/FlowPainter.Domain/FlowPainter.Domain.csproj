@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Pure domain model for FlowPainter generative painting.</Description>
+  </PropertyGroup>
+</Project>
