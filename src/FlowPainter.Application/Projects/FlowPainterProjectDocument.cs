@@ -2,7 +2,7 @@ namespace FlowPainter.Application.Projects;
 
 public sealed class FlowPainterProjectDocument
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
     public const int MinimumSupportedSchemaVersion = 1;
 
     public FlowPainterProjectDocument(int schemaVersion, FlowPainterProject project)

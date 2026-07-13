@@ -3,6 +3,7 @@ using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.FlowPainting.Presets;
+using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Strokes;
@@ -36,7 +37,8 @@ public sealed class FlowPainterPresetSerializerTests
                 StrokePlanBackgroundMode.Transparent,
                 new DetailAnalysisSettings(0.2d, 0.8d, 0.3d, 2),
                 new DetailInfluenceSettings(6d, 0.4d, 1.6d, 0.5d, 1.7d),
-                new BrushSettings(BrushKind.Bristle, 0.45d, 0.2d, 0.3d, 11, 0.85d)));
+                new BrushSettings(BrushKind.Bristle, 0.45d, 0.2d, 0.3d, 11, 0.85d),
+                new SemanticAnalysisSettings(false, 0.4d, 0d, 0d, 0d, 0d, 0.6d, 0.01d, 3, 0.5d, 1, 4)));
         await using MemoryStream stream = new();
 
         await FlowPainterPresetSerializer.SerializeAsync(original, stream);
@@ -68,7 +70,7 @@ public sealed class FlowPainterPresetSerializerTests
             new FlowPainterPreset("Invalid version", new FlowPainterSettings(strokeCount: 1)),
             valid);
         string json = Encoding.UTF8.GetString(valid.ToArray())
-            .Replace("\"schemaVersion\": 3", "\"schemaVersion\": 99", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 4", "\"schemaVersion\": 99", StringComparison.Ordinal);
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes(json), writable: false);
 
         await Assert.ThrowsAsync<NotSupportedException>(
@@ -124,7 +126,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 3", "\"schemaVersion\": 2", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 4", "\"schemaVersion\": 2", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -136,6 +138,29 @@ public sealed class FlowPainterPresetSerializerTests
 
         Assert.Equal(BrushKind.SolidRound, loaded.Settings.Brush.Kind);
         Assert.Equal(BrushSettings.DefaultHardness, loaded.Settings.Brush.Hardness);
+    }
+
+    [Fact]
+    public async Task DeserializeMigratesSchemaVersionThreeWithSemanticDefaults()
+    {
+        FlowPainterPreset preset = new("M7 preset", new FlowPainterSettings(strokeCount: 1));
+        await using MemoryStream current = new();
+        await FlowPainterPresetSerializer.SerializeAsync(preset, current);
+        string json = Encoding.UTF8.GetString(current.ToArray())
+            .Replace("\"schemaVersion\": 4", "\"schemaVersion\": 3", StringComparison.Ordinal);
+        System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
+        System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON has no settings.");
+        settings.Remove("semanticAnalysis");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterPreset loaded = await FlowPainterPresetSerializer.DeserializeAsync(legacy);
+
+        Assert.True(loaded.Settings.SemanticAnalysis.Enabled);
+        Assert.Equal(
+            SemanticAnalysisSettings.DefaultOverallInfluence,
+            loaded.Settings.SemanticAnalysis.OverallInfluence);
     }
 
     [Fact]
@@ -182,5 +207,17 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal(expected.Brush.OpacityJitter, actual.Brush.OpacityJitter);
         Assert.Equal(expected.Brush.BristleCount, actual.Brush.BristleCount);
         Assert.Equal(expected.Brush.BristleSpread, actual.Brush.BristleSpread);
+        Assert.Equal(expected.SemanticAnalysis.Enabled, actual.SemanticAnalysis.Enabled);
+        Assert.Equal(expected.SemanticAnalysis.OverallInfluence, actual.SemanticAnalysis.OverallInfluence);
+        Assert.Equal(expected.SemanticAnalysis.SaliencyWeight, actual.SemanticAnalysis.SaliencyWeight);
+        Assert.Equal(expected.SemanticAnalysis.SubjectWeight, actual.SemanticAnalysis.SubjectWeight);
+        Assert.Equal(expected.SemanticAnalysis.SilhouetteWeight, actual.SemanticAnalysis.SilhouetteWeight);
+        Assert.Equal(expected.SemanticAnalysis.FocalWeight, actual.SemanticAnalysis.FocalWeight);
+        Assert.Equal(expected.SemanticAnalysis.SubjectThreshold, actual.SemanticAnalysis.SubjectThreshold);
+        Assert.Equal(expected.SemanticAnalysis.MinimumSubjectAreaRatio, actual.SemanticAnalysis.MinimumSubjectAreaRatio);
+        Assert.Equal(expected.SemanticAnalysis.MaximumSubjects, actual.SemanticAnalysis.MaximumSubjects);
+        Assert.Equal(expected.SemanticAnalysis.CenterBias, actual.SemanticAnalysis.CenterBias);
+        Assert.Equal(expected.SemanticAnalysis.SmoothingRadius, actual.SemanticAnalysis.SmoothingRadius);
+        Assert.Equal(expected.SemanticAnalysis.BoundaryRadius, actual.SemanticAnalysis.BoundaryRadius);
     }
 }

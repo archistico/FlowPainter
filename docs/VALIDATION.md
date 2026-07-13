@@ -10,25 +10,44 @@ dotnet test FlowPainter.sln -c Release --no-build --logger "console;verbosity=no
 dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 ```
 
-## M7 expected result
+## M8 expected result
 
 - restore succeeds;
 - all nine projects build;
 - build emits zero warnings and zero errors;
-- all 440 test cases pass;
+- all 496 test cases pass;
 - the Avalonia window opens;
 - source/result synchronized zoom and pan remain operational;
-- SolidRound reproduces the M6 compatibility rendering when jitter is zero;
-- SoftRound, Flat and Bristle produce visibly distinct marks;
-- equal plan, seed and brush settings produce equal raster output;
-- preview and final export use the same approved brush settings;
-- project and preset schema 3 round-trip every brush parameter;
-- schema-1 and schema-2 documents load with SolidRound compatibility defaults;
+- source/result synchronized zoom and all M7 brush families remain operational;
+- the combined detail overlay includes structural and semantic importance;
+- saliency, subject, silhouette and focal diagnostic overlays can be selected;
+- detected semantic regions can be promoted to editable manual regions;
+- equal source and semantic settings produce equal maps and regions;
+- project and preset schema 4 round-trip every brush and semantic-analysis parameter;
+- schema-1 through schema-3 documents load with explicit compatibility defaults;
 - Domain and Application contain no Avalonia, SkiaSharp or LibNoiseCore dependency.
 
-After successful validation, update M7 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
+After successful validation, update M8 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
 
 ## Validation history
+
+### 2026-07-13 — M8.2 xUnit analyzer correction
+
+The next Windows build completed all production projects but stopped in `FlowPainter.Application.Tests` with `xUnit2031`. The semantic subject-count test used `Assert.Single(collection.Where(predicate))`; M8.2 now uses the dedicated `Assert.Single(collection, predicate)` overload. No production behavior changes, analyzer severity remains unchanged, and the expected suite remains 496 cases.
+
+### 2026-07-13 — M8.1 semantic subject-kind analyzer correction
+
+The first Windows build of M8 stopped in `FlowPainter.Domain` with `CA1720` because the public enum member `SemanticSubjectKind.Object` repeated the CLR type name `Object`. M8.1 renames that member to `SceneObject` while preserving its numeric value `3`, so serialized numeric compatibility and the semantic model remain unchanged. Analyzer severity is not reduced and the expected suite remains 496 cases.
+
+### 2026-07-13 — M8 semantic importance prepared
+
+M8 introduces a deterministic local semantic-importance provider that identifies generic salient subjects, silhouettes and focal points on the analysis proxy. Separate maps can be inspected in the desktop UI and detected regions can be promoted to persistent manual focus or critical-detail regions. The provider boundary allows future local ONNX/class-aware analyzers without adding a machine-learning runtime to Domain or Application today. Project and preset schemas move to version 4 with versions 1–3 remaining readable. Fifty-six focused cases increase the expected suite from 440 to 496.
+
+Static preparation checks include C# syntax parsing, XAML/XML/JSON parsing, named-control/event resolution, schema migration review, forbidden-dependency scans and ZIP integrity. The packaging environment cannot obtain the .NET SDK, so executable validation remains assigned to the target Windows environment.
+
+### 2026-07-13 — M7.1 validated on Windows
+
+The user confirmed that M7.1 builds and works correctly. The 440-case brush-engine baseline is accepted and M7 is marked DONE.
 
 ### 2026-07-13 — M7.1 cancellation-token parameter ordering correction
 

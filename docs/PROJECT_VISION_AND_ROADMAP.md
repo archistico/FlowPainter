@@ -2,7 +2,7 @@
 
 **Document status:** living specification  
 **Last updated:** 2026-07-13  
-**Current milestone:** M7 — Deterministic brush engine  
+**Current milestone:** M8 — Semantic importance and generic subject analysis  
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -425,7 +425,7 @@ Validated on Windows with zero build errors and all 400 tests passing.
 
 ### M7 — Brush engine
 
-**Status: READY FOR VALIDATION**
+**Status: DONE**
 
 - pure Domain `BrushSettings` and `BrushKind` values;
 - Skia-specific `ISkiaBrushRenderer` strategy boundary;
@@ -437,21 +437,26 @@ Validated on Windows with zero build errors and all 400 tests passing.
 - brush-aware built-in presets and desktop controls;
 - project and preset schema 3 with schema-1/schema-2 compatibility defaults;
 - rendering and persistence tests for all built-in brush families;
-- expected suite of 440 automated cases.
+- validated suite of 440 automated cases.
 
 Raster texture masks, custom brush-tip loading, pressure curves, stamp spacing and point-wise rotation are extensions of this foundation and remain planned after the initial procedural engine is validated.
 
 ### M8 — Semantic importance and subject analysis
 
-**Status: PLANNED**
+**Status: READY FOR VALIDATION**
 
-- pluggable saliency and subject-analysis contracts;
-- complete subject and figure masks, not only facial landmarks;
-- person, animal, object and focal-area support where providers allow;
-- face, eye and mouth refinement as optional sub-signals;
-- silhouette and subject/background boundary weighting;
-- confidence visualization and manual override;
-- local/offline provider evaluation before dependency selection.
+- pure Domain semantic roles, subject kinds and normalized regions;
+- replaceable `ISemanticImportanceAnalyzer` Application contract;
+- deterministic built-in saliency and generic subject segmentation;
+- separate subject, silhouette, focal and combined importance maps;
+- structural/semantic composition before manual-region adjustment;
+- confidence and role visualization with selectable diagnostic overlays;
+- promotion of detected subjects/focal points to editable manual regions;
+- project and preset schema 4 with schema-1/schema-2/schema-3 defaults;
+- no bundled machine-learning runtime or model in the first provider;
+- expected suite of 496 automated cases.
+
+The built-in provider identifies generic subject-like regions and must not be presented as a person/animal/object classifier. Class-aware local providers remain a compatible later extension through the same contracts.
 
 ### M9 — Geometric primitive engine
 

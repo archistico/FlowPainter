@@ -24,6 +24,10 @@ Use pure in-memory data:
 
 - generation request validation;
 - structural detail analysis;
+- semantic settings, progress and result invariants;
+- deterministic saliency, generic-subject, silhouette and focal maps;
+- structural/semantic map composition and cancellation;
+- semantic provider-independent persistence defaults;
 - edge, colour-contrast and smoothing behaviour;
 - automatic/manual detail composition;
 - viewport-to-normalized coordinate conversion;
@@ -147,12 +151,27 @@ dotnet test FlowPainter.sln -c Release --collect:"XPlat Code Coverage"
 
 ## Current suite
 
-M7 contains 440 cases:
+M8 contains 496 cases:
 
-- 71 Domain;
-- 317 Application;
+- 80 Domain;
+- 364 Application;
 - 24 Imaging.Skia;
 - 28 Rendering.Skia.
+
+
+## M8 semantic-importance tests
+
+The semantic suite verifies:
+
+- settings, progress and semantic-region invariants;
+- empty maps for disabled or uniform analysis;
+- deterministic generic-subject, silhouette and focal maps;
+- subject-count limits and stable provider identifiers;
+- structural/semantic composition without mutating source maps;
+- cancellation and progress stage ordering;
+- schema-4 project/preset round trips and schema-3 defaults.
+
+Synthetic fixtures deliberately test generic importance rather than claiming trained class recognition. Future model-backed providers must add their own model/version-specific fixtures and tolerances.
 
 ## M7 brush-rendering tests
 

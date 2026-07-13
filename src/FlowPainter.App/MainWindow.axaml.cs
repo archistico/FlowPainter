@@ -20,6 +20,7 @@ using FlowPainter.Application.FlowPainting.Presets;
 using FlowPainter.Application.Interaction;
 using FlowPainter.Application.Images;
 using FlowPainter.Application.Projects;
+using FlowPainter.Application.Semantics;
 using FlowPainter.Application.Workflow;
 using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Detail;
@@ -27,6 +28,7 @@ using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Geometry;
 using FlowPainter.Domain.Images;
 using FlowPainter.Domain.Strokes;
+using FlowPainter.Domain.Semantics;
 using FlowPainter.Imaging.Skia.Images;
 using FlowPainter.Rendering.Skia.Detail;
 using FlowPainter.Rendering.Skia.Strokes;
@@ -45,6 +47,7 @@ public partial class MainWindow : Window
     private readonly SkiaPngEncoder _pngEncoder = new();
     private readonly SkiaImageEncoder _imageEncoder = new();
     private readonly ImageDetailAnalyzer _detailAnalyzer = new();
+    private readonly HeuristicSemanticImportanceAnalyzer _semanticAnalyzer = new();
     private readonly DetailMapOverlayRenderer _detailOverlayRenderer = new();
     private readonly FlowPainterPlanner _planner = new(new DefaultFlowFieldFactory());
     private readonly FlowPainterWorkspace _workspace = new(InitialSeed, BuiltInFlowPainterPresets.All[0].Settings);
@@ -68,6 +71,7 @@ public partial class MainWindow : Window
     private readonly ComboBox _backgroundComboBox;
     private readonly ComboBox _brushKindComboBox;
     private readonly ComboBox _detailIntentComboBox;
+    private readonly ComboBox _semanticOverlayModeComboBox;
     private readonly TextBox _presetNameTextBox;
     private readonly TextBox _projectNameTextBox;
     private readonly TextBox _finalMaximumDimensionTextBox;
@@ -101,13 +105,26 @@ public partial class MainWindow : Window
     private readonly TextBox _detailedWidthTextBox;
     private readonly TextBox _backgroundWidthTextBox;
     private readonly TextBox _regionStrengthTextBox;
+    private readonly TextBox _semanticInfluenceTextBox;
+    private readonly TextBox _semanticSaliencyWeightTextBox;
+    private readonly TextBox _semanticSubjectWeightTextBox;
+    private readonly TextBox _semanticSilhouetteWeightTextBox;
+    private readonly TextBox _semanticFocalWeightTextBox;
+    private readonly TextBox _semanticThresholdTextBox;
+    private readonly TextBox _semanticMinimumAreaTextBox;
+    private readonly TextBox _semanticMaximumSubjectsTextBox;
+    private readonly TextBox _semanticCenterBiasTextBox;
+    private readonly TextBox _semanticSmoothingRadiusTextBox;
+    private readonly TextBox _semanticBoundaryRadiusTextBox;
     private readonly ListBox _regionListBox;
+    private readonly ListBox _semanticRegionListBox;
     private readonly TextBox _regionLabelTextBox;
     private readonly TextBox _regionLeftTextBox;
     private readonly TextBox _regionTopTextBox;
     private readonly TextBox _regionWidthTextBox;
     private readonly TextBox _regionHeightTextBox;
     private readonly CheckBox _showDetailOverlayCheckBox;
+    private readonly CheckBox _enableSemanticAnalysisCheckBox;
     private readonly Canvas _selectionCanvas;
     private readonly Grid _sourceViewportHost;
     private readonly Grid _sourceViewportContent;
@@ -122,6 +139,7 @@ public partial class MainWindow : Window
     private readonly TextBlock _finalOutputInfoText;
     private readonly TextBlock _finalMemoryInfoText;
     private readonly TextBlock _regionCountText;
+    private readonly TextBlock _semanticRegionCountText;
     private readonly TextBlock _statusText;
     private readonly ProgressBar _operationProgressBar;
 
@@ -130,12 +148,15 @@ public partial class MainWindow : Window
     private SkiaImage? _renderedImage;
     private Bitmap? _sourcePreviewBitmap;
     private Bitmap? _detailOverlayPreviewBitmap;
+    private Bitmap? _semanticOverlayPreviewBitmap;
     private Bitmap? _resultPreviewBitmap;
     private DetailMap? _automaticDetailMap;
     private DetailMap? _composedDetailMap;
+    private SemanticAnalysisResult? _semanticAnalysisResult;
     private StrokePlan? _previewStrokePlan;
     private BrushSettings? _previewBrushSettings;
     private DetailAnalysisSettings? _activeDetailAnalysisSettings;
+    private SemanticAnalysisSettings? _activeSemanticAnalysisSettings;
     private readonly SynchronizedImageViewportState _imageViewportState = new();
     private NormalizedPoint? _selectionStart;
     private NormalizedPoint? _selectionCurrent;
@@ -167,6 +188,7 @@ public partial class MainWindow : Window
         _backgroundComboBox = FindRequiredControl<ComboBox>("BackgroundComboBox");
         _brushKindComboBox = FindRequiredControl<ComboBox>("BrushKindComboBox");
         _detailIntentComboBox = FindRequiredControl<ComboBox>("DetailIntentComboBox");
+        _semanticOverlayModeComboBox = FindRequiredControl<ComboBox>("SemanticOverlayModeComboBox");
         _presetNameTextBox = FindRequiredControl<TextBox>("PresetNameTextBox");
         _projectNameTextBox = FindRequiredControl<TextBox>("ProjectNameTextBox");
         _finalMaximumDimensionTextBox = FindRequiredControl<TextBox>("FinalMaximumDimensionTextBox");
@@ -200,13 +222,26 @@ public partial class MainWindow : Window
         _detailedWidthTextBox = FindRequiredControl<TextBox>("DetailedWidthTextBox");
         _backgroundWidthTextBox = FindRequiredControl<TextBox>("BackgroundWidthTextBox");
         _regionStrengthTextBox = FindRequiredControl<TextBox>("RegionStrengthTextBox");
+        _semanticInfluenceTextBox = FindRequiredControl<TextBox>("SemanticInfluenceTextBox");
+        _semanticSaliencyWeightTextBox = FindRequiredControl<TextBox>("SemanticSaliencyWeightTextBox");
+        _semanticSubjectWeightTextBox = FindRequiredControl<TextBox>("SemanticSubjectWeightTextBox");
+        _semanticSilhouetteWeightTextBox = FindRequiredControl<TextBox>("SemanticSilhouetteWeightTextBox");
+        _semanticFocalWeightTextBox = FindRequiredControl<TextBox>("SemanticFocalWeightTextBox");
+        _semanticThresholdTextBox = FindRequiredControl<TextBox>("SemanticThresholdTextBox");
+        _semanticMinimumAreaTextBox = FindRequiredControl<TextBox>("SemanticMinimumAreaTextBox");
+        _semanticMaximumSubjectsTextBox = FindRequiredControl<TextBox>("SemanticMaximumSubjectsTextBox");
+        _semanticCenterBiasTextBox = FindRequiredControl<TextBox>("SemanticCenterBiasTextBox");
+        _semanticSmoothingRadiusTextBox = FindRequiredControl<TextBox>("SemanticSmoothingRadiusTextBox");
+        _semanticBoundaryRadiusTextBox = FindRequiredControl<TextBox>("SemanticBoundaryRadiusTextBox");
         _regionListBox = FindRequiredControl<ListBox>("RegionListBox");
+        _semanticRegionListBox = FindRequiredControl<ListBox>("SemanticRegionListBox");
         _regionLabelTextBox = FindRequiredControl<TextBox>("RegionLabelTextBox");
         _regionLeftTextBox = FindRequiredControl<TextBox>("RegionLeftTextBox");
         _regionTopTextBox = FindRequiredControl<TextBox>("RegionTopTextBox");
         _regionWidthTextBox = FindRequiredControl<TextBox>("RegionWidthTextBox");
         _regionHeightTextBox = FindRequiredControl<TextBox>("RegionHeightTextBox");
         _showDetailOverlayCheckBox = FindRequiredControl<CheckBox>("ShowDetailOverlayCheckBox");
+        _enableSemanticAnalysisCheckBox = FindRequiredControl<CheckBox>("EnableSemanticAnalysisCheckBox");
         _selectionCanvas = FindRequiredControl<Canvas>("SelectionCanvas");
         _sourceViewportHost = FindRequiredControl<Grid>("SourceViewportHost");
         _sourceViewportContent = FindRequiredControl<Grid>("SourceViewportContent");
@@ -221,6 +256,7 @@ public partial class MainWindow : Window
         _finalOutputInfoText = FindRequiredControl<TextBlock>("FinalOutputInfoText");
         _finalMemoryInfoText = FindRequiredControl<TextBlock>("FinalMemoryInfoText");
         _regionCountText = FindRequiredControl<TextBlock>("RegionCountText");
+        _semanticRegionCountText = FindRequiredControl<TextBlock>("SemanticRegionCountText");
         _statusText = FindRequiredControl<TextBlock>("StatusText");
         _operationProgressBar = FindRequiredControl<ProgressBar>("OperationProgressBar");
 
@@ -233,6 +269,8 @@ public partial class MainWindow : Window
         _backgroundComboBox.ItemsSource = Enum.GetValues<StrokePlanBackgroundMode>();
         _brushKindComboBox.ItemsSource = Enum.GetValues<BrushKind>();
         _detailIntentComboBox.ItemsSource = Enum.GetValues<DetailRegionIntent>();
+        _semanticOverlayModeComboBox.ItemsSource = Enum.GetValues<SemanticOverlayMode>();
+        _semanticOverlayModeComboBox.SelectedItem = SemanticOverlayMode.CombinedDetail;
         _detailIntentComboBox.SelectedItem = DetailRegionIntent.IncreaseDetail;
         _regionStrengthTextBox.Text = "80";
         _projectNameTextBox.Text = "Untitled project";
@@ -334,12 +372,13 @@ public partial class MainWindow : Window
                 previewMaximumDimension,
                 progress,
                 cancellationToken).ConfigureAwait(true);
-            DetailMap automaticMap = await AnalyzeDetailMapAsync(
+            AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                 proxy,
                 project.Settings.DetailAnalysis,
+                project.Settings.SemanticAnalysis,
                 cancellationToken).ConfigureAwait(true);
             DetailMap composedMap = DetailMapComposer.ApplyRegions(
-                automaticMap,
+                maps.Automatic,
                 project.DetailRegions,
                 cancellationToken);
             overlay = await _detailOverlayRenderer.RenderAsync(
@@ -350,10 +389,12 @@ public partial class MainWindow : Window
             ReplaceSource(
                 loaded,
                 proxy,
-                automaticMap,
+                maps.Automatic,
+                composedMap,
+                maps.Semantic,
                 project.Settings.DetailAnalysis,
+                project.Settings.SemanticAnalysis,
                 overlay);
-            _composedDetailMap = composedMap;
             adopted = true;
 
             _currentSourcePath = sourcePath;
@@ -516,19 +557,28 @@ public partial class MainWindow : Window
                     previewSettings.MaximumDimension,
                     progress,
                     cancellationToken).ConfigureAwait(true);
-                DetailMap automaticMap = await AnalyzeDetailMapAsync(
+                SemanticAnalysisSettings semanticSettings = ReadSemanticAnalysisSettings();
+                AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                     proxy,
                     detailSettings,
+                    semanticSettings,
                     cancellationToken).ConfigureAwait(true);
                 DetailMap composedMap = DetailMapComposer.ApplyRegions(
-                    automaticMap,
+                    maps.Automatic,
                     _workspace.Regions.Regions,
                     cancellationToken);
                 overlay = await _detailOverlayRenderer.RenderAsync(
                     proxy,
                     composedMap,
                     cancellationToken: cancellationToken).ConfigureAwait(true);
-                ReplaceProxy(proxy, automaticMap, composedMap, detailSettings, overlay);
+                ReplaceProxy(
+                    proxy,
+                    maps.Automatic,
+                    composedMap,
+                    maps.Semantic,
+                    detailSettings,
+                    semanticSettings,
+                    overlay);
                 adopted = true;
                 _statusText.Text = $"Preview rebuilt at {previewSettings.MaximumDimension:N0}px maximum dimension.";
             }
@@ -615,20 +665,24 @@ public partial class MainWindow : Window
                     previewSettings.MaximumDimension,
                     progress,
                     cancellationToken).ConfigureAwait(true);
-                DetailMap automaticMap = await AnalyzeDetailMapAsync(
+                AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                     proxy,
                     detailSettings,
+                    settings.SemanticAnalysis,
                     cancellationToken).ConfigureAwait(true);
                 overlay = await _detailOverlayRenderer.RenderAsync(
                     proxy,
-                    automaticMap,
+                    maps.Automatic,
                     cancellationToken: cancellationToken).ConfigureAwait(true);
 
                 ReplaceSource(
                     loaded,
                     proxy,
-                    automaticMap,
+                    maps.Automatic,
+                    maps.Automatic,
+                    maps.Semantic,
                     detailSettings,
+                    settings.SemanticAnalysis,
                     overlay);
                 adopted = true;
 
@@ -644,7 +698,7 @@ public partial class MainWindow : Window
                 _saveProjectButton.IsEnabled = true;
                 _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
                 UpdateFinalOutputEstimate();
-                _statusText.Text = "Image loaded and structural detail map analyzed. Drag on the image to refine focus.";
+                _statusText.Text = "Image loaded and structural/semantic importance analyzed. Promote a detected region or drag on the image to refine focus.";
             }
             finally
             {
@@ -694,6 +748,7 @@ public partial class MainWindow : Window
             DetailMap detailMap = await EnsureDetailMapAsync(
                 proxyImage,
                 settings.DetailAnalysis,
+                settings.SemanticAnalysis,
                 cancellationToken).ConfigureAwait(true);
             StrokeDensityMap densityMap = StrokeDensityMap.CreateUniform(
                 proxyImage.Size,
@@ -870,10 +925,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        DetailAnalysisSettings settings;
+        DetailAnalysisSettings detailSettings;
+        SemanticAnalysisSettings semanticSettings;
         try
         {
-            settings = ReadDetailAnalysisSettings();
+            detailSettings = ReadDetailAnalysisSettings();
+            semanticSettings = ReadSemanticAnalysisSettings();
         }
         catch (FormatException exception)
         {
@@ -888,15 +945,19 @@ public partial class MainWindow : Window
 
         await RunAnalyzingDetailAsync(async cancellationToken =>
         {
-            DetailMap automatic = await AnalyzeDetailMapAsync(
+            AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                 proxy,
-                settings,
+                detailSettings,
+                semanticSettings,
                 cancellationToken).ConfigureAwait(true);
-            await ReplaceAnalyzedDetailMapAsync(
-                automatic,
-                settings,
+            await ReplaceAnalyzedDetailMapsAsync(
+                maps,
+                detailSettings,
+                semanticSettings,
                 cancellationToken).ConfigureAwait(true);
-            _statusText.Text = "Structural detail map reanalyzed and manual regions reapplied.";
+            _statusText.Text = semanticSettings.Enabled
+                ? $"Structural and semantic maps updated. {maps.Semantic.Regions.Count:N0} semantic regions found."
+                : "Structural detail map updated; semantic analysis is disabled.";
         }).ConfigureAwait(true);
     }
 
@@ -932,7 +993,82 @@ public partial class MainWindow : Window
 
     private void DetailOverlayVisibilityClick(object? sender, RoutedEventArgs e)
     {
+        _ = sender;
+        _ = e;
         UpdateSourcePreviewSelection();
+        RefreshRegionVisuals();
+    }
+
+
+    private async void SemanticOverlayModeChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        SemanticOverlayMode mode = ReadSelectedSemanticOverlayMode();
+        if (mode == SemanticOverlayMode.CombinedDetail
+            || _showDetailOverlayCheckBox.IsChecked != true)
+        {
+            UpdateSourcePreviewSelection();
+            return;
+        }
+
+        SkiaImage? proxy = _proxyImage;
+        SemanticAnalysisResult? semantic = _semanticAnalysisResult;
+        if (proxy is null || semantic is null || _operationCancellation is not null)
+        {
+            UpdateSourcePreviewSelection();
+            return;
+        }
+
+        await RunAnalyzingDetailAsync(async cancellationToken =>
+        {
+            DetailMap map = SelectSemanticOverlayMap(semantic, mode);
+            using SkiaImage overlay = await _detailOverlayRenderer.RenderAsync(
+                proxy,
+                map,
+                cancellationToken: cancellationToken).ConfigureAwait(true);
+            ReplaceSemanticOverlayPreview(overlay);
+            _statusText.Text = $"Showing {mode} overlay from {semantic.ProviderId}.";
+        }).ConfigureAwait(true);
+    }
+
+    private async void PromoteSemanticFocusClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await PromoteSelectedSemanticRegionAsync(0.85d, "focus").ConfigureAwait(true);
+    }
+
+    private async void PromoteSemanticCriticalClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await PromoteSelectedSemanticRegionAsync(1d, "critical detail").ConfigureAwait(true);
+    }
+
+    private async Task PromoteSelectedSemanticRegionAsync(
+        double strength,
+        string roleLabel)
+    {
+        SemanticRegion? region = GetSelectedSemanticRegion();
+        if (region is null || _automaticDetailMap is null)
+        {
+            _statusText.Text = "Select an analyzed semantic region first.";
+            return;
+        }
+
+        string label = $"{region.Label ?? region.Id} · {roleLabel}";
+        DetailRegion manual = _workspace.AddRegion(
+            region.Bounds,
+            strength,
+            DetailRegionIntent.IncreaseDetail,
+            label);
+        await RunAnalyzingDetailAsync(async cancellationToken =>
+        {
+            await RecomposeDetailMapAsync(cancellationToken).ConfigureAwait(true);
+            RefreshRegionVisuals(manual.Id);
+            _statusText.Text = $"Promoted '{region.Label ?? region.Id}' to manual {roleLabel}.";
+        }).ConfigureAwait(true);
     }
 
     private void ViewportPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -1577,6 +1713,18 @@ public partial class MainWindow : Window
         _backgroundLengthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundLengthMultiplier * 100d);
         _detailedWidthTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedWidthMultiplier * 100d);
         _backgroundWidthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundWidthMultiplier * 100d);
+        _enableSemanticAnalysisCheckBox.IsChecked = settings.SemanticAnalysis.Enabled;
+        _semanticInfluenceTextBox.Text = FormatDouble(settings.SemanticAnalysis.OverallInfluence * 100d);
+        _semanticSaliencyWeightTextBox.Text = FormatDouble(settings.SemanticAnalysis.SaliencyWeight);
+        _semanticSubjectWeightTextBox.Text = FormatDouble(settings.SemanticAnalysis.SubjectWeight);
+        _semanticSilhouetteWeightTextBox.Text = FormatDouble(settings.SemanticAnalysis.SilhouetteWeight);
+        _semanticFocalWeightTextBox.Text = FormatDouble(settings.SemanticAnalysis.FocalWeight);
+        _semanticThresholdTextBox.Text = FormatDouble(settings.SemanticAnalysis.SubjectThreshold * 100d);
+        _semanticMinimumAreaTextBox.Text = FormatDouble(settings.SemanticAnalysis.MinimumSubjectAreaRatio * 100d);
+        _semanticMaximumSubjectsTextBox.Text = settings.SemanticAnalysis.MaximumSubjects.ToString(CultureInfo.CurrentCulture);
+        _semanticCenterBiasTextBox.Text = FormatDouble(settings.SemanticAnalysis.CenterBias);
+        _semanticSmoothingRadiusTextBox.Text = settings.SemanticAnalysis.SmoothingRadius.ToString(CultureInfo.CurrentCulture);
+        _semanticBoundaryRadiusTextBox.Text = settings.SemanticAnalysis.BoundaryRadius.ToString(CultureInfo.CurrentCulture);
     }
 
     private void ApplyFinalRenderSettings(FinalRenderSettings settings)
@@ -1715,7 +1863,8 @@ public partial class MainWindow : Window
             backgroundMode,
             ReadDetailAnalysisSettings(),
             ReadDetailInfluenceSettings(),
-            brush);
+            brush,
+            ReadSemanticAnalysisSettings());
     }
 
     private DetailAnalysisSettings ReadDetailAnalysisSettings()
@@ -1737,6 +1886,23 @@ public partial class MainWindow : Window
             ParseDouble(_backgroundWidthTextBox, "Background width") / 100d);
     }
 
+    private SemanticAnalysisSettings ReadSemanticAnalysisSettings()
+    {
+        return new SemanticAnalysisSettings(
+            _enableSemanticAnalysisCheckBox.IsChecked == true,
+            ParseDouble(_semanticInfluenceTextBox, "Semantic influence") / 100d,
+            ParseDouble(_semanticSaliencyWeightTextBox, "Saliency weight"),
+            ParseDouble(_semanticSubjectWeightTextBox, "Subject weight"),
+            ParseDouble(_semanticSilhouetteWeightTextBox, "Silhouette weight"),
+            ParseDouble(_semanticFocalWeightTextBox, "Focal weight"),
+            ParseDouble(_semanticThresholdTextBox, "Subject threshold") / 100d,
+            ParseDouble(_semanticMinimumAreaTextBox, "Minimum subject area") / 100d,
+            ParseInteger(_semanticMaximumSubjectsTextBox, "Maximum subjects"),
+            ParseDouble(_semanticCenterBiasTextBox, "Center bias"),
+            ParseInteger(_semanticSmoothingRadiusTextBox, "Semantic smoothing"),
+            ParseInteger(_semanticBoundaryRadiusTextBox, "Silhouette radius"));
+    }
+
     private DetailRegionIntent ReadSelectedDetailIntent()
     {
         return _detailIntentComboBox.SelectedItem is DetailRegionIntent intent
@@ -1753,13 +1919,13 @@ public partial class MainWindow : Window
         {
             string message = value.Stage switch
             {
-                DetailAnalysisStage.Preparing => "Preparing detail analysis...",
+                DetailAnalysisStage.Preparing => "Preparing structural analysis...",
                 DetailAnalysisStage.AnalyzingStructure => $"Analyzing image structure {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                DetailAnalysisStage.Smoothing => $"Smoothing detail map {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                DetailAnalysisStage.Completed => "Detail analysis completed.",
-                _ => "Analyzing detail..."
+                DetailAnalysisStage.Smoothing => $"Smoothing structural map {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                DetailAnalysisStage.Completed => "Structural analysis completed.",
+                _ => "Analyzing structure..."
             };
-            ReportOperationProgress(value.Fraction, message);
+            ReportOperationProgress(value.Fraction * 0.42d, message);
         });
 
         return await _detailAnalyzer.AnalyzeAsync(
@@ -1769,37 +1935,92 @@ public partial class MainWindow : Window
             cancellationToken).ConfigureAwait(true);
     }
 
+    private async Task<SemanticAnalysisResult> AnalyzeSemanticImportanceAsync(
+        SkiaImage proxy,
+        SemanticAnalysisSettings settings,
+        CancellationToken cancellationToken)
+    {
+        Progress<SemanticAnalysisProgress> progress = new(value =>
+        {
+            string message = value.Stage switch
+            {
+                SemanticAnalysisStage.Preparing => "Preparing semantic importance analysis...",
+                SemanticAnalysisStage.ComputingSaliency => $"Computing saliency {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                SemanticAnalysisStage.SegmentingSubjects => "Segmenting generic subjects...",
+                SemanticAnalysisStage.BuildingSilhouettes => $"Building subject silhouettes {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                SemanticAnalysisStage.CombiningMaps => "Combining semantic maps...",
+                SemanticAnalysisStage.Completed => "Semantic importance analysis completed.",
+                _ => "Analyzing semantic importance..."
+            };
+            ReportOperationProgress(0.42d + (value.Fraction * 0.5d), message);
+        });
+
+        return await _semanticAnalyzer.AnalyzeAsync(
+            proxy,
+            settings,
+            progress,
+            cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task<AutomaticAnalysisMaps> AnalyzeAutomaticMapsAsync(
+        SkiaImage proxy,
+        DetailAnalysisSettings detailSettings,
+        SemanticAnalysisSettings semanticSettings,
+        CancellationToken cancellationToken)
+    {
+        DetailMap structural = await AnalyzeDetailMapAsync(
+            proxy,
+            detailSettings,
+            cancellationToken).ConfigureAwait(true);
+        SemanticAnalysisResult semantic = await AnalyzeSemanticImportanceAsync(
+            proxy,
+            semanticSettings,
+            cancellationToken).ConfigureAwait(true);
+        DetailMap automatic = SemanticDetailMapComposer.Combine(
+            structural,
+            semantic,
+            semanticSettings,
+            cancellationToken);
+        ReportOperationProgress(0.94d, "Automatic importance maps combined.");
+        return new AutomaticAnalysisMaps(structural, semantic, automatic);
+    }
+
     private async Task<DetailMap> EnsureDetailMapAsync(
         SkiaImage proxy,
-        DetailAnalysisSettings settings,
+        DetailAnalysisSettings detailSettings,
+        SemanticAnalysisSettings semanticSettings,
         CancellationToken cancellationToken)
     {
         if (_automaticDetailMap is not null
             && _composedDetailMap is not null
-            && DetailAnalysisSettingsEqual(_activeDetailAnalysisSettings, settings))
+            && DetailAnalysisSettingsEqual(_activeDetailAnalysisSettings, detailSettings)
+            && SemanticAnalysisSettingsEqual(_activeSemanticAnalysisSettings, semanticSettings))
         {
             return _composedDetailMap;
         }
 
-        DetailMap automatic = await AnalyzeDetailMapAsync(
+        AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
             proxy,
-            settings,
+            detailSettings,
+            semanticSettings,
             cancellationToken).ConfigureAwait(true);
-        await ReplaceAnalyzedDetailMapAsync(
-            automatic,
-            settings,
+        await ReplaceAnalyzedDetailMapsAsync(
+            maps,
+            detailSettings,
+            semanticSettings,
             cancellationToken).ConfigureAwait(true);
         return _composedDetailMap
             ?? throw new InvalidOperationException("The composed detail map was not created.");
     }
 
-    private async Task ReplaceAnalyzedDetailMapAsync(
-        DetailMap automatic,
-        DetailAnalysisSettings settings,
+    private async Task ReplaceAnalyzedDetailMapsAsync(
+        AutomaticAnalysisMaps maps,
+        DetailAnalysisSettings detailSettings,
+        SemanticAnalysisSettings semanticSettings,
         CancellationToken cancellationToken)
     {
         DetailMap composed = DetailMapComposer.ApplyRegions(
-            automatic,
+            maps.Automatic,
             _workspace.Regions.Regions,
             cancellationToken);
         SkiaImage proxy = _proxyImage
@@ -1809,8 +2030,12 @@ public partial class MainWindow : Window
             composed,
             cancellationToken: cancellationToken).ConfigureAwait(true);
         ReplaceDetailVisualization(composed, overlay);
-        _automaticDetailMap = automatic;
-        _activeDetailAnalysisSettings = settings;
+        _automaticDetailMap = maps.Automatic;
+        _semanticAnalysisResult = maps.Semantic;
+        _activeDetailAnalysisSettings = detailSettings;
+        _activeSemanticAnalysisSettings = semanticSettings;
+        ClearSemanticOverlayPreview();
+        RefreshSemanticRegions();
     }
 
     private async Task RecomposeDetailMapAsync(CancellationToken cancellationToken)
@@ -1971,7 +2196,10 @@ public partial class MainWindow : Window
         SkiaImage source,
         SkiaImage proxy,
         DetailMap automaticDetailMap,
-        DetailAnalysisSettings analysisSettings,
+        DetailMap composedDetailMap,
+        SemanticAnalysisResult semanticAnalysis,
+        DetailAnalysisSettings detailSettings,
+        SemanticAnalysisSettings semanticSettings,
         SkiaImage detailOverlay)
     {
         Bitmap? preview = null;
@@ -1981,6 +2209,7 @@ public partial class MainWindow : Window
         SkiaImage? previousRendered = _renderedImage;
         Bitmap? previousSourcePreview = _sourcePreviewBitmap;
         Bitmap? previousOverlayPreview = _detailOverlayPreviewBitmap;
+        Bitmap? previousSemanticOverlayPreview = _semanticOverlayPreviewBitmap;
         Bitmap? previousResultPreview = _resultPreviewBitmap;
         bool adopted = false;
 
@@ -1997,22 +2226,24 @@ public partial class MainWindow : Window
             _previewBrushSettings = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
+            _semanticOverlayPreviewBitmap = null;
             _resultPreviewBitmap = null;
             _automaticDetailMap = automaticDetailMap;
-            _composedDetailMap = automaticDetailMap;
-            _activeDetailAnalysisSettings = analysisSettings;
+            _composedDetailMap = composedDetailMap;
+            _semanticAnalysisResult = semanticAnalysis;
+            _activeDetailAnalysisSettings = detailSettings;
+            _activeSemanticAnalysisSettings = semanticSettings;
             _workspace.ClearRegions();
             _imageViewportState.Reset();
 
-            _sourceImageView.Source = _showDetailOverlayCheckBox.IsChecked == true
-                ? overlayPreview
-                : preview;
+            UpdateSourcePreviewSelection();
             _resultImageView.Source = null;
             _resultInfoText.Text = "Not rendered";
             _saveButton.IsEnabled = false;
             _exportFinalButton.IsEnabled = false;
             UpdateFinalOutputEstimate();
             ApplySynchronizedViewportTransforms();
+            RefreshSemanticRegions();
             RefreshRegionVisuals();
         }
         finally
@@ -2024,6 +2255,7 @@ public partial class MainWindow : Window
                 previousRendered?.Dispose();
                 previousSourcePreview?.Dispose();
                 previousOverlayPreview?.Dispose();
+                previousSemanticOverlayPreview?.Dispose();
                 previousResultPreview?.Dispose();
             }
             else
@@ -2038,7 +2270,9 @@ public partial class MainWindow : Window
         SkiaImage proxy,
         DetailMap automaticDetailMap,
         DetailMap composedDetailMap,
-        DetailAnalysisSettings analysisSettings,
+        SemanticAnalysisResult semanticAnalysis,
+        DetailAnalysisSettings detailSettings,
+        SemanticAnalysisSettings semanticSettings,
         SkiaImage detailOverlay)
     {
         Bitmap? preview = null;
@@ -2047,6 +2281,7 @@ public partial class MainWindow : Window
         SkiaImage? previousRendered = _renderedImage;
         Bitmap? previousSourcePreview = _sourcePreviewBitmap;
         Bitmap? previousOverlayPreview = _detailOverlayPreviewBitmap;
+        Bitmap? previousSemanticOverlayPreview = _semanticOverlayPreviewBitmap;
         Bitmap? previousResultPreview = _resultPreviewBitmap;
         bool adopted = false;
 
@@ -2062,10 +2297,13 @@ public partial class MainWindow : Window
             _previewBrushSettings = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
+            _semanticOverlayPreviewBitmap = null;
             _resultPreviewBitmap = null;
             _automaticDetailMap = automaticDetailMap;
             _composedDetailMap = composedDetailMap;
-            _activeDetailAnalysisSettings = analysisSettings;
+            _semanticAnalysisResult = semanticAnalysis;
+            _activeDetailAnalysisSettings = detailSettings;
+            _activeSemanticAnalysisSettings = semanticSettings;
 
             UpdateSourcePreviewSelection();
             _resultImageView.Source = null;
@@ -2079,6 +2317,7 @@ public partial class MainWindow : Window
 
             UpdateFinalOutputEstimate();
             ApplySynchronizedViewportTransforms();
+            RefreshSemanticRegions();
             RefreshRegionVisuals();
         }
         finally
@@ -2089,6 +2328,7 @@ public partial class MainWindow : Window
                 previousRendered?.Dispose();
                 previousSourcePreview?.Dispose();
                 previousOverlayPreview?.Dispose();
+                previousSemanticOverlayPreview?.Dispose();
                 previousResultPreview?.Dispose();
             }
             else
@@ -2127,6 +2367,39 @@ public partial class MainWindow : Window
                 preview.Dispose();
             }
         }
+    }
+
+    private void ReplaceSemanticOverlayPreview(SkiaImage semanticOverlay)
+    {
+        Bitmap preview = CreateAvaloniaBitmap(semanticOverlay);
+        Bitmap? previousPreview = _semanticOverlayPreviewBitmap;
+        bool adopted = false;
+
+        try
+        {
+            adopted = true;
+            _semanticOverlayPreviewBitmap = preview;
+            UpdateSourcePreviewSelection();
+        }
+        finally
+        {
+            if (adopted)
+            {
+                previousPreview?.Dispose();
+            }
+            else
+            {
+                preview.Dispose();
+            }
+        }
+    }
+
+    private void ClearSemanticOverlayPreview()
+    {
+        Bitmap? previousPreview = _semanticOverlayPreviewBitmap;
+        _semanticOverlayPreviewBitmap = null;
+        previousPreview?.Dispose();
+        UpdateSourcePreviewSelection();
     }
 
     private void ReplaceRendered(SkiaImage rendered, StrokePlan plan, BrushSettings brush)
@@ -2182,10 +2455,16 @@ public partial class MainWindow : Window
 
     private void UpdateSourcePreviewSelection()
     {
-        _sourceImageView.Source = _showDetailOverlayCheckBox.IsChecked == true
-            && _detailOverlayPreviewBitmap is not null
-                ? _detailOverlayPreviewBitmap
-                : _sourcePreviewBitmap;
+        if (_showDetailOverlayCheckBox.IsChecked != true)
+        {
+            _sourceImageView.Source = _sourcePreviewBitmap;
+            return;
+        }
+
+        SemanticOverlayMode mode = ReadSelectedSemanticOverlayMode();
+        _sourceImageView.Source = mode == SemanticOverlayMode.CombinedDetail
+            ? _detailOverlayPreviewBitmap ?? _sourcePreviewBitmap
+            : _semanticOverlayPreviewBitmap ?? _detailOverlayPreviewBitmap ?? _sourcePreviewBitmap;
     }
 
     private void RefreshRegionVisuals(string? selectedRegionId = null)
@@ -2195,6 +2474,15 @@ public partial class MainWindow : Window
         UniformImageViewport? viewport = CreateSourceViewport();
         if (viewport is not null)
         {
+            if (_showDetailOverlayCheckBox.IsChecked == true
+                && _semanticAnalysisResult is not null)
+            {
+                foreach (SemanticRegion semanticRegion in _semanticAnalysisResult.Regions)
+                {
+                    AddSemanticRegionRectangle(viewport, semanticRegion);
+                }
+            }
+
             foreach (DetailRegion region in _workspace.Regions.Regions)
             {
                 AddRegionRectangle(viewport, region.Bounds, region.Intent, active: false);
@@ -2217,6 +2505,38 @@ public partial class MainWindow : Window
             ? "1 manual region"
             : $"{_workspace.Regions.Count:N0} manual regions";
         RefreshRegionList(selectedRegionId);
+    }
+
+    private void RefreshSemanticRegions()
+    {
+        SemanticRegion[] regions = _semanticAnalysisResult?.Regions.ToArray() ?? [];
+        SemanticRegionDisplayItem[] items = regions
+            .Select(region => new SemanticRegionDisplayItem(
+                region.Id,
+                $"{region.Label ?? region.Id} · {region.Role} · {region.Confidence:P0}"))
+            .ToArray();
+        _semanticRegionListBox.ItemsSource = items;
+        _semanticRegionListBox.SelectedIndex = items.Length > 0 ? 0 : -1;
+        _semanticRegionCountText.Text = items.Length switch
+        {
+            0 => "No semantic subjects detected",
+            1 => "1 semantic region detected",
+            _ => $"{items.Length:N0} semantic regions detected"
+        };
+    }
+
+    private SemanticRegion? GetSelectedSemanticRegion()
+    {
+        if (_semanticRegionListBox.SelectedItem is not SemanticRegionDisplayItem item
+            || _semanticAnalysisResult is null)
+        {
+            return null;
+        }
+
+        return _semanticAnalysisResult.Regions.FirstOrDefault(region => string.Equals(
+            region.Id,
+            item.Id,
+            StringComparison.OrdinalIgnoreCase));
     }
 
     private void RefreshRegionList(string? selectedRegionId)
@@ -2287,6 +2607,35 @@ public partial class MainWindow : Window
         _regionTopTextBox.Text = string.Empty;
         _regionWidthTextBox.Text = string.Empty;
         _regionHeightTextBox.Text = string.Empty;
+    }
+
+    private void AddSemanticRegionRectangle(
+        UniformImageViewport viewport,
+        SemanticRegion region)
+    {
+        ViewportRect mapped = viewport.MapToViewport(region.Bounds);
+        Color color = region.Role switch
+        {
+            SemanticRegionRole.Subject => Color.FromRgb(255, 196, 64),
+            SemanticRegionRole.FocalArea => Color.FromRgb(255, 102, 180),
+            SemanticRegionRole.CriticalDetail => Color.FromRgb(255, 64, 64),
+            SemanticRegionRole.SupportingArea => Color.FromRgb(130, 180, 255),
+            SemanticRegionRole.Background => Color.FromRgb(90, 130, 170),
+            SemanticRegionRole.Ignore => Color.FromRgb(140, 140, 140),
+            _ => Color.FromRgb(255, 196, 64)
+        };
+        Rectangle rectangle = new()
+        {
+            Width = mapped.Width,
+            Height = mapped.Height,
+            Stroke = new SolidColorBrush(color),
+            StrokeThickness = 1.5d / _imageViewportState.Zoom,
+            Fill = new SolidColorBrush(Color.FromArgb(18, color.R, color.G, color.B)),
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(rectangle, mapped.X);
+        Canvas.SetTop(rectangle, mapped.Y);
+        _selectionCanvas.Children.Add(rectangle);
     }
 
     private void AddRegionRectangle(
@@ -2365,6 +2714,30 @@ public partial class MainWindow : Window
             : DetailRegionIntent.IncreaseDetail;
     }
 
+
+    private SemanticOverlayMode ReadSelectedSemanticOverlayMode()
+    {
+        return _semanticOverlayModeComboBox.SelectedItem is SemanticOverlayMode mode
+            ? mode
+            : SemanticOverlayMode.CombinedDetail;
+    }
+
+    private static DetailMap SelectSemanticOverlayMap(
+        SemanticAnalysisResult semantic,
+        SemanticOverlayMode mode)
+    {
+        return mode switch
+        {
+            SemanticOverlayMode.SemanticImportance => semantic.ImportanceMap,
+            SemanticOverlayMode.Saliency => semantic.SaliencyMap,
+            SemanticOverlayMode.Subjects => semantic.SubjectMap,
+            SemanticOverlayMode.Silhouettes => semantic.SilhouetteMap,
+            SemanticOverlayMode.FocalAreas => semantic.FocalMap,
+            SemanticOverlayMode.CombinedDetail => semantic.ImportanceMap,
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown semantic overlay mode.")
+        };
+    }
+
     private static bool DetailAnalysisSettingsEqual(
         DetailAnalysisSettings? first,
         DetailAnalysisSettings second)
@@ -2374,6 +2747,26 @@ public partial class MainWindow : Window
             && first.EdgeWeight == second.EdgeWeight
             && first.ContrastWeight == second.ContrastWeight
             && first.SmoothingRadius == second.SmoothingRadius;
+    }
+
+
+    private static bool SemanticAnalysisSettingsEqual(
+        SemanticAnalysisSettings? first,
+        SemanticAnalysisSettings second)
+    {
+        return first is not null
+            && first.Enabled == second.Enabled
+            && first.OverallInfluence == second.OverallInfluence
+            && first.SaliencyWeight == second.SaliencyWeight
+            && first.SubjectWeight == second.SubjectWeight
+            && first.SilhouetteWeight == second.SilhouetteWeight
+            && first.FocalWeight == second.FocalWeight
+            && first.SubjectThreshold == second.SubjectThreshold
+            && first.MinimumSubjectAreaRatio == second.MinimumSubjectAreaRatio
+            && first.MaximumSubjects == second.MaximumSubjects
+            && first.CenterBias == second.CenterBias
+            && first.SmoothingRadius == second.SmoothingRadius
+            && first.BoundaryRadius == second.BoundaryRadius;
     }
 
     private static Bitmap CreateAvaloniaBitmap(SkiaImage image)
@@ -2446,6 +2839,20 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private sealed record SemanticRegionDisplayItem(string Id, string DisplayText)
+    {
+        public override string ToString()
+        {
+            return DisplayText;
+        }
+    }
+
+    private sealed record AutomaticAnalysisMaps(
+        DetailMap Structural,
+        SemanticAnalysisResult Semantic,
+        DetailMap Automatic);
+
     private T FindRequiredControl<T>(string name)
         where T : Control
     {
@@ -2470,6 +2877,7 @@ public partial class MainWindow : Window
         _renderedImage?.Dispose();
         _sourcePreviewBitmap?.Dispose();
         _detailOverlayPreviewBitmap?.Dispose();
+        _semanticOverlayPreviewBitmap?.Dispose();
         _resultPreviewBitmap?.Dispose();
 
         _sourceImage = null;
@@ -2477,12 +2885,15 @@ public partial class MainWindow : Window
         _renderedImage = null;
         _sourcePreviewBitmap = null;
         _detailOverlayPreviewBitmap = null;
+        _semanticOverlayPreviewBitmap = null;
         _resultPreviewBitmap = null;
         _automaticDetailMap = null;
         _composedDetailMap = null;
+        _semanticAnalysisResult = null;
         _previewStrokePlan = null;
         _previewBrushSettings = null;
         _activeDetailAnalysisSettings = null;
+        _activeSemanticAnalysisSettings = null;
         _imageViewportState.Reset();
     }
 }

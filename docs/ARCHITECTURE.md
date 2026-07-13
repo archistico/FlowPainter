@@ -42,6 +42,8 @@ Contains orchestration and policies that operate on domain objects:
 - generation requests;
 - explicit memory estimation;
 - `IDetailMapAnalyzer` and deterministic structural analysis;
+- `ISemanticImportanceAnalyzer`, semantic maps and normalized semantic regions;
+- provider-independent composition of structural, subject, silhouette and focal importance;
 - composition of automatic/manual detail information;
 - normalized viewport coordinate mapping;
 - characterized legacy density and planning behaviour;
@@ -92,7 +94,9 @@ Open image or project
     ↓
 Resolve source and create selected-quality proxy
     ↓
-Analyze structural importance
+Analyze structural and semantic importance
+    ↓
+Inspect/promote generic subjects and focal regions
     ↓
 Create/edit ordered normalized manual regions
     ↓
@@ -137,7 +141,7 @@ Reduce:   value × (1 - strength)
 
 This keeps values in `[0, 1]` and makes repeated adjustments deterministic.
 
-M4's `ImageDetailAnalyzer` is structural, not semantic. It calculates edge and local RGB-contrast signals on the proxy, then optionally smooths the map. Future face, landmark, saliency and segmentation providers must contribute through explicit Application contracts and must not be embedded in the planner.
+M4's `ImageDetailAnalyzer` calculates edge and local RGB-contrast signals. M8 adds `ISemanticImportanceAnalyzer`, whose built-in deterministic provider produces generic saliency, subject, silhouette and focal maps. Structural and semantic maps are composed before manual adjustments. Future class-aware or model-backed providers must return the same Application result contract and must not be embedded in the planner.
 
 ## Detail-aware stroke policy
 
@@ -179,7 +183,11 @@ The 10,000 × 10,000 limit is enforced by `ImageSize` and metadata validation in
 ### Flow engine
 
 ```text
-IDetailMapAnalyzer + DetailRegion[]
+IDetailMapAnalyzer + ISemanticImportanceAnalyzer
+            ↓
+Structural + semantic importance
+            ↓
+        DetailRegion[]
             ↓
         DetailMap
             ↓

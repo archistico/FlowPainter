@@ -3,7 +3,7 @@ namespace FlowPainter.Application.FlowPainting.Presets;
 public sealed class FlowPainterPresetDocument
 {
     public const int MinimumSupportedSchemaVersion = 1;
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     public FlowPainterPresetDocument(int schemaVersion, FlowPainterPreset preset)
     {

@@ -1,6 +1,7 @@
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Strokes;
 
@@ -21,6 +22,7 @@ public sealed class FlowPainterSettingsTests
         Assert.NotNull(settings.Field);
         Assert.NotNull(settings.DetailAnalysis);
         Assert.NotNull(settings.DetailInfluence);
+        Assert.NotNull(settings.SemanticAnalysis);
         Assert.Equal(BrushKind.SolidRound, settings.Brush.Kind);
     }
 
@@ -101,6 +103,16 @@ public sealed class FlowPainterSettingsTests
         FlowPainterSettings settings = new(brush: brush);
 
         Assert.Same(brush, settings.Brush);
+    }
+
+    [Fact]
+    public void ConstructorRetainsProvidedSemanticSettings()
+    {
+        SemanticAnalysisSettings semantic = new(overallInfluence: 0.45d, maximumSubjects: 3);
+
+        FlowPainterSettings settings = new(semanticAnalysis: semantic);
+
+        Assert.Same(semantic, settings.SemanticAnalysis);
     }
 
     [Fact]

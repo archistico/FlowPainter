@@ -5,6 +5,7 @@ using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.Projects;
+using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.FlowFields;
@@ -33,7 +34,20 @@ public sealed class FlowPainterProjectSerializerTests
             backgroundMode: StrokePlanBackgroundMode.Transparent,
             detailAnalysis: new DetailAnalysisSettings(0.2d, 0.9d, 0.6d, 3),
             detailInfluence: new DetailInfluenceSettings(5.5d, 0.4d, 1.6d, 0.55d, 1.7d),
-            brush: new BrushSettings(BrushKind.Flat, 0.7d, 0.12d, 0.2d, 5, 0.65d));
+            brush: new BrushSettings(BrushKind.Flat, 0.7d, 0.12d, 0.2d, 5, 0.65d),
+            semanticAnalysis: new SemanticAnalysisSettings(
+                enabled: true,
+                overallInfluence: 0.55d,
+                saliencyWeight: 0.4d,
+                subjectWeight: 1.2d,
+                silhouetteWeight: 1.1d,
+                focalWeight: 1.4d,
+                subjectThreshold: 0.45d,
+                minimumSubjectAreaRatio: 0.008d,
+                maximumSubjects: 4,
+                centerBias: 0.6d,
+                smoothingRadius: 1,
+                boundaryRadius: 3));
         DetailRegion region = new(
             "manual-0007",
             new NormalizedRect(0.1d, 0.2d, 0.4d, 0.7d),
@@ -247,6 +261,29 @@ public sealed class FlowPainterProjectSerializerTests
     }
 
     [Fact]
+    public async Task DeserializeMigratesSchemaVersionThreeWithSemanticDefaults()
+    {
+        FlowPainterProject project = CreateProject();
+        await using MemoryStream current = new();
+        await FlowPainterProjectSerializer.SerializeAsync(project, current);
+        current.Position = 0L;
+        JsonObject root = (await JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON is empty.");
+        root["schemaVersion"] = 3;
+        JsonObject settings = root["project"]?["settings"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON has no settings.");
+        settings.Remove("semanticAnalysis");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterProject loaded = await FlowPainterProjectSerializer.DeserializeAsync(legacy);
+
+        Assert.True(loaded.Settings.SemanticAnalysis.Enabled);
+        Assert.Equal(
+            SemanticAnalysisSettings.DefaultOverallInfluence,
+            loaded.Settings.SemanticAnalysis.OverallInfluence);
+    }
+
+    [Fact]
     public async Task DeserializeRejectsUnsupportedSchemaVersion()
     {
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes("{\"schemaVersion\":99,\"project\":{}}"));
@@ -314,6 +351,18 @@ public sealed class FlowPainterProjectSerializerTests
         Assert.Equal(expected.Brush.OpacityJitter, actual.Brush.OpacityJitter);
         Assert.Equal(expected.Brush.BristleCount, actual.Brush.BristleCount);
         Assert.Equal(expected.Brush.BristleSpread, actual.Brush.BristleSpread);
+        Assert.Equal(expected.SemanticAnalysis.Enabled, actual.SemanticAnalysis.Enabled);
+        Assert.Equal(expected.SemanticAnalysis.OverallInfluence, actual.SemanticAnalysis.OverallInfluence);
+        Assert.Equal(expected.SemanticAnalysis.SaliencyWeight, actual.SemanticAnalysis.SaliencyWeight);
+        Assert.Equal(expected.SemanticAnalysis.SubjectWeight, actual.SemanticAnalysis.SubjectWeight);
+        Assert.Equal(expected.SemanticAnalysis.SilhouetteWeight, actual.SemanticAnalysis.SilhouetteWeight);
+        Assert.Equal(expected.SemanticAnalysis.FocalWeight, actual.SemanticAnalysis.FocalWeight);
+        Assert.Equal(expected.SemanticAnalysis.SubjectThreshold, actual.SemanticAnalysis.SubjectThreshold);
+        Assert.Equal(expected.SemanticAnalysis.MinimumSubjectAreaRatio, actual.SemanticAnalysis.MinimumSubjectAreaRatio);
+        Assert.Equal(expected.SemanticAnalysis.MaximumSubjects, actual.SemanticAnalysis.MaximumSubjects);
+        Assert.Equal(expected.SemanticAnalysis.CenterBias, actual.SemanticAnalysis.CenterBias);
+        Assert.Equal(expected.SemanticAnalysis.SmoothingRadius, actual.SemanticAnalysis.SmoothingRadius);
+        Assert.Equal(expected.SemanticAnalysis.BoundaryRadius, actual.SemanticAnalysis.BoundaryRadius);
     }
 
     private static FlowPainterProject CreateProject()
