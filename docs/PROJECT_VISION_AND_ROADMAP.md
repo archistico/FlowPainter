@@ -2,7 +2,7 @@
 
 **Document status:** living specification  
 **Last updated:** 2026-07-13  
-**Current milestone:** M6 — High-resolution final rendering  
+**Current milestone:** M6.1 — Synchronized comparison viewport  
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -397,7 +397,7 @@ completed with zero warnings and errors and all 360 test cases passing. The smok
 
 ### M6 — High-resolution final rendering
 
-**Status: READY FOR VALIDATION**
+**Status: DONE**
 
 - persist final maximum dimension, PNG/JPEG format and JPEG quality;
 - derive exact output dimensions from source aspect ratio up to 10,000 × 10,000;
@@ -408,6 +408,20 @@ completed with zero warnings and errors and all 360 test cases passing. The smok
 - support cancellation and combined rendering/encoding progress;
 - migrate schema-1 projects to schema 2 defaults;
 - validate with 400 automated cases.
+
+Validated on Windows with zero build errors and all 400 tests passing.
+
+### M6.1 — Synchronized comparison viewport
+
+**Status: READY FOR VALIDATION**
+
+- zoom source and rendered preview with the mouse wheel;
+- pan either panel with the middle mouse button;
+- maintain one shared normalized center and zoom factor;
+- preserve cursor anchoring while zooming;
+- keep manual detail-region selection aligned under viewport transforms;
+- preserve the view when rebuilding or rerendering, and reset it for a new source;
+- validate with 410 automated cases.
 
 ### M7 — Brush engine
 

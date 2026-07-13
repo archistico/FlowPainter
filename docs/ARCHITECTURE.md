@@ -238,3 +238,8 @@ Proxy analysis → StrokePlan → preview bitmap
 `FinalRenderSettings` lives in Application and is persisted in project schema 2. `RasterImageFormat` is a Domain-level format value shared by Application and Imaging without reversing dependencies. `SkiaImageEncoder` owns native PNG/JPEG encoding; JPEG explicitly composes transparent pixels over white.
 
 The original background is considered compatible when fitting it to the plan's proxy maximum dimension reproduces `StrokePlan.SourceSize`. This avoids strict floating-point aspect comparisons while still rejecting unrelated images.
+
+
+## Synchronized comparison viewport
+
+`SynchronizedImageViewportState` is an Application-layer interaction model shared by the source and rendered-preview controls. It stores a normalized image center and zoom, computes a separate affine transform for each control size, inverse-maps source-selection input, and contains no Avalonia types. The desktop composition root applies the resulting matrices through top-left-origin `MatrixTransform` instances. This keeps navigation synchronized without modifying image data, render plans or project persistence.

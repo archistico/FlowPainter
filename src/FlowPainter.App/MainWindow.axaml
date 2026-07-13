@@ -13,7 +13,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="3">
                     <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="White" Text="FlowPainter" />
-                    <TextBlock Foreground="#AEB4BF" Text="M6 · high-resolution final rendering and PNG/JPEG export" />
+                    <TextBlock Foreground="#AEB4BF" Text="M6.1 · synchronized source and preview navigation" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <Button x:Name="OpenProjectButton" Padding="16,9" Click="OpenProjectClick" Content="Open project" />
@@ -232,15 +232,21 @@
                         <TextBlock x:Name="SourceInfoText" Grid.Column="1" Foreground="#AEB4BF" Text="No image" />
                     </Grid>
                     <Border Grid.Row="1" Background="#111318" CornerRadius="7" ClipToBounds="True">
-                        <Grid>
-                            <Image x:Name="SourceImageView" Stretch="Uniform" />
-                            <Canvas x:Name="SelectionCanvas"
-                                    Background="Transparent"
-                                    IsEnabled="False"
-                                    PointerPressed="SourcePointerPressed"
-                                    PointerMoved="SourcePointerMoved"
-                                    PointerReleased="SourcePointerReleased"
-                                    SizeChanged="SourceCanvasSizeChanged" />
+                        <Grid x:Name="SourceViewportHost"
+                              Background="Transparent"
+                              PointerPressed="ViewportPointerPressed"
+                              PointerMoved="ViewportPointerMoved"
+                              PointerReleased="ViewportPointerReleased"
+                              PointerWheelChanged="ViewportPointerWheelChanged"
+                              SizeChanged="ViewportHostSizeChanged"
+                              ToolTip.Tip="Mouse wheel: zoom · Middle button: pan · View synchronized with rendered preview">
+                            <Grid x:Name="SourceViewportContent" IsHitTestVisible="False" RenderTransformOrigin="0%,0%">
+                                <Image x:Name="SourceImageView" Stretch="Uniform" />
+                                <Canvas x:Name="SelectionCanvas"
+                                        Background="Transparent"
+                                        IsEnabled="False"
+                                        SizeChanged="SourceCanvasSizeChanged" />
+                            </Grid>
                         </Grid>
                     </Border>
                 </Grid>
@@ -253,7 +259,18 @@
                         <TextBlock x:Name="ResultInfoText" Grid.Column="1" Foreground="#AEB4BF" Text="Not rendered" />
                     </Grid>
                     <Border Grid.Row="1" Background="#111318" CornerRadius="7" ClipToBounds="True">
-                        <Image x:Name="ResultImageView" Stretch="Uniform" />
+                        <Grid x:Name="ResultViewportHost"
+                              Background="Transparent"
+                              PointerPressed="ViewportPointerPressed"
+                              PointerMoved="ViewportPointerMoved"
+                              PointerReleased="ViewportPointerReleased"
+                              PointerWheelChanged="ViewportPointerWheelChanged"
+                              SizeChanged="ViewportHostSizeChanged"
+                              ToolTip.Tip="Mouse wheel: zoom · Middle button: pan · View synchronized with source">
+                            <Grid x:Name="ResultViewportContent" IsHitTestVisible="False" RenderTransformOrigin="0%,0%">
+                                <Image x:Name="ResultImageView" Stretch="Uniform" />
+                            </Grid>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>

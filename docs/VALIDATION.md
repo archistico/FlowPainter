@@ -10,13 +10,16 @@ dotnet test FlowPainter.sln -c Release --no-build --logger "console;verbosity=no
 dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 ```
 
-## M6 expected result
+## M6.1 expected result
 
 - restore succeeds;
 - all nine projects build;
 - build emits zero warnings and zero errors;
-- all 400 test cases pass;
+- all 410 test cases pass;
 - the Avalonia window opens;
+- the mouse wheel zooms source and rendered preview together;
+- middle-button drag pans both panels together;
+- manual source-region selection remains aligned after navigation;
 - an image can be loaded and a deterministic preview rendered;
 - final settings accept a maximum dimension up to 10,000 and preserve source aspect ratio;
 - the memory estimate updates from source, proxy, preview, overlay and final output sizes;
@@ -28,9 +31,17 @@ dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 - schema-1 M5 projects load with M6 defaults;
 - Domain and Application contain no Avalonia, SkiaSharp or LibNoiseCore dependency.
 
-After successful validation, update M6 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
+After successful validation, update M6.1 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
 
 ## Validation history
+
+### 2026-07-13 — M6.1 synchronized viewport prepared
+
+The source/detail-map panel and rendered-preview panel now share a normalized viewport state. Wheel zoom is anchored at the pointer, middle-button pan is clamped to the image, and the same center/zoom is applied independently to both control sizes. Source-region selection inverse-maps pointer coordinates through the active transform. Ten focused tests increase the expected suite from 400 to 410 cases.
+
+### 2026-07-13 — M6 validated on Windows
+
+The user confirmed that M6 builds successfully and all 400 automated tests pass. M6 is marked DONE.
 
 ### 2026-07-13 — M6 prepared
 

@@ -9,11 +9,11 @@ The planned engine combines:
 - automatic and manually edited detail maps;
 - hybrid rendering in which broad background masses and important subjects receive different artistic treatment.
 
-## Current milestone: M6
+## Current milestone: M6.1
 
-M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved stroke plan for high-resolution PNG/JPEG export.
+M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved stroke plan for high-resolution PNG/JPEG export. M6.1 adds synchronized zoom and pan for direct source/result comparison.
 
-Implemented through M6:
+Implemented through M6.1:
 
 - local PNG, JPEG, WebP and BMP loading;
 - hard decoded-size limit of 10,000 × 10,000 RGBA;
@@ -39,9 +39,10 @@ Implemented through M6:
 - structured application workspace, operation and validation state;
 - final output up to 10,000 × 10,000 with preserved aspect ratio;
 - cached preview `StrokePlan` reused unchanged for final rasterization;
+- synchronized source/result zoom with the mouse wheel and pan with the middle mouse button;
 - known-RGBA memory estimate and risk indication before allocation;
 - project schema 2 with migration from M5 schema 1;
-- 400 automated test cases across Domain, Application, Imaging and Rendering.
+- 410 automated test cases across Domain, Application, Imaging and Rendering.
 
 M5 structural analysis does not yet recognize semantic objects. Face, eye, mouth and subject-aware analyzers will plug into the same `IDetailMapAnalyzer` and `DetailMap` pipeline in a later milestone.
 
@@ -112,3 +113,4 @@ Milestone-specific documents:
 - [`docs/M4_DETAIL_MAP_AND_MANUAL_REGIONS.md`](docs/M4_DETAIL_MAP_AND_MANUAL_REGIONS.md)
 - [`docs/M5_APPLICATION_WORKFLOW_AND_PROJECTS.md`](docs/M5_APPLICATION_WORKFLOW_AND_PROJECTS.md)
 - [`docs/M6_HIGH_RESOLUTION_EXPORT.md`](docs/M6_HIGH_RESOLUTION_EXPORT.md)
+- [`docs/M6_1_SYNCHRONIZED_VIEWPORT.md`](docs/M6_1_SYNCHRONIZED_VIEWPORT.md)

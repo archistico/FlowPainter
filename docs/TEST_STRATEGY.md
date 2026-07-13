@@ -147,12 +147,16 @@ dotnet test FlowPainter.sln -c Release --collect:"XPlat Code Coverage"
 
 ## Current suite
 
-M6 contains 400 cases:
+M6.1 contains 410 cases:
 
 - 55 Domain;
-- 303 Application;
+- 313 Application;
 - 24 Imaging.Skia;
 - 18 Rendering.Skia.
+
+## M6.1 synchronized-viewport tests
+
+The Application suite also verifies cursor-anchored zoom, normalized shared centers, pan clamping, reset behavior and coordinate conversion under the active transform. UI smoke testing confirms wheel and middle-button input in both panels.
 
 ## M6 final-render tests
 

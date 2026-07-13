@@ -102,6 +102,12 @@ public partial class MainWindow : Window
     private readonly TextBox _regionHeightTextBox;
     private readonly CheckBox _showDetailOverlayCheckBox;
     private readonly Canvas _selectionCanvas;
+    private readonly Grid _sourceViewportHost;
+    private readonly Grid _sourceViewportContent;
+    private readonly Grid _resultViewportHost;
+    private readonly Grid _resultViewportContent;
+    private readonly MatrixTransform _sourceViewportTransform = new();
+    private readonly MatrixTransform _resultViewportTransform = new();
     private readonly Image _sourceImageView;
     private readonly Image _resultImageView;
     private readonly TextBlock _sourceInfoText;
@@ -122,8 +128,11 @@ public partial class MainWindow : Window
     private DetailMap? _composedDetailMap;
     private StrokePlan? _previewStrokePlan;
     private DetailAnalysisSettings? _activeDetailAnalysisSettings;
+    private readonly SynchronizedImageViewportState _imageViewportState = new();
     private NormalizedPoint? _selectionStart;
     private NormalizedPoint? _selectionCurrent;
+    private Grid? _panViewportHost;
+    private Point _panLastPosition;
     private CancellationTokenSource? _operationCancellation;
     private string? _currentSourcePath;
     private string? _currentProjectPath;
@@ -185,6 +194,12 @@ public partial class MainWindow : Window
         _regionHeightTextBox = FindRequiredControl<TextBox>("RegionHeightTextBox");
         _showDetailOverlayCheckBox = FindRequiredControl<CheckBox>("ShowDetailOverlayCheckBox");
         _selectionCanvas = FindRequiredControl<Canvas>("SelectionCanvas");
+        _sourceViewportHost = FindRequiredControl<Grid>("SourceViewportHost");
+        _sourceViewportContent = FindRequiredControl<Grid>("SourceViewportContent");
+        _resultViewportHost = FindRequiredControl<Grid>("ResultViewportHost");
+        _resultViewportContent = FindRequiredControl<Grid>("ResultViewportContent");
+        _sourceViewportContent.RenderTransform = _sourceViewportTransform;
+        _resultViewportContent.RenderTransform = _resultViewportTransform;
         _sourceImageView = FindRequiredControl<Image>("SourceImageView");
         _resultImageView = FindRequiredControl<Image>("ResultImageView");
         _sourceInfoText = FindRequiredControl<TextBlock>("SourceInfoText");
@@ -902,27 +917,40 @@ public partial class MainWindow : Window
         UpdateSourcePreviewSelection();
     }
 
-    private void SourcePointerPressed(object? sender, PointerPressedEventArgs e)
+    private void ViewportPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (_proxyImage is null || _composedDetailMap is null || _operationCancellation is not null)
+        if (sender is not Grid viewportHost || _proxyImage is null)
         {
             return;
         }
 
-        PointerPoint pointerPoint = e.GetCurrentPoint(_selectionCanvas);
-        if (!pointerPoint.Properties.IsLeftButtonPressed)
+        PointerPoint pointerPoint = e.GetCurrentPoint(viewportHost);
+        if (pointerPoint.Properties.IsMiddleButtonPressed)
+        {
+            _panViewportHost = viewportHost;
+            _panLastPosition = e.GetPosition(viewportHost);
+            e.Pointer.Capture(viewportHost);
+            e.Handled = true;
+            return;
+        }
+
+        if (!ReferenceEquals(viewportHost, _sourceViewportHost)
+            || !pointerPoint.Properties.IsLeftButtonPressed
+            || _composedDetailMap is null
+            || _operationCancellation is not null)
         {
             return;
         }
 
-        UniformImageViewport? viewport = CreateSourceViewport();
+        UniformImageViewport? viewport = CreateViewport(viewportHost);
         if (viewport is null)
         {
             return;
         }
 
-        Point position = e.GetPosition(_selectionCanvas);
-        if (!viewport.TryMapToNormalized(
+        Point position = e.GetPosition(viewportHost);
+        if (!_imageViewportState.TryMapToNormalized(
+            viewport,
             new ViewportPoint(position.X, position.Y),
             out NormalizedPoint normalized))
         {
@@ -931,33 +959,66 @@ public partial class MainWindow : Window
 
         _selectionStart = normalized;
         _selectionCurrent = normalized;
-        e.Pointer.Capture(_selectionCanvas);
+        e.Pointer.Capture(viewportHost);
         e.Handled = true;
         RefreshRegionVisuals();
     }
 
-    private void SourcePointerMoved(object? sender, PointerEventArgs e)
+    private void ViewportPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (_selectionStart is null)
+        if (_panViewportHost is Grid panHost)
+        {
+            UniformImageViewport? viewport = CreateViewport(panHost);
+            if (viewport is null)
+            {
+                return;
+            }
+
+            Point position = e.GetPosition(panHost);
+            _imageViewportState.PanBy(
+                viewport,
+                position.X - _panLastPosition.X,
+                position.Y - _panLastPosition.Y);
+            _panLastPosition = position;
+            ApplySynchronizedViewportTransforms();
+            e.Handled = true;
+            return;
+        }
+
+        if (_selectionStart is null || !ReferenceEquals(sender, _sourceViewportHost))
         {
             return;
         }
 
-        UniformImageViewport? viewport = CreateSourceViewport();
-        if (viewport is null)
+        UniformImageViewport? sourceViewport = CreateSourceViewport();
+        if (sourceViewport is null)
         {
             return;
         }
 
-        Point position = e.GetPosition(_selectionCanvas);
-        _selectionCurrent = viewport.MapClampedToNormalized(
-            new ViewportPoint(position.X, position.Y));
+        Point sourcePosition = e.GetPosition(_sourceViewportHost);
+        _selectionCurrent = _imageViewportState.MapClampedToNormalized(
+            sourceViewport,
+            new ViewportPoint(sourcePosition.X, sourcePosition.Y));
         e.Handled = true;
         RefreshRegionVisuals();
     }
 
-    private async void SourcePointerReleased(object? sender, PointerReleasedEventArgs e)
+    private async void ViewportPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_panViewportHost is not null)
+        {
+            _panViewportHost = null;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (!ReferenceEquals(sender, _sourceViewportHost) || _selectionStart is null)
+        {
+            return;
+        }
+
         NormalizedPoint? start = _selectionStart;
         NormalizedPoint? end = _selectionCurrent;
         _selectionStart = null;
@@ -1017,6 +1078,38 @@ public partial class MainWindow : Window
             await RecomposeDetailMapAsync(cancellationToken).ConfigureAwait(true);
             _statusText.Text = "Manual detail region added. Render the preview to apply it to the strokes.";
         }).ConfigureAwait(true);
+    }
+
+    private void ViewportPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (sender is not Grid viewportHost || _proxyImage is null || _selectionStart is not null)
+        {
+            return;
+        }
+
+        UniformImageViewport? viewport = CreateViewport(viewportHost);
+        if (viewport is null)
+        {
+            return;
+        }
+
+        Point position = e.GetPosition(viewportHost);
+        _imageViewportState.ZoomAt(
+            viewport,
+            new ViewportPoint(position.X, position.Y),
+            e.Delta.Y);
+        ApplySynchronizedViewportTransforms();
+        RefreshRegionVisuals();
+        e.Handled = true;
+    }
+
+    private void ViewportHostSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        ApplySynchronizedViewportTransforms();
+        if (ReferenceEquals(sender, _sourceViewportHost))
+        {
+            RefreshRegionVisuals();
+        }
     }
 
     private void SourceCanvasSizeChanged(object? sender, SizeChangedEventArgs e)
@@ -1873,6 +1966,7 @@ public partial class MainWindow : Window
             _composedDetailMap = automaticDetailMap;
             _activeDetailAnalysisSettings = analysisSettings;
             _workspace.ClearRegions();
+            _imageViewportState.Reset();
 
             _sourceImageView.Source = _showDetailOverlayCheckBox.IsChecked == true
                 ? overlayPreview
@@ -1882,6 +1976,7 @@ public partial class MainWindow : Window
             _saveButton.IsEnabled = false;
             _exportFinalButton.IsEnabled = false;
             UpdateFinalOutputEstimate();
+            ApplySynchronizedViewportTransforms();
             RefreshRegionVisuals();
         }
         finally
@@ -1946,6 +2041,7 @@ public partial class MainWindow : Window
             }
 
             UpdateFinalOutputEstimate();
+            ApplySynchronizedViewportTransforms();
             RefreshRegionVisuals();
         }
         finally
@@ -2012,6 +2108,7 @@ public partial class MainWindow : Window
             _resultPreviewBitmap = preview;
             _resultImageView.Source = preview;
             UpdateFinalOutputEstimate();
+            ApplySynchronizedViewportTransforms();
         }
         finally
         {
@@ -2167,7 +2264,7 @@ public partial class MainWindow : Window
             Width = mapped.Width,
             Height = mapped.Height,
             Stroke = new SolidColorBrush(color),
-            StrokeThickness = active ? 3d : 2d,
+            StrokeThickness = (active ? 3d : 2d) / _imageViewportState.Zoom,
             Fill = new SolidColorBrush(Color.FromArgb(active ? (byte)55 : (byte)32, color.R, color.G, color.B)),
             IsHitTestVisible = false
         };
@@ -2178,15 +2275,47 @@ public partial class MainWindow : Window
 
     private UniformImageViewport? CreateSourceViewport()
     {
+        return CreateViewport(_sourceViewportHost);
+    }
+
+    private UniformImageViewport? CreateViewport(Grid viewportHost)
+    {
         SkiaImage? proxy = _proxyImage;
-        double width = _selectionCanvas.Bounds.Width;
-        double height = _selectionCanvas.Bounds.Height;
+        double width = viewportHost.Bounds.Width;
+        double height = viewportHost.Bounds.Height;
         if (proxy is null || width <= 0d || height <= 0d)
         {
             return null;
         }
 
         return new UniformImageViewport(proxy.Size, width, height);
+    }
+
+    private void ApplySynchronizedViewportTransforms()
+    {
+        ApplyViewportTransform(_sourceViewportHost, _sourceViewportTransform);
+        ApplyViewportTransform(_resultViewportHost, _resultViewportTransform);
+    }
+
+    private void ApplyViewportTransform(
+        Grid viewportHost,
+        MatrixTransform transform)
+    {
+        UniformImageViewport? viewport = CreateViewport(viewportHost);
+        if (viewport is null)
+        {
+            transform.Matrix = Matrix.Identity;
+            return;
+        }
+
+        ImageViewportTransform viewportTransform = _imageViewportState.GetTransform(viewport);
+        transform.Matrix = new Matrix(
+            viewportTransform.Scale,
+            0d,
+            0d,
+            viewportTransform.Scale,
+            viewportTransform.TranslationX,
+            viewportTransform.TranslationY);
     }
 
     private DetailRegionIntent ReadSelectedDetailIntentOrDefault()
@@ -2313,5 +2442,6 @@ public partial class MainWindow : Window
         _composedDetailMap = null;
         _previewStrokePlan = null;
         _activeDetailAnalysisSettings = null;
+        _imageViewportState.Reset();
     }
 }
