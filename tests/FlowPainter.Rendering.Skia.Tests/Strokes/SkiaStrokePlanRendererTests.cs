@@ -100,6 +100,18 @@ public sealed class SkiaStrokePlanRendererTests
     }
 
     [Fact]
+    public async Task RenderAsyncAcceptsOriginalBackgroundThatRecreatesPlanProxy()
+    {
+        StrokePlan plan = CreatePlan(new ImageSize(512, 341), [], StrokePlanBackgroundMode.SourceImage);
+        using SkiaImage source = await RendererTestImageFactory.LoadAsync(1000, 667, (_, _) => SKColors.Black);
+        SkiaStrokePlanRenderer renderer = new();
+
+        using SkiaImage result = await renderer.RenderAsync(plan, new ImageSize(500, 333), source);
+
+        Assert.Equal(new ImageSize(500, 333), result.Size);
+    }
+
+    [Fact]
     public async Task RenderAsyncRejectsBackgroundWithDifferentAspectRatio()
     {
         StrokePlan plan = CreatePlan(new ImageSize(10, 10), [], StrokePlanBackgroundMode.SourceImage);

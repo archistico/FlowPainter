@@ -46,7 +46,9 @@ Use very small synthetic images generated in memory:
 - cancellation and progress ordering;
 - aspect-ratio-preserving proxies;
 - independent copy ownership;
-- PNG round trips;
+- PNG and JPEG round trips;
+- JPEG transparency flattening;
+- format-specific progress, quality validation and output truncation;
 - disposed-wrapper rejection.
 
 ### Rendering integration tests
@@ -120,7 +122,7 @@ Long-running leak detection will be added to the controlled performance suite; r
 
 ## High-resolution validation
 
-Routine tests use small synthetic fixtures. Dedicated slower tests will validate:
+Routine tests use small synthetic fixtures. M6 automated tests validate estimates and representative independent output sizes. Dedicated slower tests will later validate:
 
 - rejection above 10,000 × 10,000;
 - correct byte estimates at the limit;
@@ -145,26 +147,25 @@ dotnet test FlowPainter.sln -c Release --collect:"XPlat Code Coverage"
 
 ## Current suite
 
-M5 contains 360 cases:
+M6 contains 400 cases:
 
 - 55 Domain;
-- 275 Application;
-- 13 Imaging.Skia;
-- 17 Rendering.Skia.
+- 303 Application;
+- 24 Imaging.Skia;
+- 18 Rendering.Skia.
 
+## M6 final-render tests
 
-## M5 project and workspace tests
+Tests now cover:
 
-Application tests now cover:
+- final dimension and JPEG-quality validation;
+- aspect-preserving upscaling and downscaling;
+- known RGBA peak-memory accounting and risk bands;
+- project schema-1 migration and schema-2 final-output round trips;
+- workspace dirty state for final-output changes;
+- PNG and JPEG encoder output, cancellation, progress and truncation;
+- white composition for transparent JPEG output;
+- original-source compatibility with integer-rounded proxy plan dimensions;
+- reuse of normalized renderer geometry at independent output dimensions.
 
-- preview-quality dimensions and aspect-ratio fitting;
-- project construction, copied/read-only region collections and duplicate identifiers;
-- project JSON round trips, truncation, cancellation and schema rejection;
-- relative/absolute project source-path resolution;
-- stable region identifiers, labels, movement, resizing, reordering and deletion;
-- workspace dirty-state and project load/save transitions;
-- structured operation and validation state;
-- bounded recent-path ordering, deduplication and persistence;
-- recent-items schema validation and cancellation.
-
-UI smoke validation remains manual for native file pickers and bitmap ownership. Domain/Application tests do not reference Avalonia or SkiaSharp.
+Full 10,000 × 10,000 allocation remains a controlled stress test rather than part of every unit-test run.

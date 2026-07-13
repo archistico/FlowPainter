@@ -12,13 +12,15 @@ public sealed class FlowPainterWorkspace
     public FlowPainterWorkspace(
         ulong seed,
         FlowPainterSettings settings,
-        PreviewSettings? preview = null)
+        PreviewSettings? preview = null,
+        FinalRenderSettings? finalRender = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
         _readOnlyValidationMessages = _validationMessages.AsReadOnly();
         Seed = seed;
         Settings = settings;
         Preview = preview ?? new PreviewSettings();
+        FinalRender = finalRender ?? new FinalRenderSettings();
         Regions = new DetailRegionEditor();
         Operation = WorkspaceOperationState.Idle;
     }
@@ -34,6 +36,8 @@ public sealed class FlowPainterWorkspace
     public FlowPainterSettings Settings { get; private set; }
 
     public PreviewSettings Preview { get; private set; }
+
+    public FinalRenderSettings FinalRender { get; private set; }
 
     public DetailRegionEditor Regions { get; }
 
@@ -96,6 +100,21 @@ public sealed class FlowPainterWorkspace
         }
 
         Preview = preview;
+        MarkDirty();
+    }
+
+
+    public void SetFinalRender(FinalRenderSettings finalRender)
+    {
+        ArgumentNullException.ThrowIfNull(finalRender);
+        if (FinalRender.MaximumDimension == finalRender.MaximumDimension
+            && FinalRender.Format == finalRender.Format
+            && FinalRender.JpegQuality == finalRender.JpegQuality)
+        {
+            return;
+        }
+
+        FinalRender = finalRender;
         MarkDirty();
     }
 
@@ -191,7 +210,8 @@ public sealed class FlowPainterWorkspace
             Seed,
             Settings,
             Preview,
-            Regions.Regions);
+            Regions.Regions,
+            FinalRender);
     }
 
     public void LoadProject(FlowPainterProject project, string? projectPath = null)
@@ -203,6 +223,7 @@ public sealed class FlowPainterWorkspace
         Seed = project.Seed;
         Settings = project.Settings;
         Preview = project.Preview;
+        FinalRender = project.FinalRender;
         Regions.ReplaceAll(project.DetailRegions);
         IsDirty = false;
         ClearValidation();

@@ -2,16 +2,17 @@ namespace FlowPainter.Application.Projects;
 
 public sealed class FlowPainterProjectDocument
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+    public const int MinimumSupportedSchemaVersion = 1;
 
     public FlowPainterProjectDocument(int schemaVersion, FlowPainterProject project)
     {
-        if (schemaVersion != CurrentSchemaVersion)
+        if (schemaVersion < MinimumSupportedSchemaVersion || schemaVersion > CurrentSchemaVersion)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(schemaVersion),
                 schemaVersion,
-                $"Only project schema version {CurrentSchemaVersion} is supported.");
+                $"Project schema versions {MinimumSupportedSchemaVersion} through {CurrentSchemaVersion} are supported.");
         }
 
         ArgumentNullException.ThrowIfNull(project);

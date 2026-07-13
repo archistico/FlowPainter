@@ -8,6 +8,7 @@ using FlowPainter.Application.Projects;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Geometry;
+using FlowPainter.Domain.Images;
 using FlowPainter.Domain.Strokes;
 
 namespace FlowPainter.Application.Tests.Projects;
@@ -44,7 +45,8 @@ public sealed class FlowPainterProjectSerializerTests
             987654UL,
             settings,
             new PreviewSettings(PreviewQuality.High),
-            [region]);
+            [region],
+            new FinalRenderSettings(7000, RasterImageFormat.Jpeg, 87));
         await using MemoryStream stream = new();
 
         await FlowPainterProjectSerializer.SerializeAsync(expected, stream);
@@ -55,6 +57,9 @@ public sealed class FlowPainterProjectSerializerTests
         Assert.Equal(expected.SourcePath, actual.SourcePath);
         Assert.Equal(expected.Seed, actual.Seed);
         Assert.Equal(expected.Preview.Quality, actual.Preview.Quality);
+        Assert.Equal(expected.FinalRender.MaximumDimension, actual.FinalRender.MaximumDimension);
+        Assert.Equal(expected.FinalRender.Format, actual.FinalRender.Format);
+        Assert.Equal(expected.FinalRender.JpegQuality, actual.FinalRender.JpegQuality);
         AssertSettingsEqual(expected.Settings, actual.Settings);
         DetailRegion loadedRegion = Assert.Single(actual.DetailRegions);
         Assert.Equal(region, loadedRegion);
@@ -193,6 +198,29 @@ public sealed class FlowPainterProjectSerializerTests
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes("{\"project\":{}}"));
 
         await Assert.ThrowsAsync<InvalidDataException>(() => FlowPainterProjectSerializer.DeserializeAsync(stream));
+    }
+
+    [Fact]
+    public async Task DeserializeMigratesSchemaVersionOneWithDefaultFinalRenderSettings()
+    {
+        FlowPainterProject project = CreateProject();
+        await using MemoryStream currentStream = new();
+        await FlowPainterProjectSerializer.SerializeAsync(project, currentStream);
+        currentStream.Position = 0L;
+
+        JsonObject root = (await JsonNode.ParseAsync(currentStream))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON is empty.");
+        root["schemaVersion"] = 1;
+        JsonObject projectObject = root["project"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON does not contain a project payload.");
+        projectObject.Remove("finalRender");
+        await using MemoryStream legacyStream = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterProject loaded = await FlowPainterProjectSerializer.DeserializeAsync(legacyStream);
+
+        Assert.Equal(FinalRenderSettings.DefaultMaximumDimension, loaded.FinalRender.MaximumDimension);
+        Assert.Equal(RasterImageFormat.Png, loaded.FinalRender.Format);
+        Assert.Equal(FinalRenderSettings.DefaultJpegQuality, loaded.FinalRender.JpegQuality);
     }
 
     [Fact]

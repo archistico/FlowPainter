@@ -10,27 +10,37 @@ dotnet test FlowPainter.sln -c Release --no-build --logger "console;verbosity=no
 dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 ```
 
-## M5.3 expected result
+## M6 expected result
 
 - restore succeeds;
 - all nine projects build;
 - build emits zero warnings and zero errors;
-- all 360 test cases pass;
+- all 400 test cases pass;
 - the Avalonia window opens;
-- a new image can be opened and saved as a `*.flowpainter.json` project;
-- reopening the project restores source, seed, all settings, preview quality and ordered manual regions;
-- project-relative source references resolve independently of the process working directory;
-- Draft, Standard and High rebuild to maximum sides of 256, 512 and 1,024 pixels;
-- existing regions can be relabelled, resized by normalized percentages, reordered and deleted;
-- source and result remain visible side by side;
-- recent project and preset entries survive application restart;
-- missing recent files are removed on attempted load;
-- planning, analysis and rendering can still be cancelled and rerun;
+- an image can be loaded and a deterministic preview rendered;
+- final settings accept a maximum dimension up to 10,000 and preserve source aspect ratio;
+- the memory estimate updates from source, proxy, preview, overlay and final output sizes;
+- final PNG export preserves alpha;
+- final JPEG export flattens transparency over white and honors quality;
+- final export reuses the plan shown in the preview;
+- cancellation returns the UI to an operable state;
+- project schema 2 round-trips final settings;
+- schema-1 M5 projects load with M6 defaults;
 - Domain and Application contain no Avalonia, SkiaSharp or LibNoiseCore dependency.
 
-After successful validation, update M5 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
+After successful validation, update M6 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
 
 ## Validation history
+
+### 2026-07-13 — M6 prepared
+
+M6 separates preview and final raster output. The immutable preview `StrokePlan` is retained and reused at an independently configured resolution up to 10,000 × 10,000 pixels. Final settings are persisted in project schema 2, with schema-1 migration to explicit defaults. PNG preserves alpha; JPEG composes transparency over white. A conservative estimate covers known source, proxy, preview, overlay and double final-output RGBA buffers.
+
+The expected suite grows from 360 to 400 cases. Static preparation checks include C# syntax parsing, XAML/XML/JSON parsing, named-control/event resolution, project references, forbidden dependency scans and ZIP integrity.
+
+### 2026-07-13 — M5.3 validated on Windows
+
+The user confirmed that the corrected M5.3 package builds successfully and all 360 tests pass. M5 is marked DONE.
 
 ### 2026-07-13 — M5.3 project rectangle serialization correction
 

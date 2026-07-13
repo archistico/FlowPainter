@@ -13,7 +13,8 @@ public sealed class FlowPainterProject
         ulong seed,
         FlowPainterSettings settings,
         PreviewSettings? preview = null,
-        IReadOnlyList<DetailRegion>? detailRegions = null)
+        IReadOnlyList<DetailRegion>? detailRegions = null,
+        FinalRenderSettings? finalRender = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -32,6 +33,7 @@ public sealed class FlowPainterProject
         Seed = seed;
         Settings = settings;
         Preview = preview ?? new PreviewSettings();
+        FinalRender = finalRender ?? new FinalRenderSettings();
         DetailRegion[] copiedRegions = detailRegions?.ToArray() ?? [];
 
         HashSet<string> identifiers = new(StringComparer.OrdinalIgnoreCase);
@@ -57,6 +59,8 @@ public sealed class FlowPainterProject
     public FlowPainterSettings Settings { get; }
 
     public PreviewSettings Preview { get; }
+
+    public FinalRenderSettings FinalRender { get; }
 
     public IReadOnlyList<DetailRegion> DetailRegions => _detailRegions;
 }

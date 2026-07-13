@@ -3,6 +3,7 @@ using FlowPainter.Application.Projects;
 using FlowPainter.Application.Workflow;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.Geometry;
+using FlowPainter.Domain.Images;
 
 namespace FlowPainter.Application.Tests.Workflow;
 
@@ -93,6 +94,20 @@ public sealed class FlowPainterWorkspaceTests
 
         workspace.SetPreview(new PreviewSettings(PreviewQuality.High));
         Assert.True(workspace.IsDirty);
+    }
+
+    [Fact]
+    public void SetFinalRenderMarksDirtyOnlyWhenChanged()
+    {
+        FlowPainterWorkspace workspace = CreateWorkspace();
+        workspace.LoadProject(CreateProject());
+
+        workspace.SetFinalRender(new FinalRenderSettings());
+        Assert.False(workspace.IsDirty);
+
+        workspace.SetFinalRender(new FinalRenderSettings(8000, RasterImageFormat.Jpeg, 85));
+        Assert.True(workspace.IsDirty);
+        Assert.Equal(8000, workspace.FinalRender.MaximumDimension);
     }
 
     [Fact]
@@ -189,6 +204,7 @@ public sealed class FlowPainterWorkspaceTests
         Assert.Equal("portrait.png", project.SourcePath);
         Assert.Equal(123UL, project.Seed);
         Assert.Equal(PreviewQuality.High, project.Preview.Quality);
+        Assert.Equal(FinalRenderSettings.DefaultMaximumDimension, project.FinalRender.MaximumDimension);
         Assert.Single(project.DetailRegions);
     }
 
@@ -221,6 +237,7 @@ public sealed class FlowPainterWorkspaceTests
         Assert.Equal(project.SourcePath, workspace.SourcePath);
         Assert.Equal(99UL, workspace.Seed);
         Assert.Single(workspace.Regions.Regions);
+        Assert.Equal(project.FinalRender.MaximumDimension, workspace.FinalRender.MaximumDimension);
         Assert.NotNull(workspace.ProjectPath);
     }
 

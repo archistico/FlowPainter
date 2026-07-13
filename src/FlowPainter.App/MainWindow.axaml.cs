@@ -18,11 +18,13 @@ using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.FlowPainting.Presets;
 using FlowPainter.Application.Interaction;
+using FlowPainter.Application.Images;
 using FlowPainter.Application.Projects;
 using FlowPainter.Application.Workflow;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Geometry;
+using FlowPainter.Domain.Images;
 using FlowPainter.Domain.Strokes;
 using FlowPainter.Imaging.Skia.Images;
 using FlowPainter.Rendering.Skia.Detail;
@@ -40,6 +42,7 @@ public partial class MainWindow : Window
     private readonly SkiaImageProxyGenerator _proxyGenerator = new();
     private readonly SkiaStrokePlanRenderer _renderer = new();
     private readonly SkiaPngEncoder _pngEncoder = new();
+    private readonly SkiaImageEncoder _imageEncoder = new();
     private readonly ImageDetailAnalyzer _detailAnalyzer = new();
     private readonly DetailMapOverlayRenderer _detailOverlayRenderer = new();
     private readonly FlowPainterPlanner _planner = new(new DefaultFlowFieldFactory());
@@ -53,9 +56,11 @@ public partial class MainWindow : Window
     private readonly Button _renderButton;
     private readonly Button _cancelButton;
     private readonly Button _saveButton;
+    private readonly Button _exportFinalButton;
     private readonly StackPanel _settingsPanel;
     private readonly ComboBox _presetComboBox;
     private readonly ComboBox _previewQualityComboBox;
+    private readonly ComboBox _finalFormatComboBox;
     private readonly ComboBox _recentProjectComboBox;
     private readonly ComboBox _recentPresetComboBox;
     private readonly ComboBox _flowFieldComboBox;
@@ -63,6 +68,8 @@ public partial class MainWindow : Window
     private readonly ComboBox _detailIntentComboBox;
     private readonly TextBox _presetNameTextBox;
     private readonly TextBox _projectNameTextBox;
+    private readonly TextBox _finalMaximumDimensionTextBox;
+    private readonly TextBox _jpegQualityTextBox;
     private readonly TextBox _seedTextBox;
     private readonly TextBox _strokeCountTextBox;
     private readonly TextBox _segmentCountTextBox;
@@ -99,6 +106,8 @@ public partial class MainWindow : Window
     private readonly Image _resultImageView;
     private readonly TextBlock _sourceInfoText;
     private readonly TextBlock _resultInfoText;
+    private readonly TextBlock _finalOutputInfoText;
+    private readonly TextBlock _finalMemoryInfoText;
     private readonly TextBlock _regionCountText;
     private readonly TextBlock _statusText;
     private readonly ProgressBar _operationProgressBar;
@@ -111,6 +120,7 @@ public partial class MainWindow : Window
     private Bitmap? _resultPreviewBitmap;
     private DetailMap? _automaticDetailMap;
     private DetailMap? _composedDetailMap;
+    private StrokePlan? _previewStrokePlan;
     private DetailAnalysisSettings? _activeDetailAnalysisSettings;
     private NormalizedPoint? _selectionStart;
     private NormalizedPoint? _selectionCurrent;
@@ -129,9 +139,11 @@ public partial class MainWindow : Window
         _renderButton = FindRequiredControl<Button>("RenderButton");
         _cancelButton = FindRequiredControl<Button>("CancelButton");
         _saveButton = FindRequiredControl<Button>("SaveButton");
+        _exportFinalButton = FindRequiredControl<Button>("ExportFinalButton");
         _settingsPanel = FindRequiredControl<StackPanel>("SettingsPanel");
         _presetComboBox = FindRequiredControl<ComboBox>("PresetComboBox");
         _previewQualityComboBox = FindRequiredControl<ComboBox>("PreviewQualityComboBox");
+        _finalFormatComboBox = FindRequiredControl<ComboBox>("FinalFormatComboBox");
         _recentProjectComboBox = FindRequiredControl<ComboBox>("RecentProjectComboBox");
         _recentPresetComboBox = FindRequiredControl<ComboBox>("RecentPresetComboBox");
         _flowFieldComboBox = FindRequiredControl<ComboBox>("FlowFieldComboBox");
@@ -139,6 +151,8 @@ public partial class MainWindow : Window
         _detailIntentComboBox = FindRequiredControl<ComboBox>("DetailIntentComboBox");
         _presetNameTextBox = FindRequiredControl<TextBox>("PresetNameTextBox");
         _projectNameTextBox = FindRequiredControl<TextBox>("ProjectNameTextBox");
+        _finalMaximumDimensionTextBox = FindRequiredControl<TextBox>("FinalMaximumDimensionTextBox");
+        _jpegQualityTextBox = FindRequiredControl<TextBox>("JpegQualityTextBox");
         _seedTextBox = FindRequiredControl<TextBox>("SeedTextBox");
         _strokeCountTextBox = FindRequiredControl<TextBox>("StrokeCountTextBox");
         _segmentCountTextBox = FindRequiredControl<TextBox>("SegmentCountTextBox");
@@ -175,6 +189,8 @@ public partial class MainWindow : Window
         _resultImageView = FindRequiredControl<Image>("ResultImageView");
         _sourceInfoText = FindRequiredControl<TextBlock>("SourceInfoText");
         _resultInfoText = FindRequiredControl<TextBlock>("ResultInfoText");
+        _finalOutputInfoText = FindRequiredControl<TextBlock>("FinalOutputInfoText");
+        _finalMemoryInfoText = FindRequiredControl<TextBlock>("FinalMemoryInfoText");
         _regionCountText = FindRequiredControl<TextBlock>("RegionCountText");
         _statusText = FindRequiredControl<TextBlock>("StatusText");
         _operationProgressBar = FindRequiredControl<ProgressBar>("OperationProgressBar");
@@ -182,6 +198,8 @@ public partial class MainWindow : Window
         _presetComboBox.ItemsSource = BuiltInFlowPainterPresets.All;
         _previewQualityComboBox.ItemsSource = Enum.GetValues<PreviewQuality>();
         _previewQualityComboBox.SelectedItem = PreviewQuality.Standard;
+        _finalFormatComboBox.ItemsSource = Enum.GetValues<RasterImageFormat>();
+        ApplyFinalRenderSettings(new FinalRenderSettings());
         _flowFieldComboBox.ItemsSource = Enum.GetValues<FlowFieldKind>();
         _backgroundComboBox.ItemsSource = Enum.GetValues<StrokePlanBackgroundMode>();
         _detailIntentComboBox.ItemsSource = Enum.GetValues<DetailRegionIntent>();
@@ -261,6 +279,7 @@ public partial class MainWindow : Window
         }
 
         _previewQualityComboBox.SelectedItem = project.Preview.Quality;
+        ApplyFinalRenderSettings(project.FinalRender);
         ApplyPreset(new FlowPainterPreset(project.Name, project.Settings), project.Seed);
         _projectNameTextBox.Text = project.Name;
 
@@ -315,13 +334,15 @@ public partial class MainWindow : Window
                 project.Seed,
                 project.Settings,
                 project.Preview,
-                project.DetailRegions);
+                project.DetailRegions,
+                project.FinalRender);
             _workspace.LoadProject(resolvedProject, projectPath);
             _recentProjects.Add(projectPath);
             await PersistRecentItemsBestEffortAsync(cancellationToken).ConfigureAwait(true);
             RefreshRecentItemControls();
             _saveProjectButton.IsEnabled = true;
             _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
+            UpdateFinalOutputEstimate();
             _statusText.Text = $"Loaded project '{project.Name}' with {project.DetailRegions.Count:N0} manual regions.";
             UpdateSourcePreviewSelection();
             RefreshRegionVisuals();
@@ -355,6 +376,7 @@ public partial class MainWindow : Window
             _workspace.SetSeed(ParseUnsignedInteger(_seedTextBox, "Seed"));
             _workspace.SetSettings(ReadSettingsFromControls());
             _workspace.SetPreview(ReadPreviewSettings());
+            _workspace.SetFinalRender(ReadFinalRenderSettings());
             project = _workspace.CreateProject(name);
         }
         catch (FormatException exception)
@@ -407,7 +429,8 @@ public partial class MainWindow : Window
                 project.Seed,
                 project.Settings,
                 project.Preview,
-                project.DetailRegions);
+                project.DetailRegions,
+                project.FinalRender);
             await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
             await FlowPainterProjectSerializer.SerializeAsync(
                 persistedProject,
@@ -494,11 +517,13 @@ public partial class MainWindow : Window
     {
         FlowPainterSettings settings;
         PreviewSettings previewSettings;
+        FinalRenderSettings finalRenderSettings;
         ulong seed;
         try
         {
             settings = ReadSettingsFromControls();
             previewSettings = ReadPreviewSettings();
+            finalRenderSettings = ReadFinalRenderSettings();
             seed = ParseUnsignedInteger(_seedTextBox, "Seed");
         }
         catch (FormatException exception)
@@ -584,9 +609,11 @@ public partial class MainWindow : Window
                 _workspace.SetSeed(seed);
                 _workspace.SetSettings(settings);
                 _workspace.SetPreview(previewSettings);
+                _workspace.SetFinalRender(finalRenderSettings);
                 _projectNameTextBox.Text = IoPath.GetFileNameWithoutExtension(files[0].Name);
                 _saveProjectButton.IsEnabled = true;
                 _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
+                UpdateFinalOutputEstimate();
                 _statusText.Text = "Image loaded and structural detail map analyzed. Drag on the image to refine focus.";
             }
             finally
@@ -679,7 +706,7 @@ public partial class MainWindow : Window
 
             try
             {
-                ReplaceRendered(rendered);
+                ReplaceRendered(rendered, plan);
                 adopted = true;
 
                 _resultInfoText.Text = $"{rendered.Size.Width:N0} × {rendered.Size.Height:N0} · {plan.Strokes.Count:N0} strokes · {_workspace.Regions.Count:N0} regions";
@@ -692,6 +719,98 @@ public partial class MainWindow : Window
                     rendered.Dispose();
                 }
             }
+        }).ConfigureAwait(true);
+    }
+
+    private void FinalOutputSettingsChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        _jpegQualityTextBox.IsEnabled = _finalFormatComboBox.SelectedItem is RasterImageFormat.Jpeg;
+        UpdateFinalOutputEstimate();
+    }
+
+    private void UpdateFinalEstimateClick(object? sender, RoutedEventArgs e)
+    {
+        UpdateFinalOutputEstimate(showValidationMessage: true);
+    }
+
+    private async void ExportFinalClick(object? sender, RoutedEventArgs e)
+    {
+        SkiaImage? sourceImage = _sourceImage;
+        StrokePlan? plan = _previewStrokePlan;
+        if (sourceImage is null || plan is null)
+        {
+            _statusText.Text = "Render a preview before exporting the final image.";
+            return;
+        }
+
+        FinalRenderSettings finalSettings;
+        try
+        {
+            finalSettings = ReadFinalRenderSettings();
+        }
+        catch (FormatException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        ImageSize outputSize = finalSettings.GetOutputSize(sourceImage.Size);
+        string extension = finalSettings.DefaultFileExtension;
+        string suggestedBaseName = string.IsNullOrWhiteSpace(_projectNameTextBox.Text)
+            ? "flowpainter-final"
+            : SanitizeFileName(_projectNameTextBox.Text.Trim());
+        FilePickerFileType fileType = finalSettings.Format == RasterImageFormat.Png
+            ? new FilePickerFileType("PNG image") { Patterns = ["*.png"] }
+            : new FilePickerFileType("JPEG image") { Patterns = ["*.jpg", "*.jpeg"] };
+        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(
+            new FilePickerSaveOptions
+            {
+                Title = "Export final FlowPainter image",
+                SuggestedFileName = $"{suggestedBaseName}.{extension}",
+                DefaultExtension = extension,
+                FileTypeChoices = [fileType]
+            }).ConfigureAwait(true);
+
+        if (file is null)
+        {
+            return;
+        }
+
+        await RunExportingImageAsync(async cancellationToken =>
+        {
+            _workspace.SetFinalRender(finalSettings);
+            Progress<StrokeRenderProgress> renderProgress = new(value =>
+            {
+                string message = value.Stage == StrokeRenderStage.DrawingStrokes
+                    ? $"Final rendering {value.CompletedStrokes:N0} / {value.TotalStrokes:N0} strokes"
+                    : $"Final rendering: {value.Stage}";
+                ReportOperationProgress(value.Fraction * 0.88d, message);
+            });
+            using SkiaImage finalImage = await _renderer.RenderAsync(
+                plan,
+                outputSize,
+                plan.BackgroundMode == StrokePlanBackgroundMode.SourceImage ? sourceImage : null,
+                renderProgress,
+                cancellationToken).ConfigureAwait(true);
+
+            Progress<ImageOperationProgress> encodeProgress = new(value =>
+                ReportOperationProgress(
+                    0.88d + (value.Fraction * 0.12d),
+                    value.Message));
+            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
+            await _imageEncoder.EncodeAsync(
+                finalImage,
+                output,
+                finalSettings.Format,
+                finalSettings.JpegQuality,
+                encodeProgress,
+                cancellationToken).ConfigureAwait(true);
+            _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0}.";
         }).ConfigureAwait(true);
     }
 
@@ -1343,6 +1462,94 @@ public partial class MainWindow : Window
         _backgroundWidthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundWidthMultiplier * 100d);
     }
 
+    private void ApplyFinalRenderSettings(FinalRenderSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _finalMaximumDimensionTextBox.Text = settings.MaximumDimension.ToString(CultureInfo.CurrentCulture);
+        _finalFormatComboBox.SelectedItem = settings.Format;
+        _jpegQualityTextBox.Text = settings.JpegQuality.ToString(CultureInfo.CurrentCulture);
+        _jpegQualityTextBox.IsEnabled = settings.Format == RasterImageFormat.Jpeg;
+        UpdateFinalOutputEstimate();
+    }
+
+    private FinalRenderSettings ReadFinalRenderSettings()
+    {
+        RasterImageFormat format = _finalFormatComboBox.SelectedItem is RasterImageFormat selectedFormat
+            ? selectedFormat
+            : throw new InvalidOperationException("Select a final image format.");
+        return new FinalRenderSettings(
+            ParseInteger(_finalMaximumDimensionTextBox, "Final maximum dimension"),
+            format,
+            ParseInteger(_jpegQualityTextBox, "JPEG quality"));
+    }
+
+    private void UpdateFinalOutputEstimate(bool showValidationMessage = false)
+    {
+        SkiaImage? source = _sourceImage;
+        if (source is null)
+        {
+            _finalOutputInfoText.Text = "Open an image to estimate final output.";
+            _finalMemoryInfoText.Text = "Memory estimate unavailable.";
+            return;
+        }
+
+        try
+        {
+            FinalRenderSettings settings = ReadFinalRenderSettings();
+            ImageSize outputSize = settings.GetOutputSize(source.Size);
+            ImageSize proxySize = _proxyImage?.Size ?? source.Size.FitWithin(PreviewSettings.StandardMaximumDimension, PreviewSettings.StandardMaximumDimension);
+            ImageSize previewSize = _renderedImage?.Size ?? proxySize;
+            FinalRenderMemoryEstimate estimate = FinalRenderMemoryEstimator.Estimate(
+                source.Size,
+                proxySize,
+                previewSize,
+                outputSize,
+                includeDetailOverlay: _detailOverlayPreviewBitmap is not null);
+            _finalOutputInfoText.Text = $"{outputSize.Width:N0} × {outputSize.Height:N0} · {settings.Format}";
+            _finalMemoryInfoText.Text = $"Known peak RGBA buffers: {estimate.KnownPeakMebibytes:N0} MiB · {estimate.Risk} risk";
+            if (showValidationMessage)
+            {
+                _statusText.Text = estimate.Risk == FinalRenderMemoryRisk.High
+                    ? "High memory estimate. Close other applications before final rendering."
+                    : $"Final output estimate updated: {estimate.KnownPeakMebibytes:N0} MiB known RGBA buffers.";
+            }
+        }
+        catch (FormatException exception)
+        {
+            _finalOutputInfoText.Text = "Final output settings are invalid.";
+            _finalMemoryInfoText.Text = exception.Message;
+            if (showValidationMessage)
+            {
+                _statusText.Text = exception.Message;
+            }
+        }
+        catch (ArgumentException exception)
+        {
+            _finalOutputInfoText.Text = "Final output settings are invalid.";
+            _finalMemoryInfoText.Text = exception.Message;
+            if (showValidationMessage)
+            {
+                _statusText.Text = exception.Message;
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            _finalOutputInfoText.Text = "Final output settings are invalid.";
+            _finalMemoryInfoText.Text = exception.Message;
+            if (showValidationMessage)
+            {
+                _statusText.Text = exception.Message;
+            }
+        }
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        HashSet<char> invalidCharacters = [.. IoPath.GetInvalidFileNameChars()];
+        string sanitized = string.Concat(value.Select(character => invalidCharacters.Contains(character) ? '_' : character)).Trim();
+        return string.IsNullOrWhiteSpace(sanitized) ? "flowpainter-final" : sanitized;
+    }
+
     private PreviewSettings ReadPreviewSettings()
     {
         return _previewQualityComboBox.SelectedItem is PreviewQuality quality
@@ -1622,6 +1829,7 @@ public partial class MainWindow : Window
         _saveProjectButton.IsEnabled = !running && !string.IsNullOrWhiteSpace(_currentSourcePath);
         _renderButton.IsEnabled = !running && _proxyImage is not null && _composedDetailMap is not null;
         _saveButton.IsEnabled = !running && _renderedImage is not null;
+        _exportFinalButton.IsEnabled = !running && _sourceImage is not null && _previewStrokePlan is not null;
         _cancelButton.IsEnabled = running;
         _settingsPanel.IsEnabled = !running;
         _selectionCanvas.IsEnabled = !running && _composedDetailMap is not null;
@@ -1657,6 +1865,7 @@ public partial class MainWindow : Window
             _sourceImage = source;
             _proxyImage = proxy;
             _renderedImage = null;
+            _previewStrokePlan = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
             _resultPreviewBitmap = null;
@@ -1671,6 +1880,8 @@ public partial class MainWindow : Window
             _resultImageView.Source = null;
             _resultInfoText.Text = "Not rendered";
             _saveButton.IsEnabled = false;
+            _exportFinalButton.IsEnabled = false;
+            UpdateFinalOutputEstimate();
             RefreshRegionVisuals();
         }
         finally
@@ -1716,6 +1927,7 @@ public partial class MainWindow : Window
             adopted = true;
             _proxyImage = proxy;
             _renderedImage = null;
+            _previewStrokePlan = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
             _resultPreviewBitmap = null;
@@ -1727,11 +1939,13 @@ public partial class MainWindow : Window
             _resultImageView.Source = null;
             _resultInfoText.Text = "Not rendered";
             _saveButton.IsEnabled = false;
+            _exportFinalButton.IsEnabled = false;
             if (_sourceImage is not null)
             {
                 _sourceInfoText.Text = $"{_sourceImage.Size.Width:N0} × {_sourceImage.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
             }
 
+            UpdateFinalOutputEstimate();
             RefreshRegionVisuals();
         }
         finally
@@ -1765,6 +1979,7 @@ public partial class MainWindow : Window
             adopted = true;
             _detailOverlayPreviewBitmap = preview;
             _composedDetailMap = composedDetailMap;
+            InvalidateRenderedPreview();
             UpdateSourcePreviewSelection();
             RefreshRegionVisuals();
         }
@@ -1781,8 +1996,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ReplaceRendered(SkiaImage rendered)
+    private void ReplaceRendered(SkiaImage rendered, StrokePlan plan)
     {
+        ArgumentNullException.ThrowIfNull(plan);
         Bitmap preview = CreateAvaloniaBitmap(rendered);
         SkiaImage? previousRendered = _renderedImage;
         Bitmap? previousPreview = _resultPreviewBitmap;
@@ -1792,8 +2008,10 @@ public partial class MainWindow : Window
         {
             adopted = true;
             _renderedImage = rendered;
+            _previewStrokePlan = plan;
             _resultPreviewBitmap = preview;
             _resultImageView.Source = preview;
+            UpdateFinalOutputEstimate();
         }
         finally
         {
@@ -1807,6 +2025,22 @@ public partial class MainWindow : Window
                 preview.Dispose();
             }
         }
+    }
+
+    private void InvalidateRenderedPreview()
+    {
+        SkiaImage? rendered = _renderedImage;
+        Bitmap? preview = _resultPreviewBitmap;
+        _renderedImage = null;
+        _previewStrokePlan = null;
+        _resultPreviewBitmap = null;
+        _resultImageView.Source = null;
+        _resultInfoText.Text = "Not rendered";
+        _saveButton.IsEnabled = false;
+        _exportFinalButton.IsEnabled = false;
+        rendered?.Dispose();
+        preview?.Dispose();
+        UpdateFinalOutputEstimate();
     }
 
     private void UpdateSourcePreviewSelection()
@@ -2077,6 +2311,7 @@ public partial class MainWindow : Window
         _resultPreviewBitmap = null;
         _automaticDetailMap = null;
         _composedDetailMap = null;
+        _previewStrokePlan = null;
         _activeDetailAnalysisSettings = null;
     }
 }

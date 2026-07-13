@@ -177,11 +177,14 @@ public sealed class SkiaStrokePlanRenderer
 
         if (sourceBackground is not null)
         {
-            double aspectDifference = Math.Abs(sourceBackground.Size.AspectRatio - plan.SourceSize.AspectRatio);
-            if (aspectDifference > 1e-6d)
+            int planMaximumDimension = Math.Max(plan.SourceSize.Width, plan.SourceSize.Height);
+            ImageSize expectedPlanSize = sourceBackground.Size.FitWithin(
+                planMaximumDimension,
+                planMaximumDimension);
+            if (expectedPlanSize != plan.SourceSize)
             {
                 throw new ArgumentException(
-                    "The source background must have the same aspect ratio as the stroke plan.",
+                    "The source background dimensions are not compatible with the image used to create the stroke plan.",
                     nameof(sourceBackground));
             }
         }

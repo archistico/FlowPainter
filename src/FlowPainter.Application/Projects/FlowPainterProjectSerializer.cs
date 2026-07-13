@@ -58,14 +58,21 @@ public static class FlowPainterProjectSerializer
             throw new InvalidDataException("The project schema version is missing or invalid.");
         }
 
-        if (schemaVersion != FlowPainterProjectDocument.CurrentSchemaVersion)
+        if (schemaVersion < FlowPainterProjectDocument.MinimumSupportedSchemaVersion
+            || schemaVersion > FlowPainterProjectDocument.CurrentSchemaVersion)
         {
             throw new NotSupportedException(
-                $"Project schema version {schemaVersion} is not supported. Supported version: {FlowPainterProjectDocument.CurrentSchemaVersion}.");
+                $"Project schema version {schemaVersion} is not supported. Supported versions: "
+                + $"{FlowPainterProjectDocument.MinimumSupportedSchemaVersion}-{FlowPainterProjectDocument.CurrentSchemaVersion}.");
         }
 
-        FlowPainterProjectDocument? document = root.Deserialize<FlowPainterProjectDocument>(SerializerOptions);
-        return document?.Project
+        if (!root.TryGetProperty("project", out JsonElement projectElement))
+        {
+            throw new InvalidDataException("The project payload is missing.");
+        }
+
+        FlowPainterProject? project = projectElement.Deserialize<FlowPainterProject>(SerializerOptions);
+        return project
             ?? throw new InvalidDataException("The project document is empty or invalid.");
     }
 

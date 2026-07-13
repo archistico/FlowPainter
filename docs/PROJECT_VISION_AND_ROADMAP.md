@@ -2,7 +2,7 @@
 
 **Document status:** living specification  
 **Last updated:** 2026-07-13  
-**Current milestone:** M4 — Structural detail map and manual regions  
+**Current milestone:** M6 — High-resolution final rendering  
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -11,8 +11,9 @@ FlowPainter transforms an input image into a new generative artwork that remains
 
 The software must interpret the visual hierarchy of the source and distribute artistic detail deliberately:
 
-- important subjects and focal points receive more information;
-- faces may receive additional attention around eyes, mouth and defining contours;
+- backgrounds are synthesized with broader, freer and less detailed treatment;
+- complete subjects, people, figures, objects and focal points receive progressively more information;
+- faces may receive additional attention around eyes, mouth and defining contours, but facial landmarks are only one part of the subject hierarchy;
 - high-contrast, structurally significant or visually salient areas may receive more detail;
 - broad backgrounds and uniform colour fields may be represented with larger forms and fewer marks;
 - the user can add, reduce or redirect detail by selecting areas directly with the mouse.
@@ -134,7 +135,19 @@ Expected primitive families:
 
 The optimizer, error metric, mutation strategy and rasterizer must be replaceable and independently testable.
 
-## 4. Technical principles
+## 4. Artistic hierarchy and focus
+
+The intended painting is not uniformly detailed. FlowPainter allocates artistic and computational resources according to a visual hierarchy:
+
+```text
+Background → Supporting area → Subject → Focal area → Critical detail
+```
+
+The background establishes colour, movement and atmosphere with larger primitives and broader marks. Subjects and silhouettes remain recognizable. Focal areas and critical details receive higher density, smaller forms, stronger edge preservation and more refinement passes. A subject is not limited to a face: it may be a person, group, animal, object, building, landscape feature or user-selected narrative element.
+
+Automatic analysis and manual masks will eventually contribute to an `ArtisticFocusMap` and a configurable detail budget. M8 prepares semantic subject information; M9-M10 consume it in primitive and hybrid engines; M11 provides direct editing; M12 consolidates the full visual hierarchy.
+
+## 5. Technical principles
 
 - .NET 10 and C# 14.
 - Avalonia desktop UI.
@@ -150,7 +163,7 @@ The optimizer, error metric, mutation strategy and rasterizer must be replaceabl
 - Automated tests added with each behaviour.
 - Small milestones; build and tests must remain green before continuing.
 
-## 5. Memory boundary
+## 6. Memory boundary
 
 A 10,000 × 10,000 RGBA buffer requires 400,000,000 bytes, approximately 381 MiB.
 
@@ -164,7 +177,7 @@ The architecture therefore assumes:
 - immediate disposal of temporary and native buffers;
 - tiled rendering only if measurements later prove it necessary.
 
-## 6. Architecture target
+## 7. Architecture target
 
 ```text
 FlowPainter.sln
@@ -201,7 +214,7 @@ Brush / primitive rasterization
 Preview or final export
 ```
 
-## 7. Roadmap
+## 8. Roadmap
 
 Status legend:
 
@@ -356,7 +369,7 @@ must complete with zero warnings and errors and all 249 test cases passing. The 
 
 ### M5 — Application workflow and project model
 
-**Status: READY FOR VALIDATION**
+**Status: DONE**
 
 Implemented scope:
 
@@ -380,18 +393,21 @@ dotnet build FlowPainter.sln -c Release
 dotnet test FlowPainter.sln -c Release
 ```
 
-must complete with zero warnings and errors and all 360 test cases passing. The smoke test must save and reopen a project, preserve relative source references and manual regions, edit/reorder regions, rebuild all three preview qualities and restore recent project/preset entries.
+completed with zero warnings and errors and all 360 test cases passing. The smoke test covers project save/reopen, relative source references, manual-region editing, all three preview qualities and recent project/preset restoration.
 
-### M6 — High-resolution export
+### M6 — High-resolution final rendering
 
-**Status: PLANNED**
+**Status: READY FOR VALIDATION**
 
-- render the same plan at independent output resolution;
-- PNG export up to 10,000 × 10,000;
-- memory estimate and user warning before allocation;
-- render cancellation;
-- output metadata and deterministic project save;
-- integration tests for dimensions, aspect ratio and repeatability.
+- persist final maximum dimension, PNG/JPEG format and JPEG quality;
+- derive exact output dimensions from source aspect ratio up to 10,000 × 10,000;
+- retain the immutable preview `StrokePlan` and reuse it for final export;
+- render against the original source background rather than the proxy;
+- estimate known RGBA peak buffers and display memory risk;
+- preserve alpha in PNG and flatten transparency over white for JPEG;
+- support cancellation and combined rendering/encoding progress;
+- migrate schema-1 projects to schema 2 defaults;
+- validate with 400 automated cases.
 
 ### M7 — Brush engine
 
@@ -399,218 +415,88 @@ must complete with zero warnings and errors and all 360 test cases passing. The 
 
 - `IBrushRenderer` abstraction;
 - compatible solid-stroke brush;
-- procedural soft and flat brushes;
-- texture-mask brush;
-- width, opacity, pressure, spacing and rotation curves;
-- brush presets;
-- tests for spacing, transforms and deterministic variation.
+- procedural soft, flat and irregular brushes;
+- texture-mask and bristle brushes;
+- width, opacity, pressure, spacing, scatter and rotation curves;
+- deterministic local brush variation;
+- brush presets and material tests.
 
-### M8 — Semantic importance analysis
+### M8 — Semantic importance and subject analysis
 
 **Status: PLANNED**
 
-- compose multiple automatic analyzer outputs;
-- visual saliency and subject-region providers;
-- face detection provider contract;
-- facial-landmark regions for eyes, mouth and defining contours;
-- explicit confidence and weighting policies;
-- optional semantic segmentation provider;
-- non-rectangular and brush-painted masks;
-- deterministic merge tests and model/license ADRs.
+- pluggable saliency and subject-analysis contracts;
+- complete subject and figure masks, not only facial landmarks;
+- person, animal, object and focal-area support where providers allow;
+- face, eye and mouth refinement as optional sub-signals;
+- silhouette and subject/background boundary weighting;
+- confidence visualization and manual override;
+- local/offline provider evaluation before dependency selection.
 
 ### M9 — Geometric primitive engine
 
 **Status: PLANNED**
 
-- normalized `PrimitivePlan`;
-- primitive factories and mutation strategies;
-- triangle, rectangle, circle and ellipse;
-- local error scoring and optimal colour calculation;
-- deterministic hill-climbing baseline;
-- detail-weighted candidate budgets and primitive sizes;
-- proxy optimization and full-resolution rasterization;
-- SVG export where the selected primitive types permit it.
+- immutable `PrimitivePlan`;
+- triangle, rectangle, rotated rectangle, circle and ellipse primitives;
+- replaceable rasterizer, scorer, factory and mutator;
+- optimal colour estimation and local error updates;
+- deterministic hill climbing on reduced proxies;
+- detail-aware primitive size and search budget;
+- high-resolution raster and SVG export.
 
-### M10 — Hybrid artistic engine
-
-**Status: PLANNED**
-
-- combine primitive and stroke plans;
-- use primitive geometry to influence local vector fields;
-- coarse background primitives and fine focal-region refinement;
-- layered rendering order and blending policies;
-- shared detail budget across engines;
-- hybrid presets and regression fixtures.
-
-### M11 — Performance, packaging and release
+### M10 — Hybrid primitive and flow-field engine
 
 **Status: PLANNED**
 
-- benchmark representative image sizes;
-- reduce allocations and native peak memory;
-- controlled parallel candidate search;
-- verify 10,000 × 10,000 export scenarios;
-- Windows/Linux publishing;
-- README screenshots and usage documentation;
-- dependency/license audit;
-- release checklist.
+- primitives establish broad colour masses and background composition;
+- primitive axes, boundaries and influence fields deform local stroke flow;
+- layered primitive, flow-painting and refinement passes;
+- detail-budget allocation between engines;
+- independent and hybrid modes remain available;
+- deterministic plan composition and tests.
 
-## 8. Definition of done for every milestone
+### M11 — Advanced visual editing
 
-A milestone is complete only when:
+**Status: PLANNED**
 
-1. its behaviour is documented;
-2. automated tests cover normal cases, limits and relevant failures;
-3. `dotnet build -c Release` has zero warnings and errors;
-4. `dotnet test -c Release` passes completely;
-5. native resources are disposed deterministically where applicable;
-6. no UI dependency leaks into Domain or Application;
-7. this roadmap and the architecture document are updated;
-8. the resulting ZIP can be compiled independently.
+- non-rectangular masks and brush-painted focus/background selections;
+- direct move, resize and edit operations on generated primitives;
+- local regeneration and locked/protected areas;
+- before/after comparison;
+- undo/redo command history;
+- editable subject, focal and critical-detail roles.
 
-## 9. Open decisions
+### M12 — Artistic focus and visual hierarchy
 
-The following are intentionally not fixed yet:
+**Status: PLANNED**
 
-- computer-vision runtime and model format;
-- exact saliency and semantic-analysis algorithms;
-- whether full-size rendering needs tile output in practice;
-- precise artistic weighting formulas;
-- final set of raster export formats;
-- licensing implications of any future model files.
+- explicit Background → Supporting area → Subject → Focal area → Critical detail hierarchy;
+- global and local detail budgets;
+- progressive preservation of silhouettes, subjects and narrative details;
+- coordinated stroke density, brush complexity, primitive size, edge fidelity and colour precision;
+- deliberate background simplification and painterly freedom;
+- presets such as portrait focus, central subject, multiple subjects and cinematic background;
+- quantitative tests proving that important regions receive more artistic resources than background regions.
 
-These decisions must be made through explicit ADRs after measurements or prototypes, not embedded silently in UI code.
+### M13 — Performance, packaging and release
 
-## 10. Change log
+**Status: PLANNED**
 
-### 2026-07-13 — M5.3 project rectangle serialization correction
+- controlled 10,000 × 10,000 stress suite;
+- CPU and native-memory profiling;
+- deterministic parallelization where safe;
+- autosave and recovery;
+- Windows/Linux packaging and publish profiles;
+- end-user documentation, screenshots and release checklist.
 
-- Added an Application-layer JSON converter for immutable `NormalizedRect` project values.
-- Persisted only stable rectangle edges and reconstructed the validated domain value during loading.
-- Preserved compatibility with previous schema-1 documents containing derived `width` and `height` properties.
-- Added tests for the explicit JSON shape, previous-payload compatibility and invalid rectangle rejection.
-- Increased the expected suite from 357 to 360 test cases.
+## 9. Milestone discipline
 
-### 2026-07-13 — M5.2 .NET 10 analyzer and Path ambiguity correction
+Every milestone must:
 
-- Resolved the `Path` ambiguity between `System.IO.Path` and `Avalonia.Controls.Shapes.Path` through an explicit `IoPath` alias.
-- Changed the private recent-item lookup helper to accept the concrete `string[]` values already produced by the caller, satisfying `CA1859`.
-- Reused static readonly expected-order arrays in region-editor tests, satisfying `CA1861` without weakening analyzers.
-- Preserved the M5.1 scrollbar spacing, application behavior and 357-case suite.
-
-### 2026-07-13 — M5.1 configuration scrollbar spacing
-
-- Added an 18-pixel right gutter inside the configuration ScrollViewer.
-- Disabled horizontal scrolling in the configuration panel.
-- Prevented the vertical overlay scrollbar from covering input boxes and making text editing difficult.
-- Kept the M5 feature set and 357-case suite unchanged.
-
-### 2026-07-13 — M5 prepared
-
-- Added the versioned `*.flowpainter.json` project document.
-- Added portable source-image references, preview quality and persistent recent items.
-- Added the testable workspace, structured operation state and editable ordered region collection.
-- Connected project, preset, image, analysis, rendering and export operations to the workspace state.
-- Expanded the suite from 249 to 357 test cases.
-- Added ADR-0007 for the project/workspace boundary.
-
-### 2026-07-13 — M4.1 validated on Windows
-
-- The user confirmed the corrected package and continued development.
-- Marked M4 DONE with the complete 249-case suite.
-
-### 2026-07-13 — M4.1 floating-point test correction
-
-- Preserved the viewport transformation implementation unchanged.
-- Replaced exact `ViewportRect` record equality with component-wise assertions at 12 decimal digits.
-- Applied the tolerant helper to all viewport-rectangle tests to prevent platform/runtime rounding noise.
-- Kept production geometry unchanged and prepared the tolerance-based test correction later validated on Windows.
-
-### 2026-07-13 — M4 prepared
-
-- Added deterministic structural detail analysis at proxy resolution.
-- Added heat-map visualization and normalized positive/negative mouse regions.
-- Added detail-weighted placement, length and width policies with `flow-field-detail-v1` plans.
-- Preserved the M3 `flow-field-v1` path and schema-1 preset compatibility.
-- Expanded the suite from 183 to 249 test cases.
-- Added ADR-0006 for the shared normalized detail-map pipeline.
-
-### 2026-07-13 — M3 validated on Windows
-
-- The user confirmed a clean build and all 183 tests passing.
-- M3 is marked DONE.
-
-### 2026-07-13 — M2.3 SkiaSharp 4 path-builder correction
-
-- Replaced obsolete mutable `SKPath.MoveTo` and `SKPath.LineTo` calls with `SKPathBuilder`.
-- Used `Detach()` to create the immutable `SKPath` consumed by `SKCanvas.DrawPath`.
-- Preserved deterministic disposal of both the builder and detached path.
-- Scanned all source and test projects for remaining mutable `SKPath` construction calls; none remain.
-- Kept M2 status at READY FOR VALIDATION pending a clean target build, test pass and UI smoke test.
-
-### 2026-07-13 — M2.2 stateless service analyzer correction
-
-- Addressed `CA1822` on the image loader, proxy generator, PNG encoder and stroke renderer.
-- Preserved instance service semantics for future injection, decoration and replacement.
-- Added narrow method-level suppressions with explicit architectural justifications; global analyzer severity remains unchanged.
-- Kept M2 status at READY FOR VALIDATION pending a clean target build, test pass and UI smoke test.
-
-### 2026-07-13 — M2.1 .NET 10 exception correction
-
-- Corrected `UnsupportedImageDimensionsException` to derive from `IOException` because `InvalidDataException` is sealed in .NET 10.
-- Preserved exception semantics, public properties and all image-loader call sites.
-- Kept M2 status at READY FOR VALIDATION pending a clean target build and test pass.
-
-### 2026-07-13 — M2 prepared
-
-- Added SkiaSharp 4 image loading, proxy generation, stroke-plan rasterization and PNG encoding.
-- Added the first runnable Avalonia image-to-preview workflow with cancellation and explicit native ownership.
-- Rejected decoded images above 10,000 × 10,000 before target bitmap allocation.
-- Added deterministic temporary scalar field and uniform preview density without LibNoiseCore.
-- Added package-alignment ADR for SkiaSharp managed and Linux native assets.
-- Expanded the suite from 77 to 110 test cases.
-- Marked M2 READY FOR VALIDATION.
-
-### 2026-07-13 — M1 validated
-
-- User validation confirmed clean compilation and all 77 tests passing for M1.1.
-- Marked M1 as DONE.
-
-### 2026-07-13 — M1.1 analyzer correction
-
-- Corrected two `CA1859` findings reported by the first Windows build.
-- Kept analyzer severity unchanged and introduced no suppressions.
-- Preserved all public contracts, random draw order and golden-plan behavior.
-- The corrected M1.1 package was subsequently validated with all 77 tests passing.
-
-### 2026-07-13 — M1 prepared
-
-- Extracted legacy stroke planning into pure Domain/Application code.
-- Added immutable RGBA image, relative path, stroke and stroke-plan models.
-- Added a repository-owned characterization fixture and deterministic golden plan.
-- Preserved source colour sampling, field seeding, unused random consumption and source-image background behaviour.
-- Corrected circular angle comparison and documented every intentional deviation.
-- Added the Skia resource-ownership ADR without introducing a native dependency prematurely.
-- Expanded the suite from 37 to 77 test cases.
-
-### 2026-07-13 — M0 validated
-
-- User validation confirmed clean restore, Release build and complete test pass for M0.1.
-- Marked M0 as DONE with 37 passing test cases.
-
-### 2026-07-13 — M0.1 validation fixes
-
-- Kept analyzer severity unchanged and renamed all test methods to comply with `CA1707`.
-- Resolved the namespace collision between `FlowPainter.Application` and `Avalonia.Application`.
-- Recorded the first successful restore and failed build feedback in the validation log.
-- Prepared the corrected package that was subsequently validated successfully.
-
-### 2026-07-13 — M0 prepared
-
-- Defined the software as a hybrid image-to-generative-painting system.
-- Fixed the supported decoded image limit at 10,000 × 10,000 RGBA.
-- Added automatic/manual importance-map architecture.
-- Added planned face, eye, mouth and focal-region detail handling.
-- Added planned mouse-selected detail regions.
-- Added flow, primitive and hybrid engine roadmap.
-- Created the .NET 10 solution foundation and automated tests.
+1. update this living roadmap;
+2. add or update architecture decisions when boundaries change;
+3. include automated tests for each new non-UI behaviour;
+4. build with zero warnings and zero errors;
+5. pass the complete existing test suite;
+6. document any manual smoke validation that cannot yet be automated.

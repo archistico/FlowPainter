@@ -62,7 +62,7 @@ Owns native image operations:
 - metadata inspection and image decoding;
 - the disposable `SkiaImage` pixel-source adapter;
 - aspect-ratio-preserving proxy generation;
-- PNG encoding;
+- PNG and JPEG encoding;
 - progress and cancellation for image operations.
 
 The loader validates decoded dimensions before allocating the target RGBA bitmap. The project does not expose any Skia type through Domain or Application contracts.
@@ -100,7 +100,9 @@ Visualize the detail heat map
     ↓
 Create a deterministic detail-aware StrokePlan
     ↓
-Render, save project and export preview
+Render and retain immutable preview StrokePlan
+    ↓
+Save project, export preview or rasterize final output
 ```
 
 The window owns source, proxy, rendered and Avalonia preview resources. Replacement is transactional: new previews are constructed before old resources are released, and failed operations retain or dispose ownership explicitly.
@@ -109,7 +111,7 @@ Durable editing state is represented by `FlowPainterWorkspace`; project persiste
 
 ## Project and workspace boundary
 
-`FlowPainterProject` is an immutable schema-versioned snapshot containing source reference, seed, settings, preview quality and ordered manual regions. `ProjectPathResolver` writes a relative source reference whenever possible and resolves it against the project file on load.
+`FlowPainterProject` is an immutable schema-versioned snapshot containing source reference, seed, settings, preview quality, final-output settings and ordered manual regions. `ProjectPathResolver` writes a relative source reference whenever possible and resolves it against the project file on load.
 
 `FlowPainterWorkspace` owns mutable logical session state but no native resources. `DetailRegionEditor` provides stable identifiers and atomic edit/reorder/delete operations. Exposed collections are read-only views; callers cannot mutate internal lists by casting the public contract.
 
@@ -117,7 +119,7 @@ Preset and project responsibilities remain distinct:
 
 ```text
 Preset  = reusable algorithm parameters
-Project = source + seed + parameters + preview quality + image-specific regions
+Project = source + seed + parameters + preview quality + final output + image-specific regions
 ```
 
 Recent project/preset paths are persisted separately as non-critical UI state. Failure to restore or write recent items must never prevent image or project operations.
@@ -170,7 +172,7 @@ The project must not use preview pixels as permanent geometry.
 
 The 10,000 × 10,000 limit is enforced by `ImageSize` and metadata validation in `SkiaImageLoader`. Full-size floating-point analysis maps are prohibited. M4 analysis and heat-map rendering use the maximum-512-pixel proxy.
 
-`RenderMemoryEstimator` reports explicitly allocated RGBA buffers only. Native overhead, encoded source data and renderer scratch memory remain additional costs. Controlled final-size allocation and warnings enter in M6.
+`FinalRenderMemoryEstimator` reports source, proxy, preview, overlay and two known final-output RGBA buffers. Native overhead, encoded data, Avalonia copies and codec scratch memory remain additional costs. M6 displays the estimate and a risk band before final export.
 
 ## Engine boundaries
 
@@ -223,3 +225,16 @@ Layered rasterization
 ## Native ownership
 
 `ADR-0003-SKIA-RESOURCE-OWNERSHIP.md` is implemented by the adapters. Every returned `SkiaImage` transfers disposal responsibility to its caller. Temporary native objects are deterministically disposed. Stroke geometry uses `SKPathBuilder` and detail overlays transfer their bitmap ownership to `SkiaImage` only on successful completion.
+
+## Final rendering boundary
+
+A successful preview retains its immutable `StrokePlan`. Final export reuses that same plan and changes only output dimensions, source-background resolution and encoder format. The plan is invalidated when source, proxy or composed detail information changes.
+
+```text
+Proxy analysis → StrokePlan → preview bitmap
+                         └──→ final Skia surface → PNG/JPEG
+```
+
+`FinalRenderSettings` lives in Application and is persisted in project schema 2. `RasterImageFormat` is a Domain-level format value shared by Application and Imaging without reversing dependencies. `SkiaImageEncoder` owns native PNG/JPEG encoding; JPEG explicitly composes transparent pixels over white.
+
+The original background is considered compatible when fitting it to the plan's proxy maximum dimension reproduces `StrokePlan.SourceSize`. This avoids strict floating-point aspect comparisons while still rejecting unrelated images.

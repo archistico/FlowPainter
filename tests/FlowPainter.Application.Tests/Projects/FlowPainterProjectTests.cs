@@ -83,6 +83,30 @@ public sealed class FlowPainterProjectTests
         Assert.Equal(PreviewQuality.Standard, project.Preview.Quality);
     }
 
+    [Fact]
+    public void ConstructorUsesDefaultFinalRenderSettings()
+    {
+        FlowPainterProject project = new("Project", "source.png", 1UL, new FlowPainterSettings());
+
+        Assert.Equal(FinalRenderSettings.DefaultMaximumDimension, project.FinalRender.MaximumDimension);
+        Assert.Equal(FlowPainter.Domain.Images.RasterImageFormat.Png, project.FinalRender.Format);
+    }
+
+    [Fact]
+    public void ConstructorPreservesExplicitFinalRenderSettings()
+    {
+        FinalRenderSettings finalRender = new(8000, FlowPainter.Domain.Images.RasterImageFormat.Jpeg, 88);
+
+        FlowPainterProject project = new(
+            "Project",
+            "source.png",
+            1UL,
+            new FlowPainterSettings(),
+            finalRender: finalRender);
+
+        Assert.Same(finalRender, project.FinalRender);
+    }
+
     private static DetailRegion CreateRegion(string id)
     {
         return new DetailRegion(

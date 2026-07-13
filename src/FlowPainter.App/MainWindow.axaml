@@ -13,7 +13,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="3">
                     <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="White" Text="FlowPainter" />
-                    <TextBlock Foreground="#AEB4BF" Text="M5.1 · project workflow, preview quality and editable detail regions" />
+                    <TextBlock Foreground="#AEB4BF" Text="M6 · high-resolution final rendering and PNG/JPEG export" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <Button x:Name="OpenProjectButton" Padding="16,9" Click="OpenProjectClick" Content="Open project" />
@@ -21,7 +21,8 @@
                     <Button x:Name="OpenButton" Padding="16,9" Click="OpenImageClick" Content="Open image" />
                     <Button x:Name="RenderButton" Padding="16,9" Click="RenderPreviewClick" Content="Render preview" IsEnabled="False" />
                     <Button x:Name="CancelButton" Padding="16,9" Click="CancelClick" Content="Cancel" IsEnabled="False" />
-                    <Button x:Name="SaveButton" Padding="16,9" Click="SavePngClick" Content="Save PNG" IsEnabled="False" />
+                    <Button x:Name="SaveButton" Padding="16,9" Click="SavePngClick" Content="Save preview" IsEnabled="False" />
+                    <Button x:Name="ExportFinalButton" Padding="16,9" Click="ExportFinalClick" Content="Export final" IsEnabled="False" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -46,6 +47,21 @@
                                 <ComboBox x:Name="PreviewQualityComboBox" HorizontalAlignment="Stretch" />
                                 <Button Grid.Column="1" Click="RebuildPreviewClick" Content="Rebuild" />
                             </Grid>
+
+                            <TextBlock Margin="0,8,0,0" FontWeight="SemiBold" Foreground="White" Text="Final output" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Max dimension (px)" />
+                                <TextBox x:Name="FinalMaximumDimensionTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <TextBlock Foreground="#AEB4BF" Text="Format" />
+                            <ComboBox x:Name="FinalFormatComboBox" HorizontalAlignment="Stretch" SelectionChanged="FinalOutputSettingsChanged" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="JPEG quality" />
+                                <TextBox x:Name="JpegQualityTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Button Click="UpdateFinalEstimateClick" Content="Update output estimate" />
+                            <TextBlock x:Name="FinalOutputInfoText" TextWrapping="Wrap" Foreground="#AEB4BF" Text="Open an image to estimate final output." />
+                            <TextBlock x:Name="FinalMemoryInfoText" TextWrapping="Wrap" Foreground="#7F8794" Text="Memory estimate unavailable." />
 
                             <TextBlock Foreground="#AEB4BF" Text="Built-in preset" />
                             <ComboBox x:Name="PresetComboBox" HorizontalAlignment="Stretch" />

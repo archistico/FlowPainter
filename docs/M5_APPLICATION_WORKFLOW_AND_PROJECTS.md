@@ -2,7 +2,7 @@
 
 ## Status
 
-**READY FOR VALIDATION**
+**DONE**
 
 M5 moves image-specific editing state out of ad-hoc UI collections and introduces a versioned project workflow. Native SkiaSharp and Avalonia bitmap ownership remains in the desktop composition root; persisted state and region-editing rules live in `FlowPainter.Application` and are covered by automated tests.
 
@@ -166,3 +166,8 @@ M5.3 registers an Application-layer `JsonConverter<NormalizedRect>` for project 
 - keeps serialization concerns out of the Domain assembly.
 
 Three focused project-serialization tests raise the suite from 357 to 360 cases.
+
+
+## M5 validation
+
+The user confirmed that M5.3 builds successfully and all 360 automated tests pass. M5 is closed; final-output settings are added by the schema-2 migration in M6.

@@ -7,5 +7,6 @@ public enum ImageOperationStage
     DecodingPixels = 2,
     CreatingProxy = 3,
     EncodingPng = 4,
-    Completed = 5
+    EncodingJpeg = 5,
+    Completed = 6
 }
