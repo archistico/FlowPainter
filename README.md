@@ -9,18 +9,18 @@ The planned engine combines:
 - automatic and manually edited detail maps;
 - hybrid rendering in which broad background masses and important subjects receive different artistic treatment.
 
-## Current milestone: M6.1
+## Current milestone: M7
 
-M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved stroke plan for high-resolution PNG/JPEG export. M6.1 adds synchronized zoom and pan for direct source/result comparison.
+M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved stroke plan for high-resolution PNG/JPEG export. M6.1 adds synchronized zoom and pan for direct source/result comparison. M7 separates stroke geometry from material rendering and adds four deterministic procedural brush families.
 
-Implemented through M6.1:
+Implemented through M7:
 
 - local PNG, JPEG, WebP and BMP loading;
 - hard decoded-size limit of 10,000 × 10,000 RGBA;
 - aspect-ratio-preserving Draft, Standard and High analysis proxies (256, 512 and 1,024 px maximum side);
 - resolution-independent deterministic `StrokePlan` data;
 - internal coherent-noise flow field with no LibNoiseCore dependency;
-- configurable flow, stroke and background parameters;
+- configurable flow, stroke, brush and background parameters;
 - built-in and versioned JSON presets;
 - structural detail analysis based on luminance edges and local RGB contrast;
 - deterministic smoothing of the proxy detail map;
@@ -30,7 +30,9 @@ Implemented through M6.1:
 - detail-weighted stroke placement;
 - shorter and thinner strokes in detailed areas;
 - broader and longer strokes in background areas;
-- SkiaSharp 4 preview rendering plus independent final PNG/JPEG export;
+- SkiaSharp 4 preview rendering through SolidRound, SoftRound, Flat and Bristle brush strategies;
+- deterministic per-stroke size and opacity jitter shared by preview and final export;
+- independent final PNG/JPEG export;
 - versioned `*.flowpainter.json` projects containing source reference, seed, settings, preview quality and manual regions;
 - portable project-relative source-image paths;
 - Draft, Standard and High preview qualities;
@@ -41,10 +43,10 @@ Implemented through M6.1:
 - cached preview `StrokePlan` reused unchanged for final rasterization;
 - synchronized source/result zoom with the mouse wheel and pan with the middle mouse button;
 - known-RGBA memory estimate and risk indication before allocation;
-- project schema 2 with migration from M5 schema 1;
-- 410 automated test cases across Domain, Application, Imaging and Rendering.
+- project and preset schema 3 with compatibility for schema 1 and 2;
+- 440 automated test cases across Domain, Application, Imaging and Rendering.
 
-M5 structural analysis does not yet recognize semantic objects. Face, eye, mouth and subject-aware analyzers will plug into the same `IDetailMapAnalyzer` and `DetailMap` pipeline in a later milestone.
+M7 still uses structural rather than semantic importance analysis. Face, eye, mouth and subject-aware analyzers will plug into the same `IDetailMapAnalyzer` and `DetailMap` pipeline in a later milestone.
 
 ## Requirements
 
@@ -92,14 +94,15 @@ Then:
 3. create `IncreaseDetail` or `ReduceDetail` regions by dragging over the source;
 4. select a region to relabel, resize, reorder or delete it;
 5. choose Draft, Standard or High and use **Rebuild preview** when required;
-6. edit analysis/painting parameters and explicitly reanalyze or render;
-7. save/load reusable `*.flowpreset.json` settings;
-8. save the complete image-specific working state with **Save project**;
-9. choose **Save preview** to export the current proxy-resolution PNG;
-10. configure final maximum dimension and PNG/JPEG format;
-11. choose **Export final** to rasterize the approved preview plan against the original source.
+6. choose SolidRound, SoftRound, Flat or Bristle and edit deterministic material parameters;
+7. edit analysis/painting parameters and explicitly reanalyze or render;
+8. save/load reusable `*.flowpreset.json` settings;
+9. save the complete image-specific working state with **Save project**;
+10. choose **Save preview** to export the current proxy-resolution PNG;
+11. configure final maximum dimension and PNG/JPEG format;
+12. choose **Export final** to rasterize the approved preview plan and brush against the original source.
 
-Manual regions belong to projects, not presets. Project schema 2 stores their normalized geometry and composition order together with final-output settings; schema-1 M5 files remain readable.
+Manual regions belong to projects, not presets. Project schema 3 stores their normalized geometry, composition order, final-output settings and brush material; schema-1 and schema-2 files remain readable.
 
 ## Documentation
 
@@ -114,3 +117,4 @@ Milestone-specific documents:
 - [`docs/M5_APPLICATION_WORKFLOW_AND_PROJECTS.md`](docs/M5_APPLICATION_WORKFLOW_AND_PROJECTS.md)
 - [`docs/M6_HIGH_RESOLUTION_EXPORT.md`](docs/M6_HIGH_RESOLUTION_EXPORT.md)
 - [`docs/M6_1_SYNCHRONIZED_VIEWPORT.md`](docs/M6_1_SYNCHRONIZED_VIEWPORT.md)
+- [`docs/M7_BRUSH_ENGINE.md`](docs/M7_BRUSH_ENGINE.md)

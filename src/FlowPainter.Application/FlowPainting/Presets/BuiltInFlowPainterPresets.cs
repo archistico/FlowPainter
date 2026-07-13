@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using FlowPainter.Application.FlowPainting.Fields;
+using FlowPainter.Domain.Brushes;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Strokes;
@@ -27,7 +28,12 @@ public static class BuiltInFlowPainterPresets
                 maximumCurveRadians: 0.5d,
                 minimumStrokeWidthPixels: 3d,
                 maximumStrokeWidthPixels: 7d,
-                strokeOpacity: 0.85d)),
+                strokeOpacity: 0.85d,
+                brush: new BrushSettings(
+                    BrushKind.SoftRound,
+                    hardness: 0.78d,
+                    sizeJitter: 0.03d,
+                    opacityJitter: 0.03d))),
         new FlowPainterPreset(
             "Fine detail",
             new FlowPainterSettings(
@@ -50,7 +56,12 @@ public static class BuiltInFlowPainterPresets
                     detailedLengthMultiplier: 0.45d,
                     backgroundLengthMultiplier: 1.25d,
                     detailedWidthMultiplier: 0.55d,
-                    backgroundWidthMultiplier: 1.3d))),
+                    backgroundWidthMultiplier: 1.3d),
+                brush: new BrushSettings(
+                    BrushKind.SolidRound,
+                    hardness: 0.95d,
+                    sizeJitter: 0.04d,
+                    opacityJitter: 0.06d))),
         new FlowPainterPreset(
             "Expressive",
             new FlowPainterSettings(
@@ -74,7 +85,12 @@ public static class BuiltInFlowPainterPresets
                     detailedLengthMultiplier: 0.7d,
                     backgroundLengthMultiplier: 1.6d,
                     detailedWidthMultiplier: 0.8d,
-                    backgroundWidthMultiplier: 1.7d))),
+                    backgroundWidthMultiplier: 1.7d),
+                brush: new BrushSettings(
+                    BrushKind.Flat,
+                    hardness: 0.85d,
+                    sizeJitter: 0.18d,
+                    opacityJitter: 0.16d))),
         new FlowPainterPreset(
             "Legacy comparison",
             new FlowPainterSettings(
@@ -98,7 +114,38 @@ public static class BuiltInFlowPainterPresets
                     detailedLengthMultiplier: 1d,
                     backgroundLengthMultiplier: 1d,
                     detailedWidthMultiplier: 1d,
-                    backgroundWidthMultiplier: 1d)))
+                    backgroundWidthMultiplier: 1d),
+                brush: new BrushSettings(BrushKind.SolidRound))),
+        new FlowPainterPreset(
+            "Bristle study",
+            new FlowPainterSettings(
+                field: new FlowFieldSettings(
+                    FlowFieldKind.CoherentNoise,
+                    scale: 2.8d,
+                    octaves: 4,
+                    persistence: 0.58d,
+                    lacunarity: 2.05d),
+                strokeCount: 9_000,
+                segmentCount: 18,
+                uniformDensity: 20d,
+                lengthScale: 0.007d,
+                maximumCurveRadians: 0.7d,
+                minimumStrokeWidthPixels: 5d,
+                maximumStrokeWidthPixels: 12d,
+                strokeOpacity: 0.72d,
+                detailInfluence: new DetailInfluenceSettings(
+                    placementBias: 4d,
+                    detailedLengthMultiplier: 0.65d,
+                    backgroundLengthMultiplier: 1.45d,
+                    detailedWidthMultiplier: 0.72d,
+                    backgroundWidthMultiplier: 1.55d),
+                brush: new BrushSettings(
+                    BrushKind.Bristle,
+                    hardness: 0.52d,
+                    sizeJitter: 0.12d,
+                    opacityJitter: 0.18d,
+                    bristleCount: 7,
+                    bristleSpread: 0.82d)))
         });
 
     public static IReadOnlyList<FlowPainterPreset> All => Presets;

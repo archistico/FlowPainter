@@ -1,6 +1,7 @@
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Strokes;
 
 namespace FlowPainter.Application.Tests.FlowPainting.Planning;
@@ -20,6 +21,7 @@ public sealed class FlowPainterSettingsTests
         Assert.NotNull(settings.Field);
         Assert.NotNull(settings.DetailAnalysis);
         Assert.NotNull(settings.DetailInfluence);
+        Assert.Equal(BrushKind.SolidRound, settings.Brush.Kind);
     }
 
     [Theory]
@@ -89,6 +91,16 @@ public sealed class FlowPainterSettingsTests
         FlowPainterSettings settings = new(field);
 
         Assert.Same(field, settings.Field);
+    }
+
+    [Fact]
+    public void ConstructorRetainsProvidedBrushSettings()
+    {
+        BrushSettings brush = new(BrushKind.Bristle, bristleCount: 9);
+
+        FlowPainterSettings settings = new(brush: brush);
+
+        Assert.Same(brush, settings.Brush);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.FlowPainting.Presets;
+using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Strokes;
 
@@ -34,7 +35,8 @@ public sealed class FlowPainterPresetSerializerTests
                 0.6d,
                 StrokePlanBackgroundMode.Transparent,
                 new DetailAnalysisSettings(0.2d, 0.8d, 0.3d, 2),
-                new DetailInfluenceSettings(6d, 0.4d, 1.6d, 0.5d, 1.7d)));
+                new DetailInfluenceSettings(6d, 0.4d, 1.6d, 0.5d, 1.7d),
+                new BrushSettings(BrushKind.Bristle, 0.45d, 0.2d, 0.3d, 11, 0.85d)));
         await using MemoryStream stream = new();
 
         await FlowPainterPresetSerializer.SerializeAsync(original, stream);
@@ -66,7 +68,7 @@ public sealed class FlowPainterPresetSerializerTests
             new FlowPainterPreset("Invalid version", new FlowPainterSettings(strokeCount: 1)),
             valid);
         string json = Encoding.UTF8.GetString(valid.ToArray())
-            .Replace("\"schemaVersion\": 2", "\"schemaVersion\": 99", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 3", "\"schemaVersion\": 99", StringComparison.Ordinal);
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes(json), writable: false);
 
         await Assert.ThrowsAsync<NotSupportedException>(
@@ -112,6 +114,28 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal("M3 preset", preset.Name);
         Assert.Equal(DetailAnalysisSettings.DefaultBaseDetail, preset.Settings.DetailAnalysis.BaseDetail);
         Assert.Equal(DetailInfluenceSettings.DefaultPlacementBias, preset.Settings.DetailInfluence.PlacementBias);
+        Assert.Equal(BrushKind.SolidRound, preset.Settings.Brush.Kind);
+    }
+
+    [Fact]
+    public async Task DeserializeMigratesSchemaVersionTwoWithDefaultBrush()
+    {
+        FlowPainterPreset preset = new("M6 preset", new FlowPainterSettings(strokeCount: 1));
+        await using MemoryStream current = new();
+        await FlowPainterPresetSerializer.SerializeAsync(preset, current);
+        string json = Encoding.UTF8.GetString(current.ToArray())
+            .Replace("\"schemaVersion\": 3", "\"schemaVersion\": 2", StringComparison.Ordinal);
+        System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
+        System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON has no settings.");
+        settings.Remove("brush");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterPreset loaded = await FlowPainterPresetSerializer.DeserializeAsync(legacy);
+
+        Assert.Equal(BrushKind.SolidRound, loaded.Settings.Brush.Kind);
+        Assert.Equal(BrushSettings.DefaultHardness, loaded.Settings.Brush.Hardness);
     }
 
     [Fact]
@@ -152,5 +176,11 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal(expected.DetailInfluence.BackgroundLengthMultiplier, actual.DetailInfluence.BackgroundLengthMultiplier);
         Assert.Equal(expected.DetailInfluence.DetailedWidthMultiplier, actual.DetailInfluence.DetailedWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.BackgroundWidthMultiplier, actual.DetailInfluence.BackgroundWidthMultiplier);
+        Assert.Equal(expected.Brush.Kind, actual.Brush.Kind);
+        Assert.Equal(expected.Brush.Hardness, actual.Brush.Hardness);
+        Assert.Equal(expected.Brush.SizeJitter, actual.Brush.SizeJitter);
+        Assert.Equal(expected.Brush.OpacityJitter, actual.Brush.OpacityJitter);
+        Assert.Equal(expected.Brush.BristleCount, actual.Brush.BristleCount);
+        Assert.Equal(expected.Brush.BristleSpread, actual.Brush.BristleSpread);
     }
 }

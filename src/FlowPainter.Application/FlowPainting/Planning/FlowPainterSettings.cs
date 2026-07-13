@@ -1,4 +1,5 @@
 using FlowPainter.Application.Detail;
+using FlowPainter.Domain.Brushes;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Domain.Geometry;
 using FlowPainter.Domain.Images;
@@ -33,7 +34,8 @@ public sealed class FlowPainterSettings
         double strokeOpacity = DefaultStrokeOpacity,
         StrokePlanBackgroundMode backgroundMode = StrokePlanBackgroundMode.SourceImage,
         DetailAnalysisSettings? detailAnalysis = null,
-        DetailInfluenceSettings? detailInfluence = null)
+        DetailInfluenceSettings? detailInfluence = null,
+        BrushSettings? brush = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(strokeCount, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(strokeCount, MaximumStrokeCount);
@@ -98,6 +100,7 @@ public sealed class FlowPainterSettings
         BackgroundMode = backgroundMode;
         DetailAnalysis = detailAnalysis ?? new DetailAnalysisSettings();
         DetailInfluence = detailInfluence ?? new DetailInfluenceSettings();
+        Brush = brush ?? new BrushSettings();
     }
 
     public FlowFieldSettings Field { get; }
@@ -125,6 +128,8 @@ public sealed class FlowPainterSettings
     public DetailAnalysisSettings DetailAnalysis { get; }
 
     public DetailInfluenceSettings DetailInfluence { get; }
+
+    public BrushSettings Brush { get; }
 
     private static void ValidateFinitePositive(double value, string parameterName)
     {

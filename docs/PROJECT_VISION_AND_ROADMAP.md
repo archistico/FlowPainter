@@ -2,7 +2,7 @@
 
 **Document status:** living specification  
 **Last updated:** 2026-07-13  
-**Current milestone:** M6.1 — Synchronized comparison viewport  
+**Current milestone:** M7 — Deterministic brush engine  
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -413,7 +413,7 @@ Validated on Windows with zero build errors and all 400 tests passing.
 
 ### M6.1 — Synchronized comparison viewport
 
-**Status: READY FOR VALIDATION**
+**Status: DONE**
 
 - zoom source and rendered preview with the mouse wheel;
 - pan either panel with the middle mouse button;
@@ -425,15 +425,21 @@ Validated on Windows with zero build errors and all 400 tests passing.
 
 ### M7 — Brush engine
 
-**Status: PLANNED**
+**Status: READY FOR VALIDATION**
 
-- `IBrushRenderer` abstraction;
-- compatible solid-stroke brush;
-- procedural soft, flat and irregular brushes;
-- texture-mask and bristle brushes;
-- width, opacity, pressure, spacing, scatter and rotation curves;
-- deterministic local brush variation;
-- brush presets and material tests.
+- pure Domain `BrushSettings` and `BrushKind` values;
+- Skia-specific `ISkiaBrushRenderer` strategy boundary;
+- compatible `SolidRound` renderer;
+- procedural `SoftRound`, `Flat` and `Bristle` renderers;
+- deterministic per-stroke size and opacity variation derived from plan seed and stroke index;
+- hardness, bristle count and bristle spread controls;
+- exact preview/final reuse of both `StrokePlan` and approved brush settings;
+- brush-aware built-in presets and desktop controls;
+- project and preset schema 3 with schema-1/schema-2 compatibility defaults;
+- rendering and persistence tests for all built-in brush families;
+- expected suite of 440 automated cases.
+
+Raster texture masks, custom brush-tip loading, pressure curves, stamp spacing and point-wise rotation are extensions of this foundation and remain planned after the initial procedural engine is validated.
 
 ### M8 — Semantic importance and subject analysis
 

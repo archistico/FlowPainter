@@ -21,6 +21,7 @@ using FlowPainter.Application.Interaction;
 using FlowPainter.Application.Images;
 using FlowPainter.Application.Projects;
 using FlowPainter.Application.Workflow;
+using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Geometry;
@@ -65,6 +66,7 @@ public partial class MainWindow : Window
     private readonly ComboBox _recentPresetComboBox;
     private readonly ComboBox _flowFieldComboBox;
     private readonly ComboBox _backgroundComboBox;
+    private readonly ComboBox _brushKindComboBox;
     private readonly ComboBox _detailIntentComboBox;
     private readonly TextBox _presetNameTextBox;
     private readonly TextBox _projectNameTextBox;
@@ -84,6 +86,11 @@ public partial class MainWindow : Window
     private readonly TextBox _minimumWidthTextBox;
     private readonly TextBox _maximumWidthTextBox;
     private readonly TextBox _opacityTextBox;
+    private readonly TextBox _brushHardnessTextBox;
+    private readonly TextBox _brushSizeJitterTextBox;
+    private readonly TextBox _brushOpacityJitterTextBox;
+    private readonly TextBox _brushBristleCountTextBox;
+    private readonly TextBox _brushBristleSpreadTextBox;
     private readonly TextBox _baseDetailTextBox;
     private readonly TextBox _edgeWeightTextBox;
     private readonly TextBox _contrastWeightTextBox;
@@ -127,6 +134,7 @@ public partial class MainWindow : Window
     private DetailMap? _automaticDetailMap;
     private DetailMap? _composedDetailMap;
     private StrokePlan? _previewStrokePlan;
+    private BrushSettings? _previewBrushSettings;
     private DetailAnalysisSettings? _activeDetailAnalysisSettings;
     private readonly SynchronizedImageViewportState _imageViewportState = new();
     private NormalizedPoint? _selectionStart;
@@ -157,6 +165,7 @@ public partial class MainWindow : Window
         _recentPresetComboBox = FindRequiredControl<ComboBox>("RecentPresetComboBox");
         _flowFieldComboBox = FindRequiredControl<ComboBox>("FlowFieldComboBox");
         _backgroundComboBox = FindRequiredControl<ComboBox>("BackgroundComboBox");
+        _brushKindComboBox = FindRequiredControl<ComboBox>("BrushKindComboBox");
         _detailIntentComboBox = FindRequiredControl<ComboBox>("DetailIntentComboBox");
         _presetNameTextBox = FindRequiredControl<TextBox>("PresetNameTextBox");
         _projectNameTextBox = FindRequiredControl<TextBox>("ProjectNameTextBox");
@@ -176,6 +185,11 @@ public partial class MainWindow : Window
         _minimumWidthTextBox = FindRequiredControl<TextBox>("MinimumWidthTextBox");
         _maximumWidthTextBox = FindRequiredControl<TextBox>("MaximumWidthTextBox");
         _opacityTextBox = FindRequiredControl<TextBox>("OpacityTextBox");
+        _brushHardnessTextBox = FindRequiredControl<TextBox>("BrushHardnessTextBox");
+        _brushSizeJitterTextBox = FindRequiredControl<TextBox>("BrushSizeJitterTextBox");
+        _brushOpacityJitterTextBox = FindRequiredControl<TextBox>("BrushOpacityJitterTextBox");
+        _brushBristleCountTextBox = FindRequiredControl<TextBox>("BrushBristleCountTextBox");
+        _brushBristleSpreadTextBox = FindRequiredControl<TextBox>("BrushBristleSpreadTextBox");
         _baseDetailTextBox = FindRequiredControl<TextBox>("BaseDetailTextBox");
         _edgeWeightTextBox = FindRequiredControl<TextBox>("EdgeWeightTextBox");
         _contrastWeightTextBox = FindRequiredControl<TextBox>("ContrastWeightTextBox");
@@ -217,6 +231,7 @@ public partial class MainWindow : Window
         ApplyFinalRenderSettings(new FinalRenderSettings());
         _flowFieldComboBox.ItemsSource = Enum.GetValues<FlowFieldKind>();
         _backgroundComboBox.ItemsSource = Enum.GetValues<StrokePlanBackgroundMode>();
+        _brushKindComboBox.ItemsSource = Enum.GetValues<BrushKind>();
         _detailIntentComboBox.ItemsSource = Enum.GetValues<DetailRegionIntent>();
         _detailIntentComboBox.SelectedItem = DetailRegionIntent.IncreaseDetail;
         _regionStrengthTextBox.Text = "80";
@@ -716,16 +731,17 @@ public partial class MainWindow : Window
                 proxyImage.Size,
                 proxyImage,
                 renderProgress,
+                settings.Brush,
                 cancellationToken).ConfigureAwait(true);
             bool adopted = false;
 
             try
             {
-                ReplaceRendered(rendered, plan);
+                ReplaceRendered(rendered, plan, settings.Brush);
                 adopted = true;
 
-                _resultInfoText.Text = $"{rendered.Size.Width:N0} × {rendered.Size.Height:N0} · {plan.Strokes.Count:N0} strokes · {_workspace.Regions.Count:N0} regions";
-                _statusText.Text = "Preview rendered with automatic and manual detail guidance.";
+                _resultInfoText.Text = $"{rendered.Size.Width:N0} × {rendered.Size.Height:N0} · {plan.Strokes.Count:N0} strokes · {settings.Brush.Kind} · {_workspace.Regions.Count:N0} regions";
+                _statusText.Text = $"Preview rendered with the {settings.Brush.Kind} brush and detail guidance.";
             }
             finally
             {
@@ -752,7 +768,8 @@ public partial class MainWindow : Window
     {
         SkiaImage? sourceImage = _sourceImage;
         StrokePlan? plan = _previewStrokePlan;
-        if (sourceImage is null || plan is null)
+        BrushSettings? brush = _previewBrushSettings;
+        if (sourceImage is null || plan is null || brush is null)
         {
             _statusText.Text = "Render a preview before exporting the final image.";
             return;
@@ -811,6 +828,7 @@ public partial class MainWindow : Window
                 outputSize,
                 plan.BackgroundMode == StrokePlanBackgroundMode.SourceImage ? sourceImage : null,
                 renderProgress,
+                brush,
                 cancellationToken).ConfigureAwait(true);
 
             Progress<ImageOperationProgress> encodeProgress = new(value =>
@@ -825,7 +843,7 @@ public partial class MainWindow : Window
                 finalSettings.JpegQuality,
                 encodeProgress,
                 cancellationToken).ConfigureAwait(true);
-            _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0}.";
+            _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0} with the {brush.Kind} brush.";
         }).ConfigureAwait(true);
     }
 
@@ -1544,6 +1562,12 @@ public partial class MainWindow : Window
         _minimumWidthTextBox.Text = FormatDouble(settings.MinimumStrokeWidthPixels);
         _maximumWidthTextBox.Text = FormatDouble(settings.MaximumStrokeWidthPixels);
         _opacityTextBox.Text = FormatDouble(settings.StrokeOpacity * 100d);
+        _brushKindComboBox.SelectedItem = settings.Brush.Kind;
+        _brushHardnessTextBox.Text = FormatDouble(settings.Brush.Hardness * 100d);
+        _brushSizeJitterTextBox.Text = FormatDouble(settings.Brush.SizeJitter * 100d);
+        _brushOpacityJitterTextBox.Text = FormatDouble(settings.Brush.OpacityJitter * 100d);
+        _brushBristleCountTextBox.Text = settings.Brush.BristleCount.ToString(CultureInfo.CurrentCulture);
+        _brushBristleSpreadTextBox.Text = FormatDouble(settings.Brush.BristleSpread * 100d);
         _baseDetailTextBox.Text = FormatDouble(settings.DetailAnalysis.BaseDetail * 100d);
         _edgeWeightTextBox.Text = FormatDouble(settings.DetailAnalysis.EdgeWeight);
         _contrastWeightTextBox.Text = FormatDouble(settings.DetailAnalysis.ContrastWeight);
@@ -1666,6 +1690,16 @@ public partial class MainWindow : Window
             ParseDouble(_persistenceTextBox, "Persistence"),
             ParseDouble(_lacunarityTextBox, "Lacunarity"),
             DegreesToRadians(ParseDouble(_angleOffsetTextBox, "Field rotation")));
+        BrushKind brushKind = _brushKindComboBox.SelectedItem is BrushKind selectedBrush
+            ? selectedBrush
+            : throw new InvalidOperationException("Select a brush type.");
+        BrushSettings brush = new(
+            brushKind,
+            ParseDouble(_brushHardnessTextBox, "Brush hardness") / 100d,
+            ParseDouble(_brushSizeJitterTextBox, "Brush size jitter") / 100d,
+            ParseDouble(_brushOpacityJitterTextBox, "Brush opacity jitter") / 100d,
+            ParseInteger(_brushBristleCountTextBox, "Bristle count"),
+            ParseDouble(_brushBristleSpreadTextBox, "Bristle spread") / 100d);
 
         return new FlowPainterSettings(
             field,
@@ -1680,7 +1714,8 @@ public partial class MainWindow : Window
             ParseDouble(_opacityTextBox, "Opacity") / 100d,
             backgroundMode,
             ReadDetailAnalysisSettings(),
-            ReadDetailInfluenceSettings());
+            ReadDetailInfluenceSettings(),
+            brush);
     }
 
     private DetailAnalysisSettings ReadDetailAnalysisSettings()
@@ -1959,6 +1994,7 @@ public partial class MainWindow : Window
             _proxyImage = proxy;
             _renderedImage = null;
             _previewStrokePlan = null;
+            _previewBrushSettings = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
             _resultPreviewBitmap = null;
@@ -2023,6 +2059,7 @@ public partial class MainWindow : Window
             _proxyImage = proxy;
             _renderedImage = null;
             _previewStrokePlan = null;
+            _previewBrushSettings = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
             _resultPreviewBitmap = null;
@@ -2092,9 +2129,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ReplaceRendered(SkiaImage rendered, StrokePlan plan)
+    private void ReplaceRendered(SkiaImage rendered, StrokePlan plan, BrushSettings brush)
     {
         ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(brush);
         Bitmap preview = CreateAvaloniaBitmap(rendered);
         SkiaImage? previousRendered = _renderedImage;
         Bitmap? previousPreview = _resultPreviewBitmap;
@@ -2105,6 +2143,7 @@ public partial class MainWindow : Window
             adopted = true;
             _renderedImage = rendered;
             _previewStrokePlan = plan;
+            _previewBrushSettings = brush;
             _resultPreviewBitmap = preview;
             _resultImageView.Source = preview;
             UpdateFinalOutputEstimate();
@@ -2130,6 +2169,7 @@ public partial class MainWindow : Window
         Bitmap? preview = _resultPreviewBitmap;
         _renderedImage = null;
         _previewStrokePlan = null;
+        _previewBrushSettings = null;
         _resultPreviewBitmap = null;
         _resultImageView.Source = null;
         _resultInfoText.Text = "Not rendered";
@@ -2441,6 +2481,7 @@ public partial class MainWindow : Window
         _automaticDetailMap = null;
         _composedDetailMap = null;
         _previewStrokePlan = null;
+        _previewBrushSettings = null;
         _activeDetailAnalysisSettings = null;
         _imageViewportState.Reset();
     }

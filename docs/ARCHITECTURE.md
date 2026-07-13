@@ -195,7 +195,7 @@ FlowPainterSettings + IFlowField
             ↓
 FlowPainterPlanner
             ↓
-SkiaStrokePlanRenderer → SkiaImage / PNG
+SkiaStrokePlanRenderer → ISkiaBrushRenderer → SkiaImage / PNG/JPEG
 ```
 
 ### Primitive engine
@@ -243,3 +243,20 @@ The original background is considered compatible when fitting it to the plan's p
 ## Synchronized comparison viewport
 
 `SynchronizedImageViewportState` is an Application-layer interaction model shared by the source and rendered-preview controls. It stores a normalized image center and zoom, computes a separate affine transform for each control size, inverse-maps source-selection input, and contains no Avalonia types. The desktop composition root applies the resulting matrices through top-left-origin `MatrixTransform` instances. This keeps navigation synchronized without modifying image data, render plans or project persistence.
+
+
+## Brush rendering boundary
+
+`BrushSettings` belongs to Domain because it is a serializable, renderer-independent description of material intent. Skia-specific strategies remain inside `FlowPainter.Rendering.Skia`. The desktop composition root stores the brush settings associated with the approved preview and supplies the same value to final rendering.
+
+```text
+StrokePlan + BrushSettings
+          ↓
+SkiaStrokePlanRenderer
+          ↓
+ISkiaBrushRenderer
+          ↓
+SolidRound | SoftRound | Flat | Bristle
+```
+
+Procedural variation is keyed by plan seed and stroke index. Renderer implementations cannot mutate the plan or consume global randomness.

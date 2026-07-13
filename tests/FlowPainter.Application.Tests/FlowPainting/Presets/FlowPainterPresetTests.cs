@@ -1,5 +1,6 @@
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.FlowPainting.Presets;
+using FlowPainter.Domain.Brushes;
 
 namespace FlowPainter.Application.Tests.FlowPainting.Presets;
 
@@ -21,6 +22,18 @@ public sealed class FlowPainterPresetTests
     public void ConstructorRejectsBlankName()
     {
         Assert.Throws<ArgumentException>(() => new FlowPainterPreset(" ", new FlowPainterSettings()));
+    }
+
+    [Fact]
+    public void BuiltInCatalogDemonstratesEveryBrushKind()
+    {
+        BrushKind[] kinds = BuiltInFlowPainterPresets.All
+            .Select(preset => preset.Settings.Brush.Kind)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        Assert.Equal(Enum.GetValues<BrushKind>(), kinds);
     }
 
     [Fact]

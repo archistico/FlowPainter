@@ -1,8 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
-using FlowPainter.Domain.Geometry;
+using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Images;
+using FlowPainter.Domain.Randomness;
 using FlowPainter.Domain.Strokes;
 using FlowPainter.Imaging.Skia.Images;
+using FlowPainter.Rendering.Skia.Brushes;
 using SkiaSharp;
 
 namespace FlowPainter.Rendering.Skia.Strokes;
@@ -18,13 +20,15 @@ public sealed class SkiaStrokePlanRenderer
         ImageSize outputSize,
         SkiaImage? sourceBackground = null,
         IProgress<StrokeRenderProgress>? progress = null,
+        BrushSettings? brush = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ValidateBackground(plan, sourceBackground);
 
+        BrushSettings effectiveBrush = brush ?? new BrushSettings();
         return Task.Run(
-            () => Render(plan, outputSize, sourceBackground, progress, cancellationToken),
+            () => Render(plan, outputSize, sourceBackground, effectiveBrush, progress, cancellationToken),
             cancellationToken);
     }
 
@@ -33,6 +37,7 @@ public sealed class SkiaStrokePlanRenderer
         StrokePlan plan,
         ImageSize outputSize,
         SkiaImage? sourceBackground,
+        BrushSettings brush,
         IProgress<StrokeRenderProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -54,14 +59,8 @@ public sealed class SkiaStrokePlanRenderer
         SKCanvas canvas = surface.Canvas;
         DrawBackground(canvas, plan, outputSize, sourceBackground, progress);
 
-        using SKPaint paint = new()
-        {
-            IsAntialias = true,
-            Style = SKPaintStyle.Stroke,
-            StrokeCap = SKStrokeCap.Round,
-            StrokeJoin = SKStrokeJoin.Round
-        };
-
+        using SKPaint paint = new();
+        ISkiaBrushRenderer brushRenderer = SkiaBrushRendererFactory.Get(brush.Kind);
         int maximumOutputDimension = Math.Max(outputSize.Width, outputSize.Height);
         for (int index = 0; index < plan.Strokes.Count; index++)
         {
@@ -75,7 +74,16 @@ public sealed class SkiaStrokePlanRenderer
                     CalculateFraction(index, plan.Strokes.Count)));
             }
 
-            DrawStroke(canvas, plan.Strokes[index], outputSize, maximumOutputDimension, paint);
+            DrawStroke(
+                canvas,
+                plan.Strokes[index],
+                plan.Seed,
+                outputSize,
+                maximumOutputDimension,
+                brush,
+                brushRenderer,
+                paint,
+                cancellationToken);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -141,29 +149,47 @@ public sealed class SkiaStrokePlanRenderer
     private static void DrawStroke(
         SKCanvas canvas,
         FlowStroke stroke,
+        ulong planSeed,
         ImageSize outputSize,
         int maximumOutputDimension,
-        SKPaint paint)
+        BrushSettings brush,
+        ISkiaBrushRenderer brushRenderer,
+        SKPaint paint,
+        CancellationToken cancellationToken)
     {
-        paint.Color = new SKColor(
-            stroke.Color.Red,
-            stroke.Color.Green,
-            stroke.Color.Blue,
-            stroke.Color.Alpha);
-        paint.StrokeWidth = Math.Max(0.5f, (float)(stroke.WidthRelativeToReference * maximumOutputDimension));
+        DeterministicRandom random = new(CreateStrokeSeed(planSeed, stroke.Index));
+        double sizeScale = 1d + (((random.NextDouble() * 2d) - 1d) * brush.SizeJitter);
+        double opacityScale = 1d + (((random.NextDouble() * 2d) - 1d) * brush.OpacityJitter);
+        float width = Math.Max(
+            0.5f,
+            (float)(stroke.WidthRelativeToReference * maximumOutputDimension * sizeScale));
+        SKColor color = SkiaBrushPaint.ScaleAlpha(
+            new SKColor(
+                stroke.Color.Red,
+                stroke.Color.Green,
+                stroke.Color.Blue,
+                stroke.Color.Alpha),
+            opacityScale);
+        BrushRenderContext context = new(
+            stroke,
+            outputSize,
+            brush,
+            width,
+            color,
+            random,
+            cancellationToken);
+        brushRenderer.Draw(canvas, context, paint);
+    }
 
-        using SKPathBuilder pathBuilder = new();
-        RelativePoint first = stroke.Points[0];
-        pathBuilder.MoveTo((float)(first.X * outputSize.Width), (float)(first.Y * outputSize.Height));
-
-        for (int index = 1; index < stroke.Points.Count; index++)
+    private static ulong CreateStrokeSeed(ulong planSeed, int strokeIndex)
+    {
+        unchecked
         {
-            RelativePoint point = stroke.Points[index];
-            pathBuilder.LineTo((float)(point.X * outputSize.Width), (float)(point.Y * outputSize.Height));
+            ulong value = planSeed ^ ((ulong)(uint)strokeIndex + 0x9E3779B97F4A7C15UL);
+            value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+            value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+            return value ^ (value >> 31);
         }
-
-        using SKPath path = pathBuilder.Detach();
-        canvas.DrawPath(path, paint);
     }
 
     private static void ValidateBackground(StrokePlan plan, SkiaImage? sourceBackground)

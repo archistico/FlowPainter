@@ -147,12 +147,28 @@ dotnet test FlowPainter.sln -c Release --collect:"XPlat Code Coverage"
 
 ## Current suite
 
-M6.1 contains 410 cases:
+M7 contains 440 cases:
 
-- 55 Domain;
-- 313 Application;
+- 71 Domain;
+- 317 Application;
 - 24 Imaging.Skia;
-- 18 Rendering.Skia.
+- 28 Rendering.Skia.
+
+## M7 brush-rendering tests
+
+The brush suite verifies:
+
+- validation and defaults of every brush parameter;
+- compatibility between the implicit renderer default and explicit SolidRound;
+- visible output from all built-in brush kinds;
+- distinct rasterizations for round, flat and bristle materials;
+- soft-edge coverage outside the solid core;
+- deterministic bristle and jitter output for equal seeds;
+- changed local variation for changed plan seeds;
+- persistence and migration of brush settings in presets and projects;
+- built-in preset coverage of every brush family.
+
+Full-image byte comparison is used only between two renders produced by the same native library in the same test to verify determinism or difference. Cross-version visual golden files remain intentionally avoided.
 
 ## M6.1 synchronized-viewport tests
 

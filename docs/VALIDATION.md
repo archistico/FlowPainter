@@ -10,30 +10,37 @@ dotnet test FlowPainter.sln -c Release --no-build --logger "console;verbosity=no
 dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 ```
 
-## M6.1 expected result
+## M7 expected result
 
 - restore succeeds;
 - all nine projects build;
 - build emits zero warnings and zero errors;
-- all 410 test cases pass;
+- all 440 test cases pass;
 - the Avalonia window opens;
-- the mouse wheel zooms source and rendered preview together;
-- middle-button drag pans both panels together;
-- manual source-region selection remains aligned after navigation;
-- an image can be loaded and a deterministic preview rendered;
-- final settings accept a maximum dimension up to 10,000 and preserve source aspect ratio;
-- the memory estimate updates from source, proxy, preview, overlay and final output sizes;
-- final PNG export preserves alpha;
-- final JPEG export flattens transparency over white and honors quality;
-- final export reuses the plan shown in the preview;
-- cancellation returns the UI to an operable state;
-- project schema 2 round-trips final settings;
-- schema-1 M5 projects load with M6 defaults;
+- source/result synchronized zoom and pan remain operational;
+- SolidRound reproduces the M6 compatibility rendering when jitter is zero;
+- SoftRound, Flat and Bristle produce visibly distinct marks;
+- equal plan, seed and brush settings produce equal raster output;
+- preview and final export use the same approved brush settings;
+- project and preset schema 3 round-trip every brush parameter;
+- schema-1 and schema-2 documents load with SolidRound compatibility defaults;
 - Domain and Application contain no Avalonia, SkiaSharp or LibNoiseCore dependency.
 
-After successful validation, update M6.1 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
+After successful validation, update M7 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
 
 ## Validation history
+
+### 2026-07-13 — M7.1 cancellation-token parameter ordering correction
+
+The first Windows build of M7 reached the rendering project and reported `CA1068` because `SkiaStrokePlanRenderer.RenderAsync` placed the optional `BrushSettings` parameter after `CancellationToken`. M7.1 moves `CancellationToken` to the final position required by the analyzer and updates the two positional application call sites. Named-argument test calls and rendering behaviour remain unchanged; analyzer severity is not reduced.
+
+### 2026-07-13 — M7 brush engine prepared
+
+M7 introduces a pure brush configuration value and a Skia renderer strategy boundary. The same immutable `StrokePlan` can now be rasterized with SolidRound, SoftRound, Flat or Bristle materials. Size and opacity jitter are derived from the plan seed and stroke index, so preview and final export remain repeatable. Project and preset schemas move to version 3 while earlier files receive SolidRound defaults. Thirty focused cases increase the expected suite from 410 to 440.
+
+### 2026-07-13 — M6.1 validated on Windows
+
+The user confirmed that M6.1 builds successfully and all 410 automated tests pass. Synchronized wheel zoom, middle-button pan and source-region alignment are accepted; M6.1 is marked DONE.
 
 ### 2026-07-13 — M6.1 synchronized viewport prepared
 

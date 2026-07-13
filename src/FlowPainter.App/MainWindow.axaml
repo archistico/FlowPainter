@@ -13,7 +13,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="3">
                     <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="White" Text="FlowPainter" />
-                    <TextBlock Foreground="#AEB4BF" Text="M6.1 · synchronized source and preview navigation" />
+                    <TextBlock Foreground="#AEB4BF" Text="M7 · extensible deterministic brush engine" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <Button x:Name="OpenProjectButton" Padding="16,9" Click="OpenProjectClick" Content="Open project" />
@@ -142,6 +142,31 @@
                                 <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Opacity (%)" />
                                 <TextBox x:Name="OpacityTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
                             </Grid>
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Brush rendering" />
+                            <TextBlock Foreground="#AEB4BF" Text="Brush type" />
+                            <ComboBox x:Name="BrushKindComboBox" HorizontalAlignment="Stretch" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Hardness (%)" />
+                                <TextBox x:Name="BrushHardnessTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Size jitter (%)" />
+                                <TextBox x:Name="BrushSizeJitterTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Opacity jitter (%)" />
+                                <TextBox x:Name="BrushOpacityJitterTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Bristle count" />
+                                <TextBox x:Name="BrushBristleCountTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Bristle spread (%)" />
+                                <TextBox x:Name="BrushBristleSpreadTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap" Foreground="#7F8794" Text="Hardness affects SoftRound and Bristle. Bristle count/spread affect Bristle. Jitter is deterministic for preview and final export." />
 
                             <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Automatic detail analysis" />
                             <Grid ColumnDefinitions="*,100" ColumnSpacing="8">

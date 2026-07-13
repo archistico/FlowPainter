@@ -5,6 +5,7 @@ using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.Projects;
+using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Geometry;
@@ -31,7 +32,8 @@ public sealed class FlowPainterProjectSerializerTests
             strokeOpacity: 0.63d,
             backgroundMode: StrokePlanBackgroundMode.Transparent,
             detailAnalysis: new DetailAnalysisSettings(0.2d, 0.9d, 0.6d, 3),
-            detailInfluence: new DetailInfluenceSettings(5.5d, 0.4d, 1.6d, 0.55d, 1.7d));
+            detailInfluence: new DetailInfluenceSettings(5.5d, 0.4d, 1.6d, 0.55d, 1.7d),
+            brush: new BrushSettings(BrushKind.Flat, 0.7d, 0.12d, 0.2d, 5, 0.65d));
         DetailRegion region = new(
             "manual-0007",
             new NormalizedRect(0.1d, 0.2d, 0.4d, 0.7d),
@@ -224,6 +226,27 @@ public sealed class FlowPainterProjectSerializerTests
     }
 
     [Fact]
+    public async Task DeserializeMigratesSchemaVersionTwoWithDefaultBrush()
+    {
+        FlowPainterProject project = CreateProject();
+        await using MemoryStream current = new();
+        await FlowPainterProjectSerializer.SerializeAsync(project, current);
+        current.Position = 0L;
+        JsonObject root = (await JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON is empty.");
+        root["schemaVersion"] = 2;
+        JsonObject settings = root["project"]?["settings"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON has no settings.");
+        settings.Remove("brush");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterProject loaded = await FlowPainterProjectSerializer.DeserializeAsync(legacy);
+
+        Assert.Equal(BrushKind.SolidRound, loaded.Settings.Brush.Kind);
+        Assert.Equal(BrushSettings.DefaultHardness, loaded.Settings.Brush.Hardness);
+    }
+
+    [Fact]
     public async Task DeserializeRejectsUnsupportedSchemaVersion()
     {
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes("{\"schemaVersion\":99,\"project\":{}}"));
@@ -285,6 +308,12 @@ public sealed class FlowPainterProjectSerializerTests
         Assert.Equal(expected.DetailInfluence.BackgroundLengthMultiplier, actual.DetailInfluence.BackgroundLengthMultiplier);
         Assert.Equal(expected.DetailInfluence.DetailedWidthMultiplier, actual.DetailInfluence.DetailedWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.BackgroundWidthMultiplier, actual.DetailInfluence.BackgroundWidthMultiplier);
+        Assert.Equal(expected.Brush.Kind, actual.Brush.Kind);
+        Assert.Equal(expected.Brush.Hardness, actual.Brush.Hardness);
+        Assert.Equal(expected.Brush.SizeJitter, actual.Brush.SizeJitter);
+        Assert.Equal(expected.Brush.OpacityJitter, actual.Brush.OpacityJitter);
+        Assert.Equal(expected.Brush.BristleCount, actual.Brush.BristleCount);
+        Assert.Equal(expected.Brush.BristleSpread, actual.Brush.BristleSpread);
     }
 
     private static FlowPainterProject CreateProject()
