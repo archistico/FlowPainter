@@ -1,4 +1,5 @@
 using System.Text;
+using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
@@ -36,9 +37,19 @@ public sealed class FlowPainterPresetSerializerTests
                 0.6d,
                 StrokePlanBackgroundMode.Transparent,
                 new DetailAnalysisSettings(0.2d, 0.8d, 0.3d, 2),
-                new DetailInfluenceSettings(6d, 0.4d, 1.6d, 0.5d, 1.7d),
+                new DetailInfluenceSettings(6d, 0.4d, 1.6d, 0.5d, 1.7d, 0.09d),
                 new BrushSettings(BrushKind.Bristle, 0.45d, 0.2d, 0.3d, 11, 0.85d),
-                new SemanticAnalysisSettings(false, 0.4d, 0d, 0d, 0d, 0d, 0.6d, 0.01d, 3, 0.5d, 1, 4)));
+                new SemanticAnalysisSettings(false, 0.4d, 0d, 0d, 0d, 0d, 0.6d, 0.01d, 3, 0.5d, 1, 4),
+                new SceneBoundaryAnalysisSettings(
+                    luminanceWeight: 0.7d,
+                    colorWeight: 0.8d,
+                    continuityWeight: 1.1d,
+                    textureSuppression: 0.72d,
+                    edgeThreshold: 0.12d,
+                    importantEdgeThreshold: 0.35d,
+                    coarseRadius: 4,
+                    smoothingRadius: 2,
+                    boundaryProtectionRadius: 6)));
         await using MemoryStream stream = new();
 
         await FlowPainterPresetSerializer.SerializeAsync(original, stream);
@@ -63,6 +74,34 @@ public sealed class FlowPainterPresetSerializerTests
     }
 
     [Fact]
+    public async Task DeserializeMigratesSchemaVersionSevenWithDefaultRegionTransition()
+    {
+        FlowPainterPreset preset = new(
+            "Legacy soft regions",
+            new FlowPainterSettings(
+                detailInfluence: new DetailInfluenceSettings(regionTransitionWidth: 0.12d)));
+        await using MemoryStream current = new();
+        await FlowPainterPresetSerializer.SerializeAsync(preset, current);
+        current.Position = 0L;
+
+        System.Text.Json.Nodes.JsonObject root =
+            (await System.Text.Json.Nodes.JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
+        root["schemaVersion"] = 7;
+        System.Text.Json.Nodes.JsonObject detailInfluence =
+            root["preset"]?["settings"]?["detailInfluence"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset has no detail-influence settings.");
+        detailInfluence.Remove("regionTransitionWidth");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterPreset loaded = await FlowPainterPresetSerializer.DeserializeAsync(legacy);
+
+        Assert.Equal(
+            DetailInfluenceSettings.DefaultRegionTransitionWidth,
+            loaded.Settings.DetailInfluence.RegionTransitionWidth);
+    }
+
+    [Fact]
     public async Task DeserializeRejectsUnsupportedSchemaVersion()
     {
         await using MemoryStream valid = new();
@@ -70,7 +109,7 @@ public sealed class FlowPainterPresetSerializerTests
             new FlowPainterPreset("Invalid version", new FlowPainterSettings(strokeCount: 1)),
             valid);
         string json = Encoding.UTF8.GetString(valid.ToArray())
-            .Replace("\"schemaVersion\": 4", "\"schemaVersion\": 99", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 99", StringComparison.Ordinal);
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes(json), writable: false);
 
         await Assert.ThrowsAsync<NotSupportedException>(
@@ -116,6 +155,7 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal("M3 preset", preset.Name);
         Assert.Equal(DetailAnalysisSettings.DefaultBaseDetail, preset.Settings.DetailAnalysis.BaseDetail);
         Assert.Equal(DetailInfluenceSettings.DefaultPlacementBias, preset.Settings.DetailInfluence.PlacementBias);
+        Assert.Equal(DetailInfluenceSettings.DefaultRegionTransitionWidth, preset.Settings.DetailInfluence.RegionTransitionWidth);
         Assert.Equal(BrushKind.SolidRound, preset.Settings.Brush.Kind);
     }
 
@@ -126,7 +166,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 4", "\"schemaVersion\": 2", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 2", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -147,7 +187,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 4", "\"schemaVersion\": 3", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 3", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -161,6 +201,29 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal(
             SemanticAnalysisSettings.DefaultOverallInfluence,
             loaded.Settings.SemanticAnalysis.OverallInfluence);
+    }
+
+    [Fact]
+    public async Task DeserializeMigratesSchemaVersionFourWithBoundaryDefaults()
+    {
+        FlowPainterPreset preset = new("M8 preset", new FlowPainterSettings(strokeCount: 1));
+        await using MemoryStream current = new();
+        await FlowPainterPresetSerializer.SerializeAsync(preset, current);
+        string json = Encoding.UTF8.GetString(current.ToArray())
+            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 4", StringComparison.Ordinal);
+        System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
+        System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON has no settings.");
+        settings.Remove("boundaryAnalysis");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterPreset loaded = await FlowPainterPresetSerializer.DeserializeAsync(legacy);
+
+        Assert.True(loaded.Settings.BoundaryAnalysis.Enabled);
+        Assert.Equal(
+            SceneBoundaryAnalysisSettings.DefaultImportantEdgeThreshold,
+            loaded.Settings.BoundaryAnalysis.ImportantEdgeThreshold);
     }
 
     [Fact]
@@ -201,6 +264,7 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal(expected.DetailInfluence.BackgroundLengthMultiplier, actual.DetailInfluence.BackgroundLengthMultiplier);
         Assert.Equal(expected.DetailInfluence.DetailedWidthMultiplier, actual.DetailInfluence.DetailedWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.BackgroundWidthMultiplier, actual.DetailInfluence.BackgroundWidthMultiplier);
+        Assert.Equal(expected.DetailInfluence.RegionTransitionWidth, actual.DetailInfluence.RegionTransitionWidth);
         Assert.Equal(expected.Brush.Kind, actual.Brush.Kind);
         Assert.Equal(expected.Brush.Hardness, actual.Brush.Hardness);
         Assert.Equal(expected.Brush.SizeJitter, actual.Brush.SizeJitter);
@@ -219,5 +283,39 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal(expected.SemanticAnalysis.CenterBias, actual.SemanticAnalysis.CenterBias);
         Assert.Equal(expected.SemanticAnalysis.SmoothingRadius, actual.SemanticAnalysis.SmoothingRadius);
         Assert.Equal(expected.SemanticAnalysis.BoundaryRadius, actual.SemanticAnalysis.BoundaryRadius);
+        Assert.Equal(expected.BoundaryAnalysis.Enabled, actual.BoundaryAnalysis.Enabled);
+        Assert.Equal(expected.BoundaryAnalysis.LuminanceWeight, actual.BoundaryAnalysis.LuminanceWeight);
+        Assert.Equal(expected.BoundaryAnalysis.ColorWeight, actual.BoundaryAnalysis.ColorWeight);
+        Assert.Equal(expected.BoundaryAnalysis.MultiscaleWeight, actual.BoundaryAnalysis.MultiscaleWeight);
+        Assert.Equal(expected.BoundaryAnalysis.ContinuityWeight, actual.BoundaryAnalysis.ContinuityWeight);
+        Assert.Equal(expected.BoundaryAnalysis.SemanticBoundaryWeight, actual.BoundaryAnalysis.SemanticBoundaryWeight);
+        Assert.Equal(expected.BoundaryAnalysis.TextureSuppression, actual.BoundaryAnalysis.TextureSuppression);
+        Assert.Equal(expected.BoundaryAnalysis.EdgeThreshold, actual.BoundaryAnalysis.EdgeThreshold);
+        Assert.Equal(expected.BoundaryAnalysis.ImportantEdgeThreshold, actual.BoundaryAnalysis.ImportantEdgeThreshold);
+        Assert.Equal(expected.BoundaryAnalysis.CoarseRadius, actual.BoundaryAnalysis.CoarseRadius);
+        Assert.Equal(expected.BoundaryAnalysis.SmoothingRadius, actual.BoundaryAnalysis.SmoothingRadius);
+        Assert.Equal(expected.BoundaryAnalysis.BoundaryProtectionRadius, actual.BoundaryAnalysis.BoundaryProtectionRadius);
+        Assert.Equal(expected.BoundaryPainting.Enabled, actual.BoundaryPainting.Enabled);
+        Assert.Equal(expected.BoundaryPainting.TangentAlignment, actual.BoundaryPainting.TangentAlignment);
+        Assert.Equal(expected.BoundaryPainting.AlignmentRadius, actual.BoundaryPainting.AlignmentRadius);
+        Assert.Equal(expected.BoundaryPainting.CrossingPenalty, actual.BoundaryPainting.CrossingPenalty);
+        Assert.Equal(expected.BoundaryPainting.HardBoundaryThreshold, actual.BoundaryPainting.HardBoundaryThreshold);
+        Assert.Equal(expected.BoundaryPainting.TerminationStrength, actual.BoundaryPainting.TerminationStrength);
+        Assert.Equal(expected.BoundaryPainting.InternalEdgeInfluence, actual.BoundaryPainting.InternalEdgeInfluence);
+        Assert.Equal(expected.BoundaryPainting.TextureEdgeInfluence, actual.BoundaryPainting.TextureEdgeInfluence);
+        Assert.Equal(expected.BoundaryPainting.ContourReinforcement, actual.BoundaryPainting.ContourReinforcement);
+        Assert.Equal(expected.BoundaryPainting.CornerPreservation, actual.BoundaryPainting.CornerPreservation);
+        Assert.Equal(expected.BackgroundSuppression.Enabled, actual.BackgroundSuppression.Enabled);
+        Assert.Equal(expected.BackgroundSuppression.OverallStrength, actual.BackgroundSuppression.OverallStrength);
+        Assert.Equal(expected.BackgroundSuppression.DetailFloor, actual.BackgroundSuppression.DetailFloor);
+        Assert.Equal(expected.BackgroundSuppression.UncertaintyProtection, actual.BackgroundSuppression.UncertaintyProtection);
+        Assert.Equal(expected.BackgroundSuppression.SilhouetteProtection, actual.BackgroundSuppression.SilhouetteProtection);
+        Assert.Equal(expected.BackgroundSuppression.TransitionSoftness, actual.BackgroundSuppression.TransitionSoftness);
+        Assert.Equal(expected.BackgroundSuppression.BackgroundPlacementWeight, actual.BackgroundSuppression.BackgroundPlacementWeight);
+        Assert.Equal(expected.BackgroundSuppression.StrokeLengthMultiplier, actual.BackgroundSuppression.StrokeLengthMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.StrokeWidthMultiplier, actual.BackgroundSuppression.StrokeWidthMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.SegmentMultiplier, actual.BackgroundSuppression.SegmentMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.CurveFreedomMultiplier, actual.BackgroundSuppression.CurveFreedomMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.ColorSimplification, actual.BackgroundSuppression.ColorSimplification);
     }
 }

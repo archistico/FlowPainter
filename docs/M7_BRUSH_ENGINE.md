@@ -2,7 +2,7 @@
 
 ## Status
 
-**READY FOR VALIDATION**
+**DONE — M7.1 validated on Windows with 454 passing tests**
 
 M7 separates stroke planning from the material mark left by a stroke. `StrokePlan` remains immutable and resolution-independent; a `BrushSettings` value selects how the same plan is rasterized for preview and final export.
 

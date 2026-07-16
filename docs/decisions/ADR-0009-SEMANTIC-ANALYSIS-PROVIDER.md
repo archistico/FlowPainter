@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for M8.
+Accepted for M8–M13.3; **superseded for future development by ADR-0017**.
 
 ## Context
 
@@ -14,7 +14,7 @@ Define semantic analysis through `ISemanticImportanceAnalyzer` in Application an
 
 M8 ships a deterministic model-free provider that produces saliency, subject, silhouette, focal and combined importance maps. It is useful immediately and establishes the full integration path without adding a machine-learning runtime.
 
-Class-aware or model-backed providers may be added later. They must:
+At the time of M8, class-aware or model-backed providers were permitted as a future extension and were required to:
 
 - remain local/offline by default;
 - consume `IRgbaPixelSource` or an explicitly versioned model input;
@@ -29,4 +29,6 @@ Class-aware or model-backed providers may be added later. They must:
 - The UI, detail-map composer and planner do not depend on a specific detector.
 - M8 can improve paintings immediately with generic subject hierarchy.
 - Exact person/animal/object recognition is deferred and must not be implied by the heuristic provider.
-- Adding a model later requires a separate dependency, packaging and validation decision rather than an architectural rewrite.
+- The boundary successfully prevented a model dependency from entering Domain or rendering.
+- The project has since decided not to add a model provider. ADR-0017 selects deterministic SLIC regional segmentation instead.
+- Existing M8–M13.3 code and project schemas remain supported until the active-path migration in M14.7.

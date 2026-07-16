@@ -13,7 +13,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="3">
                     <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="White" Text="FlowPainter" />
-                    <TextBlock Foreground="#AEB4BF" Text="M8 · semantic importance, subjects and focal areas" />
+                    <TextBlock Foreground="#AEB4BF" Text="M13.4.1 · dirty state and data-loss protection" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <Button x:Name="OpenProjectButton" Padding="16,9" Click="OpenProjectClick" Content="Open project" />
@@ -23,6 +23,7 @@
                     <Button x:Name="CancelButton" Padding="16,9" Click="CancelClick" Content="Cancel" IsEnabled="False" />
                     <Button x:Name="SaveButton" Padding="16,9" Click="SavePngClick" Content="Save preview" IsEnabled="False" />
                     <Button x:Name="ExportFinalButton" Padding="16,9" Click="ExportFinalClick" Content="Export final" IsEnabled="False" />
+                    <Button x:Name="ExportSvgButton" Padding="16,9" Click="ExportSvgClick" Content="Export SVG" IsEnabled="False" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -30,11 +31,14 @@
         <Grid Grid.Row="1" Margin="20" ColumnDefinitions="370,*,*" ColumnSpacing="18">
             <Border Background="#202329" CornerRadius="10" Padding="14">
                 <Grid RowDefinitions="Auto,*">
-                    <TextBlock Margin="2,0,2,12" FontSize="17" FontWeight="SemiBold" Foreground="White" Text="Flow and detail parameters" />
+                    <TextBlock Margin="2,0,2,12" FontSize="17" FontWeight="SemiBold" Foreground="White" Text="Generative and detail parameters" />
                     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="SettingsPanel" Margin="0,0,18,0" Spacing="10">
                             <TextBlock Foreground="#AEB4BF" Text="Project name" />
                             <TextBox x:Name="ProjectNameTextBox" />
+
+                            <TextBlock Margin="0,8,0,0" FontWeight="SemiBold" Foreground="White" Text="Generative engine" />
+                            <ComboBox x:Name="GenerativeModeComboBox" HorizontalAlignment="Stretch" SelectionChanged="GenerativeModeChanged" />
 
                             <TextBlock Foreground="#AEB4BF" Text="Recent projects" />
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -77,6 +81,90 @@
 
                             <TextBlock Margin="0,8,0,0" Foreground="#AEB4BF" Text="Preset name" />
                             <TextBox x:Name="PresetNameTextBox" />
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Geometric primitives" />
+                            <TextBlock Foreground="#AEB4BF" Text="Allowed shapes" />
+                            <ComboBox x:Name="PrimitiveKindsComboBox" HorizontalAlignment="Stretch" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Primitives" />
+                                <TextBox x:Name="PrimitiveCountTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Candidates / step" />
+                                <TextBox x:Name="PrimitiveCandidatesTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Mutations" />
+                                <TextBox x:Name="PrimitiveMutationsTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Minimum size (%)" />
+                                <TextBox x:Name="PrimitiveMinimumSizeTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Maximum size (%)" />
+                                <TextBox x:Name="PrimitiveMaximumSizeTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Opacity (%)" />
+                                <TextBox x:Name="PrimitiveOpacityTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detail size influence (%)" />
+                                <TextBox x:Name="PrimitiveDetailSizeTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detail placement bias" />
+                                <TextBox x:Name="PrimitivePlacementBiasTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detail error weight" />
+                                <TextBox x:Name="PrimitiveErrorWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detail search influence" />
+                                <TextBox x:Name="PrimitiveSearchInfluenceTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Hybrid composition" />
+                            <TextBlock Foreground="#AEB4BF" Text="Primitive flow influence" />
+                            <ComboBox x:Name="HybridInfluenceKindComboBox" HorizontalAlignment="Stretch" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Primitive budget (%)" />
+                                <TextBox x:Name="HybridPrimitiveBudgetTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Flow budget (%)" />
+                                <TextBox x:Name="HybridFlowBudgetTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Refinement budget (%)" />
+                                <TextBox x:Name="HybridRefinementBudgetTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Flow influence (%)" />
+                                <TextBox x:Name="HybridInfluenceStrengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Influence radius" />
+                                <TextBox x:Name="HybridInfluenceRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Max nearby primitives" />
+                                <TextBox x:Name="HybridMaximumInfluencesTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Refinement detail bias" />
+                                <TextBox x:Name="HybridRefinementDetailBiasTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Refinement length (%)" />
+                                <TextBox x:Name="HybridRefinementLengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Refinement width (%)" />
+                                <TextBox x:Name="HybridRefinementWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
 
                             <TextBlock Margin="0,8,0,0" FontWeight="SemiBold" Foreground="White" Text="Flow field" />
                             <ComboBox x:Name="FlowFieldComboBox" HorizontalAlignment="Stretch" />
@@ -185,7 +273,7 @@
                                 <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Smoothing radius" />
                                 <TextBox x:Name="SmoothingRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
                             </Grid>
-                            <Button Click="ReanalyzeDetailClick" Content="Reanalyze detail + subjects" />
+                            <Button Click="ReanalyzeDetailClick" Content="Reanalyze detail + subjects + boundaries" />
 
                             <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Semantic importance" />
                             <CheckBox x:Name="EnableSemanticAnalysisCheckBox"
@@ -242,14 +330,184 @@
                             <TextBlock x:Name="SemanticRegionCountText"
                                        Foreground="#AEB4BF"
                                        Text="No semantic subjects analyzed" />
-                            <ListBox x:Name="SemanticRegionListBox" Height="105" />
+                            <ListBox x:Name="SemanticRegionListBox"
+                                     Height="105"
+                                     SelectionChanged="SemanticRegionSelectionChanged" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Click="SetSemanticPrimarySubjectClick" Content="Set primary subject" />
+                                <Button Grid.Column="1" Click="SetSemanticSubjectClick" Content="Mark as subject" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Click="SetSemanticBackgroundClick" Content="Mark as background" />
+                                <Button Grid.Column="1" Click="IgnoreSemanticDetectionClick" Content="Ignore detection" />
+                            </Grid>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Button Click="PromoteSemanticFocusClick" Content="Promote to focus" />
                                 <Button Grid.Column="1" Click="PromoteSemanticCriticalClick" Content="Critical detail" />
                             </Grid>
+                            <TextBlock Margin="0,6,0,0"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"
+                                       Text="Semantic corrections" />
+                            <TextBlock x:Name="SemanticCorrectionCountText"
+                                       Foreground="#AEB4BF"
+                                       Text="0 semantic corrections" />
+                            <ListBox x:Name="SemanticCorrectionListBox"
+                                     Height="90"
+                                     SelectionChanged="SemanticCorrectionSelectionChanged" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Click="DeleteSelectedSemanticCorrectionClick" Content="Delete selected" />
+                                <Button Grid.Column="1" Click="ClearSemanticCorrectionsClick" Content="Clear corrections" />
+                            </Grid>
                             <TextBlock TextWrapping="Wrap"
                                        Foreground="#7F8794"
-                                       Text="The built-in analyzer finds generic salient subjects, silhouettes and focal points. Class-specific providers can later identify people, animals and objects through the same contracts." />
+                                       Text="Click a detected rectangle to select it, then correct its role. Manual corrections are saved in the project and override automatic semantic maps using the same soft transition as detail regions." />
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Scene boundaries" />
+                            <CheckBox x:Name="EnableBoundaryAnalysisCheckBox"
+                                      Content="Analyze important edges and background"
+                                      IsChecked="True" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Luminance weight" />
+                                <TextBox x:Name="BoundaryLuminanceWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Colour weight" />
+                                <TextBox x:Name="BoundaryColorWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Multiscale weight" />
+                                <TextBox x:Name="BoundaryMultiscaleWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Continuity weight" />
+                                <TextBox x:Name="BoundaryContinuityWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Silhouette weight" />
+                                <TextBox x:Name="BoundarySemanticWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Texture suppression (%)" />
+                                <TextBox x:Name="BoundaryTextureSuppressionTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Edge threshold (%)" />
+                                <TextBox x:Name="BoundaryEdgeThresholdTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Important threshold (%)" />
+                                <TextBox x:Name="BoundaryImportantThresholdTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Coarse radius" />
+                                <TextBox x:Name="BoundaryCoarseRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Boundary smoothing" />
+                                <TextBox x:Name="BoundarySmoothingRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Silhouette protection" />
+                                <TextBox x:Name="BoundaryProtectionRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap"
+                                       Foreground="#7F8794"
+                                       Text="M11 classifies important contours, internal structure, texture, background confidence and tangent direction." />
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Boundary-aware painting" />
+                            <CheckBox x:Name="EnableBoundaryPaintingCheckBox"
+                                      Content="Guide and stop strokes at important edges" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Tangent alignment (%)" />
+                                <TextBox x:Name="BoundaryTangentAlignmentTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Alignment radius" />
+                                <TextBox x:Name="BoundaryAlignmentRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Crossing penalty (%)" />
+                                <TextBox x:Name="BoundaryCrossingPenaltyTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Hard edge threshold (%)" />
+                                <TextBox x:Name="BoundaryHardThresholdTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Termination strength (%)" />
+                                <TextBox x:Name="BoundaryTerminationStrengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Internal edge influence (%)" />
+                                <TextBox x:Name="BoundaryInternalInfluenceTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Texture influence (%)" />
+                                <TextBox x:Name="BoundaryTextureInfluenceTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Contour reinforcement" />
+                                <TextBox x:Name="BoundaryContourReinforcementTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Corner preservation (%)" />
+                                <TextBox x:Name="BoundaryCornerPreservationTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap"
+                                       Foreground="#7F8794"
+                                       Text="Near important contours, strokes progressively follow the tangent. Strong silhouette crossings are deflected or stopped while low-value texture remains comparatively free." />
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Background suppression" />
+                            <CheckBox x:Name="EnableBackgroundSuppressionCheckBox"
+                                      Content="Simplify low-importance background" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Overall strength (%)" />
+                                <TextBox x:Name="BackgroundSuppressionStrengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detail floor (%)" />
+                                <TextBox x:Name="BackgroundDetailFloorTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Uncertainty protection (%)" />
+                                <TextBox x:Name="BackgroundUncertaintyProtectionTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Silhouette protection (%)" />
+                                <TextBox x:Name="BackgroundSilhouetteProtectionTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Transition softness (%)" />
+                                <TextBox x:Name="BackgroundTransitionSoftnessTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Placement floor (%)" />
+                                <TextBox x:Name="BackgroundPlacementWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Stroke length (%)" />
+                                <TextBox x:Name="BackgroundSuppressionLengthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Stroke width (%)" />
+                                <TextBox x:Name="BackgroundSuppressionWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Segments retained (%)" />
+                                <TextBox x:Name="BackgroundSegmentMultiplierTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Curve freedom (%)" />
+                                <TextBox x:Name="BackgroundCurveFreedomTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Colour simplification (%)" />
+                                <TextBox x:Name="BackgroundColorSimplificationTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap"
+                                       Foreground="#7F8794"
+                                       Text="High-confidence background receives fewer, broader and freer strokes. Subjects, uncertain areas, manual focus regions and protected silhouettes retain detail through soft transitions." />
 
                             <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Detail influence" />
                             <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
@@ -272,9 +530,16 @@
                                 <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Background width (%)" />
                                 <TextBox x:Name="BackgroundWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
                             </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Region transition (%)" />
+                                <TextBox x:Name="RegionTransitionWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap"
+                                       Foreground="#7F8794"
+                                       Text="Manual regions keep full influence in their core and blend gradually across the border. The percentage is measured against the shorter analysis dimension." />
 
                             <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Manual detail regions" />
-                            <TextBlock TextWrapping="Wrap" Foreground="#7F8794" Text="Drag on the source image to add a rectangular focus or background region." />
+                            <TextBlock TextWrapping="Wrap" Foreground="#7F8794" Text="Click a region to select it; drag to add a rectangular focus or background region. Press Delete to remove the selected manual region or semantic correction." />
                             <ComboBox x:Name="DetailIntentComboBox" HorizontalAlignment="Stretch" />
                             <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
                                 <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Region strength (%)" />

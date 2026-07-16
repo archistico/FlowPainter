@@ -1,5 +1,7 @@
 # M6.1 — Synchronized source and preview viewport
 
+**Status:** DONE — validated on Windows with 410 passing tests  
+
 ## Purpose
 
 M6.1 improves visual comparison between the source/detail-map panel and the rendered-preview panel without changing rendering output or project persistence.

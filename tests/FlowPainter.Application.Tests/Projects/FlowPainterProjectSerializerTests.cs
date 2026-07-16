@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
@@ -12,6 +13,7 @@ using FlowPainter.Domain.FlowFields;
 using FlowPainter.Domain.Geometry;
 using FlowPainter.Domain.Images;
 using FlowPainter.Domain.Strokes;
+using FlowPainter.Domain.Semantics;
 
 namespace FlowPainter.Application.Tests.Projects;
 
@@ -33,7 +35,7 @@ public sealed class FlowPainterProjectSerializerTests
             strokeOpacity: 0.63d,
             backgroundMode: StrokePlanBackgroundMode.Transparent,
             detailAnalysis: new DetailAnalysisSettings(0.2d, 0.9d, 0.6d, 3),
-            detailInfluence: new DetailInfluenceSettings(5.5d, 0.4d, 1.6d, 0.55d, 1.7d),
+            detailInfluence: new DetailInfluenceSettings(5.5d, 0.4d, 1.6d, 0.55d, 1.7d, 0.08d),
             brush: new BrushSettings(BrushKind.Flat, 0.7d, 0.12d, 0.2d, 5, 0.65d),
             semanticAnalysis: new SemanticAnalysisSettings(
                 enabled: true,
@@ -47,7 +49,20 @@ public sealed class FlowPainterProjectSerializerTests
                 maximumSubjects: 4,
                 centerBias: 0.6d,
                 smoothingRadius: 1,
-                boundaryRadius: 3));
+                boundaryRadius: 3),
+            boundaryAnalysis: new SceneBoundaryAnalysisSettings(
+                enabled: true,
+                luminanceWeight: 0.6d,
+                colorWeight: 0.9d,
+                multiscaleWeight: 0.8d,
+                continuityWeight: 1.1d,
+                semanticBoundaryWeight: 1.5d,
+                textureSuppression: 0.7d,
+                edgeThreshold: 0.12d,
+                importantEdgeThreshold: 0.38d,
+                coarseRadius: 4,
+                smoothingRadius: 2,
+                boundaryProtectionRadius: 5));
         DetailRegion region = new(
             "manual-0007",
             new NormalizedRect(0.1d, 0.2d, 0.4d, 0.7d),
@@ -55,6 +70,12 @@ public sealed class FlowPainterProjectSerializerTests
             DetailRegionOrigin.Manual,
             DetailRegionIntent.IncreaseDetail,
             "Eyes");
+        SemanticCorrectionRegion correction = new(
+            "semantic-correction-0003",
+            new NormalizedRect(0.2d, 0.1d, 0.8d, 0.9d),
+            SemanticCorrectionKind.ForcePrimarySubject,
+            "Main portrait",
+            "semantic-subject-01");
         FlowPainterProject expected = new(
             "Portrait",
             "images/portrait.png",
@@ -62,7 +83,8 @@ public sealed class FlowPainterProjectSerializerTests
             settings,
             new PreviewSettings(PreviewQuality.High),
             [region],
-            new FinalRenderSettings(7000, RasterImageFormat.Jpeg, 87));
+            new FinalRenderSettings(7000, RasterImageFormat.Jpeg, 87),
+            semanticCorrections: [correction]);
         await using MemoryStream stream = new();
 
         await FlowPainterProjectSerializer.SerializeAsync(expected, stream);
@@ -79,6 +101,8 @@ public sealed class FlowPainterProjectSerializerTests
         AssertSettingsEqual(expected.Settings, actual.Settings);
         DetailRegion loadedRegion = Assert.Single(actual.DetailRegions);
         Assert.Equal(region, loadedRegion);
+        SemanticCorrectionRegion loadedCorrection = Assert.Single(actual.SemanticCorrections);
+        Assert.Equal(correction, loadedCorrection);
     }
 
 
@@ -284,6 +308,75 @@ public sealed class FlowPainterProjectSerializerTests
     }
 
     [Fact]
+    public async Task DeserializeMigratesSchemaVersionSixWithBoundaryDefaults()
+    {
+        FlowPainterProject project = CreateProject();
+        await using MemoryStream current = new();
+        await FlowPainterProjectSerializer.SerializeAsync(project, current);
+        current.Position = 0L;
+        JsonObject root = (await JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON is empty.");
+        root["schemaVersion"] = 6;
+        JsonObject settings = root["project"]?["settings"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON has no settings.");
+        settings.Remove("boundaryAnalysis");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterProject loaded = await FlowPainterProjectSerializer.DeserializeAsync(legacy);
+
+        Assert.True(loaded.Settings.BoundaryAnalysis.Enabled);
+        Assert.Equal(
+            SceneBoundaryAnalysisSettings.DefaultSemanticBoundaryWeight,
+            loaded.Settings.BoundaryAnalysis.SemanticBoundaryWeight);
+    }
+
+    [Fact]
+    public async Task DeserializeMigratesSchemaVersionNineWithDefaultRegionTransition()
+    {
+        FlowPainterProject project = new(
+            "Legacy soft regions",
+            "images/source.png",
+            42UL,
+            new FlowPainterSettings(
+                detailInfluence: new DetailInfluenceSettings(regionTransitionWidth: 0.12d)));
+        await using MemoryStream current = new();
+        await FlowPainterProjectSerializer.SerializeAsync(project, current);
+        current.Position = 0L;
+
+        JsonObject root = (await JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON is empty.");
+        root["schemaVersion"] = 9;
+        JsonObject detailInfluence = root["project"]?["settings"]?["detailInfluence"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project has no detail-influence settings.");
+        detailInfluence.Remove("regionTransitionWidth");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterProject loaded = await FlowPainterProjectSerializer.DeserializeAsync(legacy);
+
+        Assert.Equal(
+            DetailInfluenceSettings.DefaultRegionTransitionWidth,
+            loaded.Settings.DetailInfluence.RegionTransitionWidth);
+    }
+
+    [Fact]
+    public async Task DeserializeSchemaVersionTenDefaultsSemanticCorrectionsToEmpty()
+    {
+        FlowPainterProject project = CreateProject();
+        await using MemoryStream current = new();
+        await FlowPainterProjectSerializer.SerializeAsync(project, current);
+        current.Position = 0L;
+        JsonObject root = (await JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON is empty.");
+        root["schemaVersion"] = 10;
+        root["project"]?.AsObject().Remove("semanticCorrections");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterProject loaded = await FlowPainterProjectSerializer.DeserializeAsync(legacy);
+
+        Assert.Empty(loaded.SemanticCorrections);
+    }
+
+    [Fact]
     public async Task DeserializeRejectsUnsupportedSchemaVersion()
     {
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes("{\"schemaVersion\":99,\"project\":{}}"));
@@ -345,6 +438,7 @@ public sealed class FlowPainterProjectSerializerTests
         Assert.Equal(expected.DetailInfluence.BackgroundLengthMultiplier, actual.DetailInfluence.BackgroundLengthMultiplier);
         Assert.Equal(expected.DetailInfluence.DetailedWidthMultiplier, actual.DetailInfluence.DetailedWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.BackgroundWidthMultiplier, actual.DetailInfluence.BackgroundWidthMultiplier);
+        Assert.Equal(expected.DetailInfluence.RegionTransitionWidth, actual.DetailInfluence.RegionTransitionWidth);
         Assert.Equal(expected.Brush.Kind, actual.Brush.Kind);
         Assert.Equal(expected.Brush.Hardness, actual.Brush.Hardness);
         Assert.Equal(expected.Brush.SizeJitter, actual.Brush.SizeJitter);
@@ -363,6 +457,40 @@ public sealed class FlowPainterProjectSerializerTests
         Assert.Equal(expected.SemanticAnalysis.CenterBias, actual.SemanticAnalysis.CenterBias);
         Assert.Equal(expected.SemanticAnalysis.SmoothingRadius, actual.SemanticAnalysis.SmoothingRadius);
         Assert.Equal(expected.SemanticAnalysis.BoundaryRadius, actual.SemanticAnalysis.BoundaryRadius);
+        Assert.Equal(expected.BoundaryAnalysis.Enabled, actual.BoundaryAnalysis.Enabled);
+        Assert.Equal(expected.BoundaryAnalysis.LuminanceWeight, actual.BoundaryAnalysis.LuminanceWeight);
+        Assert.Equal(expected.BoundaryAnalysis.ColorWeight, actual.BoundaryAnalysis.ColorWeight);
+        Assert.Equal(expected.BoundaryAnalysis.MultiscaleWeight, actual.BoundaryAnalysis.MultiscaleWeight);
+        Assert.Equal(expected.BoundaryAnalysis.ContinuityWeight, actual.BoundaryAnalysis.ContinuityWeight);
+        Assert.Equal(expected.BoundaryAnalysis.SemanticBoundaryWeight, actual.BoundaryAnalysis.SemanticBoundaryWeight);
+        Assert.Equal(expected.BoundaryAnalysis.TextureSuppression, actual.BoundaryAnalysis.TextureSuppression);
+        Assert.Equal(expected.BoundaryAnalysis.EdgeThreshold, actual.BoundaryAnalysis.EdgeThreshold);
+        Assert.Equal(expected.BoundaryAnalysis.ImportantEdgeThreshold, actual.BoundaryAnalysis.ImportantEdgeThreshold);
+        Assert.Equal(expected.BoundaryAnalysis.CoarseRadius, actual.BoundaryAnalysis.CoarseRadius);
+        Assert.Equal(expected.BoundaryAnalysis.SmoothingRadius, actual.BoundaryAnalysis.SmoothingRadius);
+        Assert.Equal(expected.BoundaryAnalysis.BoundaryProtectionRadius, actual.BoundaryAnalysis.BoundaryProtectionRadius);
+        Assert.Equal(expected.BoundaryPainting.Enabled, actual.BoundaryPainting.Enabled);
+        Assert.Equal(expected.BoundaryPainting.TangentAlignment, actual.BoundaryPainting.TangentAlignment);
+        Assert.Equal(expected.BoundaryPainting.AlignmentRadius, actual.BoundaryPainting.AlignmentRadius);
+        Assert.Equal(expected.BoundaryPainting.CrossingPenalty, actual.BoundaryPainting.CrossingPenalty);
+        Assert.Equal(expected.BoundaryPainting.HardBoundaryThreshold, actual.BoundaryPainting.HardBoundaryThreshold);
+        Assert.Equal(expected.BoundaryPainting.TerminationStrength, actual.BoundaryPainting.TerminationStrength);
+        Assert.Equal(expected.BoundaryPainting.InternalEdgeInfluence, actual.BoundaryPainting.InternalEdgeInfluence);
+        Assert.Equal(expected.BoundaryPainting.TextureEdgeInfluence, actual.BoundaryPainting.TextureEdgeInfluence);
+        Assert.Equal(expected.BoundaryPainting.ContourReinforcement, actual.BoundaryPainting.ContourReinforcement);
+        Assert.Equal(expected.BoundaryPainting.CornerPreservation, actual.BoundaryPainting.CornerPreservation);
+        Assert.Equal(expected.BackgroundSuppression.Enabled, actual.BackgroundSuppression.Enabled);
+        Assert.Equal(expected.BackgroundSuppression.OverallStrength, actual.BackgroundSuppression.OverallStrength);
+        Assert.Equal(expected.BackgroundSuppression.DetailFloor, actual.BackgroundSuppression.DetailFloor);
+        Assert.Equal(expected.BackgroundSuppression.UncertaintyProtection, actual.BackgroundSuppression.UncertaintyProtection);
+        Assert.Equal(expected.BackgroundSuppression.SilhouetteProtection, actual.BackgroundSuppression.SilhouetteProtection);
+        Assert.Equal(expected.BackgroundSuppression.TransitionSoftness, actual.BackgroundSuppression.TransitionSoftness);
+        Assert.Equal(expected.BackgroundSuppression.BackgroundPlacementWeight, actual.BackgroundSuppression.BackgroundPlacementWeight);
+        Assert.Equal(expected.BackgroundSuppression.StrokeLengthMultiplier, actual.BackgroundSuppression.StrokeLengthMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.StrokeWidthMultiplier, actual.BackgroundSuppression.StrokeWidthMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.SegmentMultiplier, actual.BackgroundSuppression.SegmentMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.CurveFreedomMultiplier, actual.BackgroundSuppression.CurveFreedomMultiplier);
+        Assert.Equal(expected.BackgroundSuppression.ColorSimplification, actual.BackgroundSuppression.ColorSimplification);
     }
 
     private static FlowPainterProject CreateProject()

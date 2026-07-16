@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using FlowPainter.Domain.Images;
 using SkiaSharp;
@@ -6,6 +7,18 @@ namespace FlowPainter.Imaging.Skia.Images;
 
 public sealed class SkiaImageLoader
 {
+    public const int DefaultMaximumEncodedImageBytes = 256 * 1024 * 1024;
+    private const int CopyBufferSize = 81_920;
+    private readonly int _maximumEncodedImageBytes;
+
+    public SkiaImageLoader(int maximumEncodedImageBytes = DefaultMaximumEncodedImageBytes)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumEncodedImageBytes, 1);
+        _maximumEncodedImageBytes = maximumEncodedImageBytes;
+    }
+
+    public int MaximumEncodedImageBytes => _maximumEncodedImageBytes;
+
     [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "The loader is an application service with instance semantics so it can be injected, decorated or replaced without changing call sites.")]
     public async Task<SkiaImage> LoadAsync(
         Stream input,
@@ -25,14 +38,68 @@ public sealed class SkiaImageLoader
             0d,
             "Reading encoded image data"));
 
-        using MemoryStream encodedBuffer = new();
-        await input.CopyToAsync(encodedBuffer, cancellationToken).ConfigureAwait(false);
+        byte[] encodedData = await ReadEncodedDataAsync(input, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        byte[] encodedData = encodedBuffer.ToArray();
         return await Task.Run(
             () => Decode(encodedData, sourceName, progress, cancellationToken),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<byte[]> ReadEncodedDataAsync(
+        Stream input,
+        CancellationToken cancellationToken)
+    {
+        if (input.CanSeek)
+        {
+            long remaining = input.Length - input.Position;
+            ValidateEncodedLength(remaining);
+            byte[] encodedData = new byte[checked((int)remaining)];
+            await input.ReadExactlyAsync(encodedData, cancellationToken).ConfigureAwait(false);
+            return encodedData;
+        }
+
+        using MemoryStream encodedBuffer = new(Math.Min(CopyBufferSize, _maximumEncodedImageBytes));
+        byte[] copyBuffer = ArrayPool<byte>.Shared.Rent(CopyBufferSize);
+        try
+        {
+            int totalBytes = 0;
+            while (true)
+            {
+                int read = await input.ReadAsync(copyBuffer, cancellationToken).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                totalBytes = checked(totalBytes + read);
+                ValidateEncodedLength(totalBytes);
+                await encodedBuffer.WriteAsync(
+                    copyBuffer.AsMemory(0, read),
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return encodedBuffer.ToArray();
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(copyBuffer);
+        }
+    }
+
+    private void ValidateEncodedLength(long encodedLength)
+    {
+        if (encodedLength < 0)
+        {
+            throw new InvalidDataException("The image stream reports an invalid encoded length.");
+        }
+
+        if (encodedLength > _maximumEncodedImageBytes)
+        {
+            double maximumMebibytes = _maximumEncodedImageBytes / 1024d / 1024d;
+            throw new InvalidDataException(
+                $"The encoded image exceeds the supported {maximumMebibytes:N0} MiB input limit.");
+        }
     }
 
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "The decoded SKBitmap ownership is transferred to the returned SkiaImage; every failure path disposes that wrapper.")]

@@ -13,24 +13,36 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using FlowPainter.Application.Background;
+using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.FlowPainting.Presets;
 using FlowPainter.Application.Interaction;
 using FlowPainter.Application.Images;
+using FlowPainter.Application.Hybrid;
+using FlowPainter.Application.PrimitiveGeneration;
 using FlowPainter.Application.Projects;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Application.Workflow;
+using FlowPainter.Application.Workloads;
+using FlowPainter.Domain.Boundaries;
 using FlowPainter.Domain.Brushes;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.FlowFields;
+using FlowPainter.Domain.Generation;
 using FlowPainter.Domain.Geometry;
 using FlowPainter.Domain.Images;
+using FlowPainter.Domain.Hybrid;
+using FlowPainter.Domain.Primitives;
 using FlowPainter.Domain.Strokes;
 using FlowPainter.Domain.Semantics;
 using FlowPainter.Imaging.Skia.Images;
+using FlowPainter.Rendering.Skia.Boundaries;
 using FlowPainter.Rendering.Skia.Detail;
+using FlowPainter.Rendering.Skia.Hybrid;
+using FlowPainter.Rendering.Skia.Primitives;
 using FlowPainter.Rendering.Skia.Strokes;
 
 namespace FlowPainter.App;
@@ -40,17 +52,25 @@ public partial class MainWindow : Window
 {
     private const ulong InitialSeed = 0xF10A_2026UL;
     private const double MinimumManualRegionSize = 0.002d;
+    private const double RegionSelectionDragThresholdPixels = 6d;
 
     private readonly SkiaImageLoader _imageLoader = new();
     private readonly SkiaImageProxyGenerator _proxyGenerator = new();
     private readonly SkiaStrokePlanRenderer _renderer = new();
+    private readonly PrimitivePlanOptimizer _primitiveOptimizer = new();
+    private readonly SkiaPrimitivePlanRenderer _primitiveRenderer = new();
+    private readonly HybridPlanComposer _hybridComposer = new();
+    private readonly SkiaHybridPlanRenderer _hybridRenderer = new();
     private readonly SkiaPngEncoder _pngEncoder = new();
     private readonly SkiaImageEncoder _imageEncoder = new();
     private readonly ImageDetailAnalyzer _detailAnalyzer = new();
     private readonly HeuristicSemanticImportanceAnalyzer _semanticAnalyzer = new();
+    private readonly HeuristicSceneBoundaryAnalyzer _boundaryAnalyzer = new();
     private readonly DetailMapOverlayRenderer _detailOverlayRenderer = new();
+    private readonly BoundaryDirectionOverlayRenderer _boundaryDirectionOverlayRenderer = new();
     private readonly FlowPainterPlanner _planner = new(new DefaultFlowFieldFactory());
     private readonly FlowPainterWorkspace _workspace = new(InitialSeed, BuiltInFlowPainterPresets.All[0].Settings);
+    private readonly ProjectSessionController _projectSessionController;
     private readonly RecentPathList _recentProjects = new();
     private readonly RecentPathList _recentPresets = new();
 
@@ -61,8 +81,12 @@ public partial class MainWindow : Window
     private readonly Button _cancelButton;
     private readonly Button _saveButton;
     private readonly Button _exportFinalButton;
+    private readonly Button _exportSvgButton;
     private readonly StackPanel _settingsPanel;
     private readonly ComboBox _presetComboBox;
+    private readonly ComboBox _generativeModeComboBox;
+    private readonly ComboBox _primitiveKindsComboBox;
+    private readonly ComboBox _hybridInfluenceKindComboBox;
     private readonly ComboBox _previewQualityComboBox;
     private readonly ComboBox _finalFormatComboBox;
     private readonly ComboBox _recentProjectComboBox;
@@ -73,6 +97,25 @@ public partial class MainWindow : Window
     private readonly ComboBox _detailIntentComboBox;
     private readonly ComboBox _semanticOverlayModeComboBox;
     private readonly TextBox _presetNameTextBox;
+    private readonly TextBox _primitiveCountTextBox;
+    private readonly TextBox _primitiveCandidatesTextBox;
+    private readonly TextBox _primitiveMutationsTextBox;
+    private readonly TextBox _primitiveMinimumSizeTextBox;
+    private readonly TextBox _primitiveMaximumSizeTextBox;
+    private readonly TextBox _primitiveOpacityTextBox;
+    private readonly TextBox _primitiveDetailSizeTextBox;
+    private readonly TextBox _primitivePlacementBiasTextBox;
+    private readonly TextBox _primitiveErrorWeightTextBox;
+    private readonly TextBox _primitiveSearchInfluenceTextBox;
+    private readonly TextBox _hybridPrimitiveBudgetTextBox;
+    private readonly TextBox _hybridFlowBudgetTextBox;
+    private readonly TextBox _hybridRefinementBudgetTextBox;
+    private readonly TextBox _hybridInfluenceStrengthTextBox;
+    private readonly TextBox _hybridInfluenceRadiusTextBox;
+    private readonly TextBox _hybridMaximumInfluencesTextBox;
+    private readonly TextBox _hybridRefinementDetailBiasTextBox;
+    private readonly TextBox _hybridRefinementLengthTextBox;
+    private readonly TextBox _hybridRefinementWidthTextBox;
     private readonly TextBox _projectNameTextBox;
     private readonly TextBox _finalMaximumDimensionTextBox;
     private readonly TextBox _jpegQualityTextBox;
@@ -104,6 +147,7 @@ public partial class MainWindow : Window
     private readonly TextBox _backgroundLengthTextBox;
     private readonly TextBox _detailedWidthTextBox;
     private readonly TextBox _backgroundWidthTextBox;
+    private readonly TextBox _regionTransitionWidthTextBox;
     private readonly TextBox _regionStrengthTextBox;
     private readonly TextBox _semanticInfluenceTextBox;
     private readonly TextBox _semanticSaliencyWeightTextBox;
@@ -116,8 +160,40 @@ public partial class MainWindow : Window
     private readonly TextBox _semanticCenterBiasTextBox;
     private readonly TextBox _semanticSmoothingRadiusTextBox;
     private readonly TextBox _semanticBoundaryRadiusTextBox;
+    private readonly TextBox _boundaryLuminanceWeightTextBox;
+    private readonly TextBox _boundaryColorWeightTextBox;
+    private readonly TextBox _boundaryMultiscaleWeightTextBox;
+    private readonly TextBox _boundaryContinuityWeightTextBox;
+    private readonly TextBox _boundarySemanticWeightTextBox;
+    private readonly TextBox _boundaryTextureSuppressionTextBox;
+    private readonly TextBox _boundaryEdgeThresholdTextBox;
+    private readonly TextBox _boundaryImportantThresholdTextBox;
+    private readonly TextBox _boundaryCoarseRadiusTextBox;
+    private readonly TextBox _boundarySmoothingRadiusTextBox;
+    private readonly TextBox _boundaryProtectionRadiusTextBox;
+    private readonly TextBox _boundaryTangentAlignmentTextBox;
+    private readonly TextBox _boundaryAlignmentRadiusTextBox;
+    private readonly TextBox _boundaryCrossingPenaltyTextBox;
+    private readonly TextBox _boundaryHardThresholdTextBox;
+    private readonly TextBox _boundaryTerminationStrengthTextBox;
+    private readonly TextBox _boundaryInternalInfluenceTextBox;
+    private readonly TextBox _boundaryTextureInfluenceTextBox;
+    private readonly TextBox _boundaryContourReinforcementTextBox;
+    private readonly TextBox _boundaryCornerPreservationTextBox;
+    private readonly TextBox _backgroundSuppressionStrengthTextBox;
+    private readonly TextBox _backgroundDetailFloorTextBox;
+    private readonly TextBox _backgroundUncertaintyProtectionTextBox;
+    private readonly TextBox _backgroundSilhouetteProtectionTextBox;
+    private readonly TextBox _backgroundTransitionSoftnessTextBox;
+    private readonly TextBox _backgroundPlacementWeightTextBox;
+    private readonly TextBox _backgroundSuppressionLengthTextBox;
+    private readonly TextBox _backgroundSuppressionWidthTextBox;
+    private readonly TextBox _backgroundSegmentMultiplierTextBox;
+    private readonly TextBox _backgroundCurveFreedomTextBox;
+    private readonly TextBox _backgroundColorSimplificationTextBox;
     private readonly ListBox _regionListBox;
     private readonly ListBox _semanticRegionListBox;
+    private readonly ListBox _semanticCorrectionListBox;
     private readonly TextBox _regionLabelTextBox;
     private readonly TextBox _regionLeftTextBox;
     private readonly TextBox _regionTopTextBox;
@@ -125,6 +201,9 @@ public partial class MainWindow : Window
     private readonly TextBox _regionHeightTextBox;
     private readonly CheckBox _showDetailOverlayCheckBox;
     private readonly CheckBox _enableSemanticAnalysisCheckBox;
+    private readonly CheckBox _enableBoundaryAnalysisCheckBox;
+    private readonly CheckBox _enableBoundaryPaintingCheckBox;
+    private readonly CheckBox _enableBackgroundSuppressionCheckBox;
     private readonly Canvas _selectionCanvas;
     private readonly Grid _sourceViewportHost;
     private readonly Grid _sourceViewportContent;
@@ -140,6 +219,7 @@ public partial class MainWindow : Window
     private readonly TextBlock _finalMemoryInfoText;
     private readonly TextBlock _regionCountText;
     private readonly TextBlock _semanticRegionCountText;
+    private readonly TextBlock _semanticCorrectionCountText;
     private readonly TextBlock _statusText;
     private readonly ProgressBar _operationProgressBar;
 
@@ -153,24 +233,41 @@ public partial class MainWindow : Window
     private DetailMap? _automaticDetailMap;
     private DetailMap? _composedDetailMap;
     private SemanticAnalysisResult? _semanticAnalysisResult;
+    private SceneBoundaryAnalysisResult? _sceneBoundaryAnalysisResult;
+    private BackgroundSuppressionResult? _backgroundSuppressionResult;
     private StrokePlan? _previewStrokePlan;
+    private PrimitivePlan? _previewPrimitivePlan;
+    private HybridPlan? _previewHybridPlan;
     private BrushSettings? _previewBrushSettings;
+    private GenerativeMode _previewGenerativeMode = GenerativeMode.FlowPainting;
     private DetailAnalysisSettings? _activeDetailAnalysisSettings;
+    private double _activeDetailRegionTransitionWidth = double.NaN;
+    private long _activeDetailRegionRevision = -1L;
+    private long _activeSemanticCorrectionRevision = -1L;
     private SemanticAnalysisSettings? _activeSemanticAnalysisSettings;
+    private SceneBoundaryAnalysisSettings? _activeBoundaryAnalysisSettings;
+    private BackgroundSuppressionSettings? _activeBackgroundSuppressionSettings;
     private readonly SynchronizedImageViewportState _imageViewportState = new();
     private NormalizedPoint? _selectionStart;
     private NormalizedPoint? _selectionCurrent;
+    private Point? _selectionPointerStartPosition;
     private Grid? _panViewportHost;
     private Point _panLastPosition;
     private CancellationTokenSource? _operationCancellation;
     private string? _currentSourcePath;
     private string? _currentProjectPath;
     private bool _suppressRegionSelectionChange;
+    private bool _suppressSemanticRegionSelectionChange;
+    private bool _suppressSemanticCorrectionSelectionChange;
+    private bool _suppressDirtyTracking;
+    private bool _allowClose;
+    private bool _closeGuardRunning;
     private bool _isClosed;
 
     public MainWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        _projectSessionController = new ProjectSessionController(_workspace);
         _openButton = FindRequiredControl<Button>("OpenButton");
         _openProjectButton = FindRequiredControl<Button>("OpenProjectButton");
         _saveProjectButton = FindRequiredControl<Button>("SaveProjectButton");
@@ -178,8 +275,12 @@ public partial class MainWindow : Window
         _cancelButton = FindRequiredControl<Button>("CancelButton");
         _saveButton = FindRequiredControl<Button>("SaveButton");
         _exportFinalButton = FindRequiredControl<Button>("ExportFinalButton");
+        _exportSvgButton = FindRequiredControl<Button>("ExportSvgButton");
         _settingsPanel = FindRequiredControl<StackPanel>("SettingsPanel");
         _presetComboBox = FindRequiredControl<ComboBox>("PresetComboBox");
+        _generativeModeComboBox = FindRequiredControl<ComboBox>("GenerativeModeComboBox");
+        _primitiveKindsComboBox = FindRequiredControl<ComboBox>("PrimitiveKindsComboBox");
+        _hybridInfluenceKindComboBox = FindRequiredControl<ComboBox>("HybridInfluenceKindComboBox");
         _previewQualityComboBox = FindRequiredControl<ComboBox>("PreviewQualityComboBox");
         _finalFormatComboBox = FindRequiredControl<ComboBox>("FinalFormatComboBox");
         _recentProjectComboBox = FindRequiredControl<ComboBox>("RecentProjectComboBox");
@@ -190,6 +291,25 @@ public partial class MainWindow : Window
         _detailIntentComboBox = FindRequiredControl<ComboBox>("DetailIntentComboBox");
         _semanticOverlayModeComboBox = FindRequiredControl<ComboBox>("SemanticOverlayModeComboBox");
         _presetNameTextBox = FindRequiredControl<TextBox>("PresetNameTextBox");
+        _primitiveCountTextBox = FindRequiredControl<TextBox>("PrimitiveCountTextBox");
+        _primitiveCandidatesTextBox = FindRequiredControl<TextBox>("PrimitiveCandidatesTextBox");
+        _primitiveMutationsTextBox = FindRequiredControl<TextBox>("PrimitiveMutationsTextBox");
+        _primitiveMinimumSizeTextBox = FindRequiredControl<TextBox>("PrimitiveMinimumSizeTextBox");
+        _primitiveMaximumSizeTextBox = FindRequiredControl<TextBox>("PrimitiveMaximumSizeTextBox");
+        _primitiveOpacityTextBox = FindRequiredControl<TextBox>("PrimitiveOpacityTextBox");
+        _primitiveDetailSizeTextBox = FindRequiredControl<TextBox>("PrimitiveDetailSizeTextBox");
+        _primitivePlacementBiasTextBox = FindRequiredControl<TextBox>("PrimitivePlacementBiasTextBox");
+        _primitiveErrorWeightTextBox = FindRequiredControl<TextBox>("PrimitiveErrorWeightTextBox");
+        _primitiveSearchInfluenceTextBox = FindRequiredControl<TextBox>("PrimitiveSearchInfluenceTextBox");
+        _hybridPrimitiveBudgetTextBox = FindRequiredControl<TextBox>("HybridPrimitiveBudgetTextBox");
+        _hybridFlowBudgetTextBox = FindRequiredControl<TextBox>("HybridFlowBudgetTextBox");
+        _hybridRefinementBudgetTextBox = FindRequiredControl<TextBox>("HybridRefinementBudgetTextBox");
+        _hybridInfluenceStrengthTextBox = FindRequiredControl<TextBox>("HybridInfluenceStrengthTextBox");
+        _hybridInfluenceRadiusTextBox = FindRequiredControl<TextBox>("HybridInfluenceRadiusTextBox");
+        _hybridMaximumInfluencesTextBox = FindRequiredControl<TextBox>("HybridMaximumInfluencesTextBox");
+        _hybridRefinementDetailBiasTextBox = FindRequiredControl<TextBox>("HybridRefinementDetailBiasTextBox");
+        _hybridRefinementLengthTextBox = FindRequiredControl<TextBox>("HybridRefinementLengthTextBox");
+        _hybridRefinementWidthTextBox = FindRequiredControl<TextBox>("HybridRefinementWidthTextBox");
         _projectNameTextBox = FindRequiredControl<TextBox>("ProjectNameTextBox");
         _finalMaximumDimensionTextBox = FindRequiredControl<TextBox>("FinalMaximumDimensionTextBox");
         _jpegQualityTextBox = FindRequiredControl<TextBox>("JpegQualityTextBox");
@@ -221,6 +341,7 @@ public partial class MainWindow : Window
         _backgroundLengthTextBox = FindRequiredControl<TextBox>("BackgroundLengthTextBox");
         _detailedWidthTextBox = FindRequiredControl<TextBox>("DetailedWidthTextBox");
         _backgroundWidthTextBox = FindRequiredControl<TextBox>("BackgroundWidthTextBox");
+        _regionTransitionWidthTextBox = FindRequiredControl<TextBox>("RegionTransitionWidthTextBox");
         _regionStrengthTextBox = FindRequiredControl<TextBox>("RegionStrengthTextBox");
         _semanticInfluenceTextBox = FindRequiredControl<TextBox>("SemanticInfluenceTextBox");
         _semanticSaliencyWeightTextBox = FindRequiredControl<TextBox>("SemanticSaliencyWeightTextBox");
@@ -233,8 +354,40 @@ public partial class MainWindow : Window
         _semanticCenterBiasTextBox = FindRequiredControl<TextBox>("SemanticCenterBiasTextBox");
         _semanticSmoothingRadiusTextBox = FindRequiredControl<TextBox>("SemanticSmoothingRadiusTextBox");
         _semanticBoundaryRadiusTextBox = FindRequiredControl<TextBox>("SemanticBoundaryRadiusTextBox");
+        _boundaryLuminanceWeightTextBox = FindRequiredControl<TextBox>("BoundaryLuminanceWeightTextBox");
+        _boundaryColorWeightTextBox = FindRequiredControl<TextBox>("BoundaryColorWeightTextBox");
+        _boundaryMultiscaleWeightTextBox = FindRequiredControl<TextBox>("BoundaryMultiscaleWeightTextBox");
+        _boundaryContinuityWeightTextBox = FindRequiredControl<TextBox>("BoundaryContinuityWeightTextBox");
+        _boundarySemanticWeightTextBox = FindRequiredControl<TextBox>("BoundarySemanticWeightTextBox");
+        _boundaryTextureSuppressionTextBox = FindRequiredControl<TextBox>("BoundaryTextureSuppressionTextBox");
+        _boundaryEdgeThresholdTextBox = FindRequiredControl<TextBox>("BoundaryEdgeThresholdTextBox");
+        _boundaryImportantThresholdTextBox = FindRequiredControl<TextBox>("BoundaryImportantThresholdTextBox");
+        _boundaryCoarseRadiusTextBox = FindRequiredControl<TextBox>("BoundaryCoarseRadiusTextBox");
+        _boundarySmoothingRadiusTextBox = FindRequiredControl<TextBox>("BoundarySmoothingRadiusTextBox");
+        _boundaryProtectionRadiusTextBox = FindRequiredControl<TextBox>("BoundaryProtectionRadiusTextBox");
+        _boundaryTangentAlignmentTextBox = FindRequiredControl<TextBox>("BoundaryTangentAlignmentTextBox");
+        _boundaryAlignmentRadiusTextBox = FindRequiredControl<TextBox>("BoundaryAlignmentRadiusTextBox");
+        _boundaryCrossingPenaltyTextBox = FindRequiredControl<TextBox>("BoundaryCrossingPenaltyTextBox");
+        _boundaryHardThresholdTextBox = FindRequiredControl<TextBox>("BoundaryHardThresholdTextBox");
+        _boundaryTerminationStrengthTextBox = FindRequiredControl<TextBox>("BoundaryTerminationStrengthTextBox");
+        _boundaryInternalInfluenceTextBox = FindRequiredControl<TextBox>("BoundaryInternalInfluenceTextBox");
+        _boundaryTextureInfluenceTextBox = FindRequiredControl<TextBox>("BoundaryTextureInfluenceTextBox");
+        _boundaryContourReinforcementTextBox = FindRequiredControl<TextBox>("BoundaryContourReinforcementTextBox");
+        _boundaryCornerPreservationTextBox = FindRequiredControl<TextBox>("BoundaryCornerPreservationTextBox");
+        _backgroundSuppressionStrengthTextBox = FindRequiredControl<TextBox>("BackgroundSuppressionStrengthTextBox");
+        _backgroundDetailFloorTextBox = FindRequiredControl<TextBox>("BackgroundDetailFloorTextBox");
+        _backgroundUncertaintyProtectionTextBox = FindRequiredControl<TextBox>("BackgroundUncertaintyProtectionTextBox");
+        _backgroundSilhouetteProtectionTextBox = FindRequiredControl<TextBox>("BackgroundSilhouetteProtectionTextBox");
+        _backgroundTransitionSoftnessTextBox = FindRequiredControl<TextBox>("BackgroundTransitionSoftnessTextBox");
+        _backgroundPlacementWeightTextBox = FindRequiredControl<TextBox>("BackgroundPlacementWeightTextBox");
+        _backgroundSuppressionLengthTextBox = FindRequiredControl<TextBox>("BackgroundSuppressionLengthTextBox");
+        _backgroundSuppressionWidthTextBox = FindRequiredControl<TextBox>("BackgroundSuppressionWidthTextBox");
+        _backgroundSegmentMultiplierTextBox = FindRequiredControl<TextBox>("BackgroundSegmentMultiplierTextBox");
+        _backgroundCurveFreedomTextBox = FindRequiredControl<TextBox>("BackgroundCurveFreedomTextBox");
+        _backgroundColorSimplificationTextBox = FindRequiredControl<TextBox>("BackgroundColorSimplificationTextBox");
         _regionListBox = FindRequiredControl<ListBox>("RegionListBox");
         _semanticRegionListBox = FindRequiredControl<ListBox>("SemanticRegionListBox");
+        _semanticCorrectionListBox = FindRequiredControl<ListBox>("SemanticCorrectionListBox");
         _regionLabelTextBox = FindRequiredControl<TextBox>("RegionLabelTextBox");
         _regionLeftTextBox = FindRequiredControl<TextBox>("RegionLeftTextBox");
         _regionTopTextBox = FindRequiredControl<TextBox>("RegionTopTextBox");
@@ -242,6 +395,9 @@ public partial class MainWindow : Window
         _regionHeightTextBox = FindRequiredControl<TextBox>("RegionHeightTextBox");
         _showDetailOverlayCheckBox = FindRequiredControl<CheckBox>("ShowDetailOverlayCheckBox");
         _enableSemanticAnalysisCheckBox = FindRequiredControl<CheckBox>("EnableSemanticAnalysisCheckBox");
+        _enableBoundaryAnalysisCheckBox = FindRequiredControl<CheckBox>("EnableBoundaryAnalysisCheckBox");
+        _enableBoundaryPaintingCheckBox = FindRequiredControl<CheckBox>("EnableBoundaryPaintingCheckBox");
+        _enableBackgroundSuppressionCheckBox = FindRequiredControl<CheckBox>("EnableBackgroundSuppressionCheckBox");
         _selectionCanvas = FindRequiredControl<Canvas>("SelectionCanvas");
         _sourceViewportHost = FindRequiredControl<Grid>("SourceViewportHost");
         _sourceViewportContent = FindRequiredControl<Grid>("SourceViewportContent");
@@ -257,10 +413,28 @@ public partial class MainWindow : Window
         _finalMemoryInfoText = FindRequiredControl<TextBlock>("FinalMemoryInfoText");
         _regionCountText = FindRequiredControl<TextBlock>("RegionCountText");
         _semanticRegionCountText = FindRequiredControl<TextBlock>("SemanticRegionCountText");
+        _semanticCorrectionCountText = FindRequiredControl<TextBlock>("SemanticCorrectionCountText");
         _statusText = FindRequiredControl<TextBlock>("StatusText");
         _operationProgressBar = FindRequiredControl<ProgressBar>("OperationProgressBar");
 
         _presetComboBox.ItemsSource = BuiltInFlowPainterPresets.All;
+        _generativeModeComboBox.ItemsSource = new[]
+        {
+            GenerativeMode.FlowPainting,
+            GenerativeMode.GeometricPrimitives,
+            GenerativeMode.Hybrid
+        };
+        _generativeModeComboBox.SelectedItem = GenerativeMode.FlowPainting;
+        _primitiveKindsComboBox.ItemsSource = Enumerable
+            .Range(1, (int)PrimitiveKindSet.All)
+            .Select(value => (PrimitiveKindSet)value)
+            .OrderByDescending(value => value == PrimitiveKindSet.All)
+            .ThenBy(value => CountEnabledPrimitiveKinds(value))
+            .ThenBy(value => (int)value)
+            .ToArray();
+        ApplyPrimitiveGenerationSettings(new PrimitiveGenerationSettings());
+        _hybridInfluenceKindComboBox.ItemsSource = Enum.GetValues<PrimitiveFlowInfluenceKind>();
+        ApplyHybridGenerationSettings(new HybridGenerationSettings());
         _previewQualityComboBox.ItemsSource = Enum.GetValues<PreviewQuality>();
         _previewQualityComboBox.SelectedItem = PreviewQuality.Standard;
         _finalFormatComboBox.ItemsSource = Enum.GetValues<RasterImageFormat>();
@@ -269,8 +443,8 @@ public partial class MainWindow : Window
         _backgroundComboBox.ItemsSource = Enum.GetValues<StrokePlanBackgroundMode>();
         _brushKindComboBox.ItemsSource = Enum.GetValues<BrushKind>();
         _detailIntentComboBox.ItemsSource = Enum.GetValues<DetailRegionIntent>();
-        _semanticOverlayModeComboBox.ItemsSource = Enum.GetValues<SemanticOverlayMode>();
-        _semanticOverlayModeComboBox.SelectedItem = SemanticOverlayMode.CombinedDetail;
+        _semanticOverlayModeComboBox.ItemsSource = Enum.GetValues<SceneBoundaryOverlayMode>();
+        _semanticOverlayModeComboBox.SelectedItem = SceneBoundaryOverlayMode.CombinedDetail;
         _detailIntentComboBox.SelectedItem = DetailRegionIntent.IncreaseDetail;
         _regionStrengthTextBox.Text = "80";
         _projectNameTextBox.Text = "Untitled project";
@@ -278,11 +452,19 @@ public partial class MainWindow : Window
         _presetComboBox.SelectionChanged += (_, _) => ApplySelectedBuiltInPreset();
         ApplyPreset(BuiltInFlowPainterPresets.All[0], InitialSeed);
         _presetComboBox.SelectedIndex = 0;
+        AttachProjectDirtyTracking();
+        KeyDown += WindowKeyDown;
+        Closing += WindowClosing;
         Closed += WindowClosed;
     }
 
     private async void OpenProjectClick(object? sender, RoutedEventArgs e)
     {
+        if (!await ConfirmSessionReplacementAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
         IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(
             new FilePickerOpenOptions
             {
@@ -325,6 +507,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!await ConfirmSessionReplacementAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
         await RunLoadingProjectAsync(cancellationToken => LoadProjectFromPathAsync(
             projectPath,
             cancellationToken)).ConfigureAwait(true);
@@ -346,10 +533,21 @@ public partial class MainWindow : Window
                 sourcePath);
         }
 
-        _previewQualityComboBox.SelectedItem = project.Preview.Quality;
-        ApplyFinalRenderSettings(project.FinalRender);
-        ApplyPreset(new FlowPainterPreset(project.Name, project.Settings), project.Seed);
-        _projectNameTextBox.Text = project.Name;
+        FlowPainterProject resolvedProject = new(
+            project.Name,
+            sourcePath,
+            project.Seed,
+            project.Settings,
+            project.Preview,
+            project.DetailRegions,
+            project.FinalRender,
+            project.Mode,
+            project.PrimitiveGeneration,
+            project.HybridGeneration,
+            project.SemanticCorrections);
+        WorkspaceProjectCandidate workspaceCandidate = FlowPainterWorkspace.PrepareProjectLoad(
+            resolvedProject,
+            projectPath);
 
         Progress<ImageOperationProgress> progress = CreateImageProgress();
         await using FileStream sourceStream = File.OpenRead(sourcePath);
@@ -366,6 +564,7 @@ public partial class MainWindow : Window
                 progress,
                 cancellationToken).ConfigureAwait(true);
             int previewMaximumDimension = project.Preview.MaximumDimension;
+            EnsureAnalysisMemoryBudget(loaded.Size, previewMaximumDimension);
             proxy = await _proxyGenerator.CreateProxyAsync(
                 loaded,
                 previewMaximumDimension,
@@ -375,46 +574,56 @@ public partial class MainWindow : Window
             AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                 proxy,
                 project.Settings.DetailAnalysis,
+                project.Settings.DetailInfluence,
                 project.Settings.SemanticAnalysis,
+                project.Settings.BoundaryAnalysis,
+                project.SemanticCorrections,
                 cancellationToken).ConfigureAwait(true);
-            DetailMap composedMap = DetailMapComposer.ApplyRegions(
+            DetailMap manuallyComposedMap = DetailMapComposer.ApplyRegions(
                 maps.Automatic,
                 project.DetailRegions,
+                project.Settings.DetailInfluence.RegionTransitionWidth,
+                cancellationToken);
+            BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
+                maps,
+                manuallyComposedMap,
+                project.Settings.BackgroundSuppression,
                 cancellationToken);
             overlay = await _detailOverlayRenderer.RenderAsync(
                 proxy,
-                composedMap,
+                backgroundSuppression.EffectiveDetailMap,
                 cancellationToken: cancellationToken).ConfigureAwait(true);
 
+            cancellationToken.ThrowIfCancellationRequested();
             ReplaceSource(
                 loaded,
                 proxy,
                 maps.Automatic,
-                composedMap,
+                backgroundSuppression.EffectiveDetailMap,
                 maps.Semantic,
+                maps.Boundary,
+                backgroundSuppression,
                 project.Settings.DetailAnalysis,
+                project.Settings.DetailInfluence,
                 project.Settings.SemanticAnalysis,
+                project.Settings.BoundaryAnalysis,
+                project.Settings.BackgroundSuppression,
                 overlay);
             adopted = true;
 
             _currentSourcePath = sourcePath;
             _currentProjectPath = projectPath;
-            FlowPainterProject resolvedProject = new(
-                project.Name,
-                sourcePath,
-                project.Seed,
-                project.Settings,
-                project.Preview,
-                project.DetailRegions,
-                project.FinalRender);
-            _workspace.LoadProject(resolvedProject, projectPath);
+            _workspace.LoadProject(workspaceCandidate);
+            RefreshDirtyIndicator();
+            CaptureActiveWorkspaceRevisions();
+            ApplyProjectControls(project);
             _recentProjects.Add(projectPath);
             await PersistRecentItemsBestEffortAsync(cancellationToken).ConfigureAwait(true);
             RefreshRecentItemControls();
             _saveProjectButton.IsEnabled = true;
             _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
             UpdateFinalOutputEstimate();
-            _statusText.Text = $"Loaded project '{project.Name}' with {project.DetailRegions.Count:N0} manual regions.";
+            _statusText.Text = $"Loaded project '{project.Name}' with {project.DetailRegions.Count:N0} detail regions and {project.SemanticCorrections.Count:N0} semantic corrections.";
             UpdateSourcePreviewSelection();
             RefreshRegionVisuals();
         }
@@ -431,11 +640,16 @@ public partial class MainWindow : Window
 
     private async void SaveProjectClick(object? sender, RoutedEventArgs e)
     {
+        await SaveProjectAsync().ConfigureAwait(true);
+    }
+
+    private async Task<bool> SaveProjectAsync()
+    {
         string? currentSourcePath = _currentSourcePath;
         if (string.IsNullOrWhiteSpace(currentSourcePath))
         {
             _statusText.Text = "Open an image before saving a project.";
-            return;
+            return false;
         }
 
         FlowPainterProject project;
@@ -448,22 +662,25 @@ public partial class MainWindow : Window
             _workspace.SetSettings(ReadSettingsFromControls());
             _workspace.SetPreview(ReadPreviewSettings());
             _workspace.SetFinalRender(ReadFinalRenderSettings());
+            _workspace.SetGenerativeMode(ReadSelectedGenerativeMode());
+            _workspace.SetPrimitiveGeneration(ReadPrimitiveGenerationSettings());
+            _workspace.SetHybridGeneration(ReadHybridGenerationSettings());
             project = _workspace.CreateProject(name);
         }
         catch (FormatException exception)
         {
             _statusText.Text = exception.Message;
-            return;
+            return false;
         }
         catch (ArgumentException exception)
         {
             _statusText.Text = exception.Message;
-            return;
+            return false;
         }
         catch (InvalidOperationException exception)
         {
             _statusText.Text = exception.Message;
-            return;
+            return false;
         }
 
         IStorageFile? file = await StorageProvider.SaveFilePickerAsync(
@@ -485,10 +702,10 @@ public partial class MainWindow : Window
 
         if (file is null)
         {
-            return;
+            return false;
         }
 
-        await RunSavingProjectAsync(async cancellationToken =>
+        bool saved = await RunSavingProjectAsync(async cancellationToken =>
         {
             string projectPath = file.Path.LocalPath;
             string sourceReference = ProjectPathResolver.CreateSourceReference(
@@ -501,7 +718,11 @@ public partial class MainWindow : Window
                 project.Settings,
                 project.Preview,
                 project.DetailRegions,
-                project.FinalRender);
+                project.FinalRender,
+                project.Mode,
+                project.PrimitiveGeneration,
+                project.HybridGeneration,
+                project.SemanticCorrections);
             await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
             await FlowPainterProjectSerializer.SerializeAsync(
                 persistedProject,
@@ -509,11 +730,14 @@ public partial class MainWindow : Window
                 cancellationToken).ConfigureAwait(true);
             _currentProjectPath = projectPath;
             _workspace.MarkSaved(projectPath, project.Name);
+            RefreshDirtyIndicator();
             _recentProjects.Add(projectPath);
             await PersistRecentItemsBestEffortAsync(cancellationToken).ConfigureAwait(true);
             RefreshRecentItemControls();
             _statusText.Text = $"Saved project '{project.Name}'.";
         }).ConfigureAwait(true);
+
+        return saved;
     }
 
     private async void RebuildPreviewClick(object? sender, RoutedEventArgs e)
@@ -526,10 +750,12 @@ public partial class MainWindow : Window
         }
 
         DetailAnalysisSettings detailSettings;
+        DetailInfluenceSettings detailInfluenceSettings;
         PreviewSettings previewSettings;
         try
         {
             detailSettings = ReadDetailAnalysisSettings();
+            detailInfluenceSettings = ReadDetailInfluenceSettings();
             previewSettings = ReadPreviewSettings();
         }
         catch (FormatException exception)
@@ -551,6 +777,7 @@ public partial class MainWindow : Window
             bool adopted = false;
             try
             {
+                EnsureAnalysisMemoryBudget(source.Size, previewSettings.MaximumDimension);
                 proxy = await _proxyGenerator.CreateProxyAsync(
                     source,
                     previewSettings.MaximumDimension,
@@ -558,26 +785,42 @@ public partial class MainWindow : Window
                     progress,
                     cancellationToken).ConfigureAwait(true);
                 SemanticAnalysisSettings semanticSettings = ReadSemanticAnalysisSettings();
+                SceneBoundaryAnalysisSettings boundarySettings = ReadBoundaryAnalysisSettings();
+                BackgroundSuppressionSettings backgroundSettings = ReadBackgroundSuppressionSettings();
                 AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                     proxy,
                     detailSettings,
+                    detailInfluenceSettings,
                     semanticSettings,
+                    boundarySettings,
+                    _workspace.SemanticCorrections.Regions,
                     cancellationToken).ConfigureAwait(true);
-                DetailMap composedMap = DetailMapComposer.ApplyRegions(
+                DetailMap manuallyComposedMap = DetailMapComposer.ApplyRegions(
                     maps.Automatic,
                     _workspace.Regions.Regions,
+                    detailInfluenceSettings.RegionTransitionWidth,
+                    cancellationToken);
+                BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
+                    maps,
+                    manuallyComposedMap,
+                    backgroundSettings,
                     cancellationToken);
                 overlay = await _detailOverlayRenderer.RenderAsync(
                     proxy,
-                    composedMap,
+                    backgroundSuppression.EffectiveDetailMap,
                     cancellationToken: cancellationToken).ConfigureAwait(true);
                 ReplaceProxy(
                     proxy,
                     maps.Automatic,
-                    composedMap,
+                    backgroundSuppression.EffectiveDetailMap,
                     maps.Semantic,
+                    maps.Boundary,
+                    backgroundSuppression,
                     detailSettings,
+                    detailInfluenceSettings,
                     semanticSettings,
+                    boundarySettings,
+                    backgroundSettings,
                     overlay);
                 adopted = true;
                 _statusText.Text = $"Preview rebuilt at {previewSettings.MaximumDimension:N0}px maximum dimension.";
@@ -595,6 +838,11 @@ public partial class MainWindow : Window
 
     private async void OpenImageClick(object? sender, RoutedEventArgs e)
     {
+        if (!await ConfirmSessionReplacementAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
         FlowPainterSettings settings;
         PreviewSettings previewSettings;
         FinalRenderSettings finalRenderSettings;
@@ -659,6 +907,7 @@ public partial class MainWindow : Window
                     files[0].Name,
                     progress,
                     cancellationToken).ConfigureAwait(true);
+                EnsureAnalysisMemoryBudget(loaded.Size, previewSettings.MaximumDimension);
                 proxy = await _proxyGenerator.CreateProxyAsync(
                     loaded,
                     previewSettings.MaximumDimension,
@@ -668,21 +917,34 @@ public partial class MainWindow : Window
                 AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                     proxy,
                     detailSettings,
+                    settings.DetailInfluence,
                     settings.SemanticAnalysis,
+                    settings.BoundaryAnalysis,
+                    Array.Empty<SemanticCorrectionRegion>(),
                     cancellationToken).ConfigureAwait(true);
+                BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
+                    maps,
+                    maps.Automatic,
+                    settings.BackgroundSuppression,
+                    cancellationToken);
                 overlay = await _detailOverlayRenderer.RenderAsync(
                     proxy,
-                    maps.Automatic,
+                    backgroundSuppression.EffectiveDetailMap,
                     cancellationToken: cancellationToken).ConfigureAwait(true);
 
                 ReplaceSource(
                     loaded,
                     proxy,
                     maps.Automatic,
-                    maps.Automatic,
+                    backgroundSuppression.EffectiveDetailMap,
                     maps.Semantic,
+                    maps.Boundary,
+                    backgroundSuppression,
                     detailSettings,
+                    settings.DetailInfluence,
                     settings.SemanticAnalysis,
+                    settings.BoundaryAnalysis,
+                    settings.BackgroundSuppression,
                     overlay);
                 adopted = true;
 
@@ -694,6 +956,8 @@ public partial class MainWindow : Window
                 _workspace.SetSettings(settings);
                 _workspace.SetPreview(previewSettings);
                 _workspace.SetFinalRender(finalRenderSettings);
+                RefreshDirtyIndicator();
+                CaptureActiveWorkspaceRevisions();
                 _projectNameTextBox.Text = IoPath.GetFileNameWithoutExtension(files[0].Name);
                 _saveProjectButton.IsEnabled = true;
                 _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
@@ -721,10 +985,20 @@ public partial class MainWindow : Window
         }
 
         FlowPainterSettings settings;
+        PrimitiveGenerationSettings primitiveSettings;
+        HybridGenerationSettings hybridSettings;
+        GenerativeMode generativeMode;
         ulong seed;
         try
         {
             settings = ReadSettingsFromControls();
+            generativeMode = ReadSelectedGenerativeMode();
+            primitiveSettings = generativeMode == GenerativeMode.FlowPainting
+                ? _workspace.PrimitiveGeneration
+                : ReadPrimitiveGenerationSettings();
+            hybridSettings = generativeMode == GenerativeMode.Hybrid
+                ? ReadHybridGenerationSettings()
+                : _workspace.HybridGeneration;
             seed = ParseUnsignedInteger(_seedTextBox, "Seed");
         }
         catch (FormatException exception)
@@ -743,12 +1017,36 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (generativeMode == GenerativeMode.GeometricPrimitives)
+        {
+            await RenderPrimitivePreviewAsync(
+                proxyImage,
+                settings,
+                primitiveSettings,
+                seed).ConfigureAwait(true);
+            return;
+        }
+
+        if (generativeMode == GenerativeMode.Hybrid)
+        {
+            await RenderHybridPreviewAsync(
+                proxyImage,
+                settings,
+                primitiveSettings,
+                hybridSettings,
+                seed).ConfigureAwait(true);
+            return;
+        }
+
         await RunRenderingPreviewAsync(async cancellationToken =>
         {
             DetailMap detailMap = await EnsureDetailMapAsync(
                 proxyImage,
                 settings.DetailAnalysis,
+                settings.DetailInfluence,
                 settings.SemanticAnalysis,
+                settings.BoundaryAnalysis,
+                settings.BackgroundSuppression,
                 cancellationToken).ConfigureAwait(true);
             StrokeDensityMap densityMap = StrokeDensityMap.CreateUniform(
                 proxyImage.Size,
@@ -761,15 +1059,39 @@ public partial class MainWindow : Window
                 ReportOperationProgress(value.Fraction, message);
             });
 
+            SceneBoundaryAnalysisResult boundaryAnalysis = _sceneBoundaryAnalysisResult
+                ?? SceneBoundaryAnalysisResult.CreateEmpty(proxyImage.Size);
+            BackgroundSuppressionResult backgroundSuppression = _backgroundSuppressionResult
+                ?? BackgroundSuppressionResult.CreateDisabled(detailMap);
             StrokePlan plan = await Task.Run(
-                () => _planner.CreatePlan(
-                    proxyImage,
-                    densityMap,
-                    detailMap,
-                    seed,
-                    settings,
-                    planningProgress,
-                    cancellationToken),
+                () => settings.BackgroundSuppression.Enabled
+                    ? _planner.CreatePlan(
+                        proxyImage,
+                        densityMap,
+                        backgroundSuppression,
+                        boundaryAnalysis,
+                        seed,
+                        settings,
+                        planningProgress,
+                        cancellationToken)
+                    : settings.BoundaryPainting.Enabled
+                        ? _planner.CreatePlan(
+                            proxyImage,
+                            densityMap,
+                            detailMap,
+                            boundaryAnalysis,
+                            seed,
+                            settings,
+                            planningProgress,
+                            cancellationToken)
+                        : _planner.CreatePlan(
+                            proxyImage,
+                            densityMap,
+                            detailMap,
+                            seed,
+                            settings,
+                            planningProgress,
+                            cancellationToken),
                 cancellationToken).ConfigureAwait(true);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -794,9 +1116,186 @@ public partial class MainWindow : Window
             {
                 ReplaceRendered(rendered, plan, settings.Brush);
                 adopted = true;
+                _workspace.SetGenerativeMode(GenerativeMode.FlowPainting);
+                _workspace.SetSettings(settings);
 
                 _resultInfoText.Text = $"{rendered.Size.Width:N0} × {rendered.Size.Height:N0} · {plan.Strokes.Count:N0} strokes · {settings.Brush.Kind} · {_workspace.Regions.Count:N0} regions";
-                _statusText.Text = $"Preview rendered with the {settings.Brush.Kind} brush and detail guidance.";
+                _statusText.Text = settings.BackgroundSuppression.Enabled
+                    ? $"Preview rendered with {settings.Brush.Kind}, protected silhouettes and painterly background suppression."
+                    : settings.BoundaryPainting.Enabled
+                        ? $"Preview rendered with {settings.Brush.Kind}, detail guidance and boundary-aware flow."
+                        : $"Preview rendered with the {settings.Brush.Kind} brush and detail guidance.";
+            }
+            finally
+            {
+                if (!adopted)
+                {
+                    rendered.Dispose();
+                }
+            }
+        }).ConfigureAwait(true);
+    }
+
+    private async Task RenderPrimitivePreviewAsync(
+        SkiaImage proxyImage,
+        FlowPainterSettings flowSettings,
+        PrimitiveGenerationSettings primitiveSettings,
+        ulong seed)
+    {
+        await RunRenderingPreviewAsync(async cancellationToken =>
+        {
+            DetailMap detailMap = await EnsureDetailMapAsync(
+                proxyImage,
+                flowSettings.DetailAnalysis,
+                flowSettings.DetailInfluence,
+                flowSettings.SemanticAnalysis,
+                flowSettings.BoundaryAnalysis,
+                flowSettings.BackgroundSuppression,
+                cancellationToken).ConfigureAwait(true);
+            Progress<PrimitiveGenerationProgress> planningProgress = new(value =>
+            {
+                string message = value.Stage == PrimitiveGenerationStage.Searching
+                    ? $"Optimizing primitives {value.CompletedPrimitives:N0} / {value.RequestedPrimitives:N0}"
+                    : $"Primitive planning: {value.Stage}";
+                ReportOperationProgress(value.Fraction * 0.82d, message);
+            });
+            PrimitivePlan plan = await Task.Run(
+                () => _primitiveOptimizer.CreatePlan(
+                    proxyImage,
+                    detailMap,
+                    seed,
+                    primitiveSettings,
+                    planningProgress,
+                    cancellationToken),
+                cancellationToken).ConfigureAwait(true);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Progress<PrimitiveRenderProgress> renderProgress = new(value =>
+                ReportOperationProgress(
+                    0.82d + (value.Fraction * 0.18d),
+                    value.Stage == PrimitiveRenderStage.DrawingPrimitives
+                        ? $"Rendering primitives {value.CompletedPrimitives:N0} / {value.TotalPrimitives:N0}"
+                        : $"Primitive rendering: {value.Stage}"));
+            SkiaImage rendered = await _primitiveRenderer.RenderAsync(
+                plan,
+                proxyImage.Size,
+                renderProgress,
+                cancellationToken).ConfigureAwait(true);
+            bool adopted = false;
+
+            try
+            {
+                ReplaceRenderedPrimitive(rendered, plan);
+                adopted = true;
+                _workspace.SetGenerativeMode(GenerativeMode.GeometricPrimitives);
+                _workspace.SetPrimitiveGeneration(primitiveSettings);
+                _resultInfoText.Text = $"{rendered.Size.Width:N0} × {rendered.Size.Height:N0} · {plan.Primitives.Count:N0} primitives · {_workspace.Regions.Count:N0} regions";
+                _statusText.Text = "Primitive preview optimized from the current detail map.";
+            }
+            finally
+            {
+                if (!adopted)
+                {
+                    rendered.Dispose();
+                }
+            }
+        }).ConfigureAwait(true);
+    }
+
+    private async Task RenderHybridPreviewAsync(
+        SkiaImage proxyImage,
+        FlowPainterSettings flowSettings,
+        PrimitiveGenerationSettings primitiveSettings,
+        HybridGenerationSettings hybridSettings,
+        ulong seed)
+    {
+        await RunRenderingPreviewAsync(async cancellationToken =>
+        {
+            DetailMap detailMap = await EnsureDetailMapAsync(
+                proxyImage,
+                flowSettings.DetailAnalysis,
+                flowSettings.DetailInfluence,
+                flowSettings.SemanticAnalysis,
+                flowSettings.BoundaryAnalysis,
+                flowSettings.BackgroundSuppression,
+                cancellationToken).ConfigureAwait(true);
+            StrokeDensityMap densityMap = StrokeDensityMap.CreateUniform(
+                proxyImage.Size,
+                flowSettings.UniformDensity);
+            Progress<HybridPlanningProgress> planningProgress = new(value =>
+                ReportOperationProgress(value.Fraction * 0.72d, value.Message));
+            SceneBoundaryAnalysisResult boundaryAnalysis = _sceneBoundaryAnalysisResult
+                ?? SceneBoundaryAnalysisResult.CreateEmpty(proxyImage.Size);
+            BackgroundSuppressionResult backgroundSuppression = _backgroundSuppressionResult
+                ?? BackgroundSuppressionResult.CreateDisabled(detailMap);
+            HybridPlan plan = await Task.Run(
+                () => flowSettings.BackgroundSuppression.Enabled
+                    ? _hybridComposer.CreatePlan(
+                        proxyImage,
+                        densityMap,
+                        backgroundSuppression,
+                        boundaryAnalysis,
+                        seed,
+                        flowSettings,
+                        primitiveSettings,
+                        hybridSettings,
+                        planningProgress,
+                        cancellationToken)
+                    : flowSettings.BoundaryPainting.Enabled
+                        ? _hybridComposer.CreatePlan(
+                            proxyImage,
+                            densityMap,
+                            detailMap,
+                            boundaryAnalysis,
+                            seed,
+                            flowSettings,
+                            primitiveSettings,
+                            hybridSettings,
+                            planningProgress,
+                            cancellationToken)
+                        : _hybridComposer.CreatePlan(
+                            proxyImage,
+                            densityMap,
+                            detailMap,
+                            seed,
+                            flowSettings,
+                            primitiveSettings,
+                            hybridSettings,
+                            planningProgress,
+                            cancellationToken),
+                cancellationToken).ConfigureAwait(true);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Progress<HybridRenderProgress> renderProgress = new(value =>
+                ReportOperationProgress(
+                    0.72d + (value.Fraction * 0.28d),
+                    value.Message));
+            SkiaImage rendered = await _hybridRenderer.RenderAsync(
+                plan,
+                proxyImage.Size,
+                flowSettings.Brush,
+                flowSettings.Brush,
+                renderProgress,
+                cancellationToken).ConfigureAwait(true);
+            bool adopted = false;
+
+            try
+            {
+                ReplaceRenderedHybrid(rendered, plan, flowSettings.Brush);
+                adopted = true;
+                _workspace.SetGenerativeMode(GenerativeMode.Hybrid);
+                _workspace.SetSettings(flowSettings);
+                _workspace.SetPrimitiveGeneration(primitiveSettings);
+                _workspace.SetHybridGeneration(hybridSettings);
+                _resultInfoText.Text = $"{rendered.Size.Width:N0} × {rendered.Size.Height:N0} · "
+                    + $"{plan.PrimitivePlan.Primitives.Count:N0} primitives + "
+                    + $"{plan.FlowStrokePlan.Strokes.Count:N0} flow + "
+                    + $"{plan.RefinementStrokePlan.Strokes.Count:N0} refinement strokes";
+                _statusText.Text = flowSettings.BackgroundSuppression.Enabled
+                    ? "Hybrid preview rendered: simplified background masses, protected boundary-aware flow and focal refinement."
+                    : flowSettings.BoundaryPainting.Enabled
+                        ? "Hybrid preview rendered: primitive masses, boundary-aware deformed flow and detail refinement."
+                        : "Hybrid preview rendered: primitive masses, deformed flow and detail refinement.";
             }
             finally
             {
@@ -822,11 +1321,44 @@ public partial class MainWindow : Window
     private async void ExportFinalClick(object? sender, RoutedEventArgs e)
     {
         SkiaImage? sourceImage = _sourceImage;
+        if (sourceImage is null)
+        {
+            _statusText.Text = "Open an image before exporting the final image.";
+            return;
+        }
+
+        if (_previewGenerativeMode == GenerativeMode.GeometricPrimitives)
+        {
+            PrimitivePlan? primitivePlan = _previewPrimitivePlan;
+            if (primitivePlan is null)
+            {
+                _statusText.Text = "Render a primitive preview before exporting the final image.";
+                return;
+            }
+
+            await ExportPrimitiveFinalAsync(sourceImage, primitivePlan).ConfigureAwait(true);
+            return;
+        }
+
+        if (_previewGenerativeMode == GenerativeMode.Hybrid)
+        {
+            HybridPlan? hybridPlan = _previewHybridPlan;
+            BrushSettings? hybridBrush = _previewBrushSettings;
+            if (hybridPlan is null || hybridBrush is null)
+            {
+                _statusText.Text = "Render a hybrid preview before exporting the final image.";
+                return;
+            }
+
+            await ExportHybridFinalAsync(sourceImage, hybridPlan, hybridBrush).ConfigureAwait(true);
+            return;
+        }
+
         StrokePlan? plan = _previewStrokePlan;
         BrushSettings? brush = _previewBrushSettings;
-        if (sourceImage is null || plan is null || brush is null)
+        if (plan is null || brush is null)
         {
-            _statusText.Text = "Render a preview before exporting the final image.";
+            _statusText.Text = "Render a flow preview before exporting the final image.";
             return;
         }
 
@@ -847,6 +1379,14 @@ public partial class MainWindow : Window
         }
 
         ImageSize outputSize = finalSettings.GetOutputSize(sourceImage.Size);
+        if (!TryEnsureFinalRenderMemoryBudget(
+                sourceImage,
+                outputSize,
+                GenerativeMode.FlowPainting))
+        {
+            return;
+        }
+
         string extension = finalSettings.DefaultFileExtension;
         string suggestedBaseName = string.IsNullOrWhiteSpace(_projectNameTextBox.Text)
             ? "flowpainter-final"
@@ -902,6 +1442,246 @@ public partial class MainWindow : Window
         }).ConfigureAwait(true);
     }
 
+    private async Task ExportHybridFinalAsync(
+        SkiaImage sourceImage,
+        HybridPlan plan,
+        BrushSettings brush)
+    {
+        FinalRenderSettings finalSettings;
+        try
+        {
+            finalSettings = ReadFinalRenderSettings();
+        }
+        catch (FormatException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        ImageSize outputSize = finalSettings.GetOutputSize(sourceImage.Size);
+        if (!TryEnsureFinalRenderMemoryBudget(
+                sourceImage,
+                outputSize,
+                GenerativeMode.Hybrid))
+        {
+            return;
+        }
+
+        string extension = finalSettings.DefaultFileExtension;
+        string suggestedBaseName = string.IsNullOrWhiteSpace(_projectNameTextBox.Text)
+            ? "flowpainter-hybrid"
+            : SanitizeFileName(_projectNameTextBox.Text.Trim());
+        FilePickerFileType fileType = finalSettings.Format == RasterImageFormat.Png
+            ? new FilePickerFileType("PNG image") { Patterns = ["*.png"] }
+            : new FilePickerFileType("JPEG image") { Patterns = ["*.jpg", "*.jpeg"] };
+        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(
+            new FilePickerSaveOptions
+            {
+                Title = "Export final hybrid artwork",
+                SuggestedFileName = $"{suggestedBaseName}.{extension}",
+                DefaultExtension = extension,
+                FileTypeChoices = [fileType]
+            }).ConfigureAwait(true);
+        if (file is null)
+        {
+            return;
+        }
+
+        await RunExportingImageAsync(async cancellationToken =>
+        {
+            _workspace.SetFinalRender(finalSettings);
+            Progress<HybridRenderProgress> renderProgress = new(value =>
+                ReportOperationProgress(value.Fraction * 0.88d, value.Message));
+            using SkiaImage finalImage = await _hybridRenderer.RenderAsync(
+                plan,
+                outputSize,
+                brush,
+                brush,
+                renderProgress,
+                cancellationToken).ConfigureAwait(true);
+            Progress<ImageOperationProgress> encodeProgress = new(value =>
+                ReportOperationProgress(0.88d + (value.Fraction * 0.12d), value.Message));
+            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
+            await _imageEncoder.EncodeAsync(
+                finalImage,
+                output,
+                finalSettings.Format,
+                finalSettings.JpegQuality,
+                encodeProgress,
+                cancellationToken).ConfigureAwait(true);
+            _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0} "
+                + $"from {plan.PrimitivePlan.Primitives.Count:N0} primitives and "
+                + $"{plan.FlowStrokePlan.Strokes.Count + plan.RefinementStrokePlan.Strokes.Count:N0} strokes.";
+        }).ConfigureAwait(true);
+    }
+
+    private async Task ExportPrimitiveFinalAsync(
+        SkiaImage sourceImage,
+        PrimitivePlan plan)
+    {
+        FinalRenderSettings finalSettings;
+        try
+        {
+            finalSettings = ReadFinalRenderSettings();
+        }
+        catch (FormatException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        ImageSize outputSize = finalSettings.GetOutputSize(sourceImage.Size);
+        if (!TryEnsureFinalRenderMemoryBudget(
+                sourceImage,
+                outputSize,
+                GenerativeMode.GeometricPrimitives))
+        {
+            return;
+        }
+
+        string extension = finalSettings.DefaultFileExtension;
+        string suggestedBaseName = string.IsNullOrWhiteSpace(_projectNameTextBox.Text)
+            ? "flowpainter-primitives"
+            : SanitizeFileName(_projectNameTextBox.Text.Trim());
+        FilePickerFileType fileType = finalSettings.Format == RasterImageFormat.Png
+            ? new FilePickerFileType("PNG image") { Patterns = ["*.png"] }
+            : new FilePickerFileType("JPEG image") { Patterns = ["*.jpg", "*.jpeg"] };
+        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(
+            new FilePickerSaveOptions
+            {
+                Title = "Export final primitive artwork",
+                SuggestedFileName = $"{suggestedBaseName}.{extension}",
+                DefaultExtension = extension,
+                FileTypeChoices = [fileType]
+            }).ConfigureAwait(true);
+        if (file is null)
+        {
+            return;
+        }
+
+        await RunExportingImageAsync(async cancellationToken =>
+        {
+            _workspace.SetFinalRender(finalSettings);
+            Progress<PrimitiveRenderProgress> renderProgress = new(value =>
+                ReportOperationProgress(
+                    value.Fraction * 0.88d,
+                    value.Stage == PrimitiveRenderStage.DrawingPrimitives
+                        ? $"Final rendering {value.CompletedPrimitives:N0} / {value.TotalPrimitives:N0} primitives"
+                        : $"Final primitive rendering: {value.Stage}"));
+            using SkiaImage finalImage = await _primitiveRenderer.RenderAsync(
+                plan,
+                outputSize,
+                renderProgress,
+                cancellationToken).ConfigureAwait(true);
+            Progress<ImageOperationProgress> encodeProgress = new(value =>
+                ReportOperationProgress(0.88d + (value.Fraction * 0.12d), value.Message));
+            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
+            await _imageEncoder.EncodeAsync(
+                finalImage,
+                output,
+                finalSettings.Format,
+                finalSettings.JpegQuality,
+                encodeProgress,
+                cancellationToken).ConfigureAwait(true);
+            _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0} from {plan.Primitives.Count:N0} primitives.";
+        }).ConfigureAwait(true);
+    }
+
+    private async void ExportSvgClick(object? sender, RoutedEventArgs e)
+    {
+        SkiaImage? sourceImage = _sourceImage;
+        PrimitivePlan? plan = _previewPrimitivePlan;
+        if (sourceImage is null || plan is null || _previewGenerativeMode != GenerativeMode.GeometricPrimitives)
+        {
+            _statusText.Text = "Render a primitive preview before exporting SVG.";
+            return;
+        }
+
+        FinalRenderSettings finalSettings;
+        try
+        {
+            finalSettings = ReadFinalRenderSettings();
+        }
+        catch (FormatException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        ImageSize outputSize = finalSettings.GetOutputSize(sourceImage.Size);
+        string suggestedBaseName = string.IsNullOrWhiteSpace(_projectNameTextBox.Text)
+            ? "flowpainter-primitives"
+            : SanitizeFileName(_projectNameTextBox.Text.Trim());
+        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(
+            new FilePickerSaveOptions
+            {
+                Title = "Export primitive artwork as SVG",
+                SuggestedFileName = $"{suggestedBaseName}.svg",
+                DefaultExtension = "svg",
+                FileTypeChoices =
+                [
+                    new FilePickerFileType("SVG vector image") { Patterns = ["*.svg"] }
+                ]
+            }).ConfigureAwait(true);
+        if (file is null)
+        {
+            return;
+        }
+
+        await RunExportingImageAsync(async cancellationToken =>
+        {
+            ReportOperationProgress(0.1d, "Writing SVG primitives");
+            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
+            await SvgPrimitivePlanExporter.ExportAsync(
+                plan,
+                outputSize,
+                output,
+                cancellationToken).ConfigureAwait(true);
+            ReportOperationProgress(1d, "SVG export completed");
+            _statusText.Text = $"Exported {file.Name} with {plan.Primitives.Count:N0} vector primitives.";
+        }).ConfigureAwait(true);
+    }
+
+    private async void WindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        _ = sender;
+        if (e.Key != Key.Delete
+            || e.KeyModifiers != KeyModifiers.None
+            || e.Source is TextBox
+            || _operationCancellation is not null)
+        {
+            return;
+        }
+
+        if (GetSelectedRegion() is not null)
+        {
+            e.Handled = true;
+            await DeleteSelectedDetailRegionAsync().ConfigureAwait(true);
+            return;
+        }
+
+        if (GetSelectedSemanticCorrection() is not null)
+        {
+            e.Handled = true;
+            await DeleteSelectedSemanticCorrectionAsync().ConfigureAwait(true);
+        }
+    }
+
     private void CancelClick(object? sender, RoutedEventArgs e)
     {
         _operationCancellation?.Cancel();
@@ -926,11 +1706,17 @@ public partial class MainWindow : Window
         }
 
         DetailAnalysisSettings detailSettings;
+        DetailInfluenceSettings detailInfluenceSettings;
         SemanticAnalysisSettings semanticSettings;
+        SceneBoundaryAnalysisSettings boundarySettings;
+        BackgroundSuppressionSettings backgroundSettings;
         try
         {
             detailSettings = ReadDetailAnalysisSettings();
+            detailInfluenceSettings = ReadDetailInfluenceSettings();
             semanticSettings = ReadSemanticAnalysisSettings();
+            boundarySettings = ReadBoundaryAnalysisSettings();
+            backgroundSettings = ReadBackgroundSuppressionSettings();
         }
         catch (FormatException exception)
         {
@@ -948,16 +1734,22 @@ public partial class MainWindow : Window
             AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
                 proxy,
                 detailSettings,
+                detailInfluenceSettings,
                 semanticSettings,
+                boundarySettings,
+                _workspace.SemanticCorrections.Regions,
                 cancellationToken).ConfigureAwait(true);
             await ReplaceAnalyzedDetailMapsAsync(
                 maps,
                 detailSettings,
+                detailInfluenceSettings,
                 semanticSettings,
+                boundarySettings,
+                backgroundSettings,
                 cancellationToken).ConfigureAwait(true);
             _statusText.Text = semanticSettings.Enabled
-                ? $"Structural and semantic maps updated. {maps.Semantic.Regions.Count:N0} semantic regions found."
-                : "Structural detail map updated; semantic analysis is disabled.";
+                ? $"Structural, semantic and boundary maps updated. {maps.Semantic.Regions.Count:N0} semantic regions found."
+                : "Structural and boundary maps updated; semantic analysis is disabled.";
         }).ConfigureAwait(true);
     }
 
@@ -968,12 +1760,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        string? selectedRegionId = GetSelectedRegion()?.Id;
         _workspace.RemoveLastRegion();
-        await RunAnalyzingDetailAsync(async cancellationToken =>
+        bool succeeded = await RunAnalyzingDetailAsync(async cancellationToken =>
         {
             await RecomposeDetailMapAsync(cancellationToken).ConfigureAwait(true);
             _statusText.Text = "Last manual detail region removed.";
         }).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedRegionId: selectedRegionId);
+        }
     }
 
     private async void ClearRegionsClick(object? sender, RoutedEventArgs e)
@@ -983,12 +1781,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        string? selectedRegionId = GetSelectedRegion()?.Id;
         _workspace.ClearRegions();
-        await RunAnalyzingDetailAsync(async cancellationToken =>
+        bool succeeded = await RunAnalyzingDetailAsync(async cancellationToken =>
         {
             await RecomposeDetailMapAsync(cancellationToken).ConfigureAwait(true);
             _statusText.Text = "All manual detail regions cleared.";
         }).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedRegionId: selectedRegionId);
+        }
     }
 
     private void DetailOverlayVisibilityClick(object? sender, RoutedEventArgs e)
@@ -1004,8 +1808,8 @@ public partial class MainWindow : Window
     {
         _ = sender;
         _ = e;
-        SemanticOverlayMode mode = ReadSelectedSemanticOverlayMode();
-        if (mode == SemanticOverlayMode.CombinedDetail
+        SceneBoundaryOverlayMode mode = ReadSelectedAnalysisOverlayMode();
+        if (mode == SceneBoundaryOverlayMode.CombinedDetail
             || _showDetailOverlayCheckBox.IsChecked != true)
         {
             UpdateSourcePreviewSelection();
@@ -1014,7 +1818,9 @@ public partial class MainWindow : Window
 
         SkiaImage? proxy = _proxyImage;
         SemanticAnalysisResult? semantic = _semanticAnalysisResult;
-        if (proxy is null || semantic is null || _operationCancellation is not null)
+        SceneBoundaryAnalysisResult? boundary = _sceneBoundaryAnalysisResult;
+        BackgroundSuppressionResult? backgroundSuppression = _backgroundSuppressionResult;
+        if (proxy is null || semantic is null || boundary is null || _operationCancellation is not null)
         {
             UpdateSourcePreviewSelection();
             return;
@@ -1022,13 +1828,201 @@ public partial class MainWindow : Window
 
         await RunAnalyzingDetailAsync(async cancellationToken =>
         {
-            DetailMap map = SelectSemanticOverlayMap(semantic, mode);
-            using SkiaImage overlay = await _detailOverlayRenderer.RenderAsync(
-                proxy,
-                map,
-                cancellationToken: cancellationToken).ConfigureAwait(true);
+            using SkiaImage overlay = mode == SceneBoundaryOverlayMode.EdgeDirections
+                ? await _boundaryDirectionOverlayRenderer.RenderAsync(
+                    proxy,
+                    boundary.DirectionField,
+                    boundary.EdgeImportanceMap,
+                    cancellationToken: cancellationToken).ConfigureAwait(true)
+                : await _detailOverlayRenderer.RenderAsync(
+                    proxy,
+                    SelectAnalysisOverlayMap(semantic, boundary, backgroundSuppression, mode),
+                    cancellationToken: cancellationToken).ConfigureAwait(true);
             ReplaceSemanticOverlayPreview(overlay);
-            _statusText.Text = $"Showing {mode} overlay from {semantic.ProviderId}.";
+            _statusText.Text = $"Showing {mode} overlay from {boundary.ProviderId}.";
+        }).ConfigureAwait(true);
+    }
+
+    private async void SetSemanticPrimarySubjectClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await AddSelectedSemanticCorrectionAsync(
+            SemanticCorrectionKind.ForcePrimarySubject,
+            "primary subject").ConfigureAwait(true);
+    }
+
+    private async void SetSemanticSubjectClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await AddSelectedSemanticCorrectionAsync(
+            SemanticCorrectionKind.ForceSubject,
+            "subject").ConfigureAwait(true);
+    }
+
+    private async void SetSemanticBackgroundClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await AddSelectedSemanticCorrectionAsync(
+            SemanticCorrectionKind.ForceBackground,
+            "background").ConfigureAwait(true);
+    }
+
+    private async void IgnoreSemanticDetectionClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await AddSelectedSemanticCorrectionAsync(
+            SemanticCorrectionKind.IgnoreAutomaticDetection,
+            "ignored detection").ConfigureAwait(true);
+    }
+
+    private async Task AddSelectedSemanticCorrectionAsync(
+        SemanticCorrectionKind kind,
+        string roleLabel)
+    {
+        SemanticRegion? region = GetSelectedSemanticRegion();
+        if (region is null || _proxyImage is null)
+        {
+            _statusText.Text = "Select an analyzed semantic region first.";
+            return;
+        }
+
+        SemanticCorrectionRegion correction;
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        try
+        {
+            correction = _workspace.AddSemanticCorrection(
+                region.Bounds,
+                kind,
+                $"{region.Label ?? region.Id} · {roleLabel}",
+                region.Id);
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        ClearDetailAndAutomaticSemanticSelections();
+        RefreshSemanticCorrections(correction.Id);
+        bool succeeded = await ReanalyzeAfterSemanticCorrectionsAsync(
+            $"Applied {roleLabel} correction to '{region.Label ?? region.Id}'.",
+            correction.Id).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedSemanticRegionId: region.Id);
+        }
+    }
+
+    private async void DeleteSelectedSemanticCorrectionClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await DeleteSelectedSemanticCorrectionAsync().ConfigureAwait(true);
+    }
+
+    private async Task DeleteSelectedSemanticCorrectionAsync()
+    {
+        SemanticCorrectionRegion? selected = GetSelectedSemanticCorrection();
+        if (selected is null)
+        {
+            return;
+        }
+
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        if (!_workspace.RemoveSemanticCorrection(selected.Id))
+        {
+            return;
+        }
+
+        bool succeeded = await ReanalyzeAfterSemanticCorrectionsAsync(
+            "Selected semantic correction deleted.").ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedCorrectionId: selected.Id);
+        }
+    }
+
+    private async void ClearSemanticCorrectionsClick(object? sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        if (_workspace.SemanticCorrections.Count == 0)
+        {
+            return;
+        }
+
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        string? selectedCorrectionId = GetSelectedSemanticCorrection()?.Id;
+        _workspace.ClearSemanticCorrections();
+        bool succeeded = await ReanalyzeAfterSemanticCorrectionsAsync(
+            "All semantic corrections cleared.").ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedCorrectionId: selectedCorrectionId);
+        }
+    }
+
+    private async Task<bool> ReanalyzeAfterSemanticCorrectionsAsync(
+        string completionMessage,
+        string? selectedCorrectionId = null)
+    {
+        SkiaImage? proxy = _proxyImage;
+        if (proxy is null)
+        {
+            RefreshSemanticCorrections(selectedCorrectionId);
+            RefreshRegionVisuals();
+            return false;
+        }
+
+        DetailAnalysisSettings detailSettings;
+        DetailInfluenceSettings detailInfluenceSettings;
+        SemanticAnalysisSettings semanticSettings;
+        SceneBoundaryAnalysisSettings boundarySettings;
+        BackgroundSuppressionSettings backgroundSettings;
+        try
+        {
+            detailSettings = ReadDetailAnalysisSettings();
+            detailInfluenceSettings = ReadDetailInfluenceSettings();
+            semanticSettings = ReadSemanticAnalysisSettings();
+            boundarySettings = ReadBoundaryAnalysisSettings();
+            backgroundSettings = ReadBackgroundSuppressionSettings();
+        }
+        catch (FormatException exception)
+        {
+            _statusText.Text = exception.Message;
+            return false;
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = exception.Message;
+            return false;
+        }
+
+        return await RunAnalyzingDetailAsync(async cancellationToken =>
+        {
+            AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
+                proxy,
+                detailSettings,
+                detailInfluenceSettings,
+                semanticSettings,
+                boundarySettings,
+                _workspace.SemanticCorrections.Regions,
+                cancellationToken).ConfigureAwait(true);
+            await ReplaceAnalyzedDetailMapsAsync(
+                maps,
+                detailSettings,
+                detailInfluenceSettings,
+                semanticSettings,
+                boundarySettings,
+                backgroundSettings,
+                cancellationToken).ConfigureAwait(true);
+            RefreshSemanticCorrections(selectedCorrectionId);
+            RefreshRegionVisuals();
+            _statusText.Text = completionMessage;
         }).ConfigureAwait(true);
     }
 
@@ -1058,17 +2052,23 @@ public partial class MainWindow : Window
         }
 
         string label = $"{region.Label ?? region.Id} · {roleLabel}";
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
         DetailRegion manual = _workspace.AddRegion(
             region.Bounds,
             strength,
             DetailRegionIntent.IncreaseDetail,
             label);
-        await RunAnalyzingDetailAsync(async cancellationToken =>
+        ClearSemanticSelections();
+        bool succeeded = await RunAnalyzingDetailAsync(async cancellationToken =>
         {
             await RecomposeDetailMapAsync(cancellationToken).ConfigureAwait(true);
             RefreshRegionVisuals(manual.Id);
             _statusText.Text = $"Promoted '{region.Label ?? region.Id}' to manual {roleLabel}.";
         }).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedSemanticRegionId: region.Id);
+        }
     }
 
     private void ViewportPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -1113,6 +2113,7 @@ public partial class MainWindow : Window
 
         _selectionStart = normalized;
         _selectionCurrent = normalized;
+        _selectionPointerStartPosition = position;
         e.Pointer.Capture(viewportHost);
         e.Handled = true;
         RefreshRegionVisuals();
@@ -1175,8 +2176,11 @@ public partial class MainWindow : Window
 
         NormalizedPoint? start = _selectionStart;
         NormalizedPoint? end = _selectionCurrent;
+        Point? pointerStart = _selectionPointerStartPosition;
+        Point pointerEnd = e.GetPosition(_sourceViewportHost);
         _selectionStart = null;
         _selectionCurrent = null;
+        _selectionPointerStartPosition = null;
         e.Pointer.Capture(null);
         e.Handled = true;
 
@@ -1186,23 +2190,45 @@ public partial class MainWindow : Window
             return;
         }
 
+        double dragDistance;
+        if (pointerStart is Point pressed)
+        {
+            double horizontalDistance = pointerEnd.X - pressed.X;
+            double verticalDistance = pointerEnd.Y - pressed.Y;
+            dragDistance = Math.Sqrt(
+                (horizontalDistance * horizontalDistance)
+                + (verticalDistance * verticalDistance));
+        }
+        else
+        {
+            dragDistance = double.PositiveInfinity;
+        }
+        if (dragDistance < RegionSelectionDragThresholdPixels)
+        {
+            SelectOverlayRegionAt(end.Value);
+            return;
+        }
+
         double width = Math.Abs(end.Value.X - start.Value.X);
         double height = Math.Abs(end.Value.Y - start.Value.Y);
         if (width < MinimumManualRegionSize || height < MinimumManualRegionSize)
         {
-            _statusText.Text = "The selected area is too small.";
+            _statusText.Text = "The dragged area is too small.";
             RefreshRegionVisuals();
             return;
         }
 
         DetailRegionIntent intent;
         double strength;
+        DetailRegion? added = null;
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        string? selectedRegionId = GetSelectedRegion()?.Id;
         try
         {
             intent = ReadSelectedDetailIntent();
             strength = ParseDouble(_regionStrengthTextBox, "Region strength") / 100d;
             NormalizedRect bounds = NormalizedRect.FromCorners(start.Value, end.Value);
-            _workspace.AddRegion(
+            added = _workspace.AddRegion(
                 bounds,
                 strength,
                 intent);
@@ -1226,12 +2252,17 @@ public partial class MainWindow : Window
             return;
         }
 
-        RefreshRegionVisuals();
-        await RunAnalyzingDetailAsync(async cancellationToken =>
+        ClearSemanticSelections();
+        RefreshRegionVisuals(added.Id);
+        bool succeeded = await RunAnalyzingDetailAsync(async cancellationToken =>
         {
             await RecomposeDetailMapAsync(cancellationToken).ConfigureAwait(true);
             _statusText.Text = "Manual detail region added. Render the preview to apply it to the strokes.";
         }).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedRegionId: selectedRegionId);
+        }
     }
 
     private void ViewportPointerWheelChanged(object? sender, PointerWheelEventArgs e)
@@ -1271,6 +2302,54 @@ public partial class MainWindow : Window
         RefreshRegionVisuals();
     }
 
+    private void SelectOverlayRegionAt(NormalizedPoint point)
+    {
+        DetailRegion? detail = OverlayRegionHitTester.SelectDetailRegion(
+            _workspace.Regions.Regions,
+            point,
+            GetSelectedRegion()?.Id);
+        if (detail is not null)
+        {
+            ClearSemanticSelections();
+            RefreshRegionVisuals(detail.Id);
+            _statusText.Text = $"Selected manual detail region '{detail.Label ?? detail.Id}'.";
+            return;
+        }
+
+        SemanticCorrectionRegion? correction = OverlayRegionHitTester.SelectSemanticCorrection(
+            _workspace.SemanticCorrections.Regions,
+            point,
+            GetSelectedSemanticCorrection()?.Id);
+        if (correction is not null)
+        {
+            ClearDetailAndAutomaticSemanticSelections();
+            RefreshSemanticCorrections(correction.Id);
+            RefreshRegionVisuals();
+            _statusText.Text = $"Selected semantic correction '{correction.Label ?? correction.Id}'.";
+            return;
+        }
+
+        SemanticRegion? semantic = _showDetailOverlayCheckBox.IsChecked != true
+            || _semanticAnalysisResult is null
+                ? null
+                : OverlayRegionHitTester.SelectAutomaticSemanticRegion(
+                    _semanticAnalysisResult.Regions,
+                    point,
+                    GetSelectedSemanticRegion()?.Id);
+        if (semantic is not null)
+        {
+            ClearDetailAndCorrectionSelections();
+            SelectSemanticRegionInList(semantic.Id);
+            RefreshRegionVisuals();
+            _statusText.Text = $"Selected detected region '{semantic.Label ?? semantic.Id}'.";
+            return;
+        }
+
+        ClearAllOverlaySelections();
+        RefreshRegionVisuals();
+        _statusText.Text = "No selectable region at this point.";
+    }
+
     private void RegionSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_suppressRegionSelectionChange)
@@ -1278,7 +2357,43 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_regionListBox.SelectedItem is not null)
+        {
+            ClearSemanticSelections();
+        }
+
         PopulateRegionEditorControls(GetSelectedRegion());
+        RefreshRegionVisuals(GetSelectedRegion()?.Id);
+    }
+
+    private void SemanticRegionSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSemanticRegionSelectionChange)
+        {
+            return;
+        }
+
+        if (_semanticRegionListBox.SelectedItem is not null)
+        {
+            ClearDetailAndCorrectionSelections();
+        }
+
+        RefreshRegionVisuals();
+    }
+
+    private void SemanticCorrectionSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSemanticCorrectionSelectionChange)
+        {
+            return;
+        }
+
+        if (_semanticCorrectionListBox.SelectedItem is not null)
+        {
+            ClearDetailAndAutomaticSemanticSelections();
+        }
+
+        RefreshRegionVisuals();
     }
 
     private async void ApplyRegionChangesClick(object? sender, RoutedEventArgs e)
@@ -1290,6 +2405,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
         try
         {
             double left = ParseDouble(_regionLeftTextBox, "Region left") / 100d;
@@ -1326,51 +2442,99 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RecomposeRegionsFromEditorAsync("Selected detail region updated.").ConfigureAwait(true);
+        bool succeeded = await RecomposeRegionsFromEditorAsync(
+            "Selected detail region updated.",
+            selected.Id).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedRegionId: selected.Id);
+        }
     }
 
     private async void MoveRegionEarlierClick(object? sender, RoutedEventArgs e)
     {
         DetailRegion? selected = GetSelectedRegion();
-        if (selected is null || !_workspace.MoveRegionEarlier(selected.Id))
+        if (selected is null)
         {
             return;
         }
 
-        await RecomposeRegionsFromEditorAsync("Selected detail region moved earlier in the composition order.", selected.Id).ConfigureAwait(true);
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        if (!_workspace.MoveRegionEarlier(selected.Id))
+        {
+            return;
+        }
+
+        bool succeeded = await RecomposeRegionsFromEditorAsync(
+            "Selected detail region moved earlier in the composition order.",
+            selected.Id).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedRegionId: selected.Id);
+        }
     }
 
     private async void MoveRegionLaterClick(object? sender, RoutedEventArgs e)
     {
         DetailRegion? selected = GetSelectedRegion();
-        if (selected is null || !_workspace.MoveRegionLater(selected.Id))
+        if (selected is null)
         {
             return;
         }
 
-        await RecomposeRegionsFromEditorAsync("Selected detail region moved later in the composition order.", selected.Id).ConfigureAwait(true);
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        if (!_workspace.MoveRegionLater(selected.Id))
+        {
+            return;
+        }
+
+        bool succeeded = await RecomposeRegionsFromEditorAsync(
+            "Selected detail region moved later in the composition order.",
+            selected.Id).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedRegionId: selected.Id);
+        }
     }
 
     private async void DeleteSelectedRegionClick(object? sender, RoutedEventArgs e)
     {
+        _ = sender;
+        _ = e;
+        await DeleteSelectedDetailRegionAsync().ConfigureAwait(true);
+    }
+
+    private async Task DeleteSelectedDetailRegionAsync()
+    {
         DetailRegion? selected = GetSelectedRegion();
-        if (selected is null || !_workspace.RemoveRegion(selected.Id))
+        if (selected is null)
         {
             return;
         }
 
-        await RecomposeRegionsFromEditorAsync("Selected detail region deleted.").ConfigureAwait(true);
+        WorkspaceEditSnapshot snapshot = _workspace.CaptureEditState();
+        if (!_workspace.RemoveRegion(selected.Id))
+        {
+            return;
+        }
+
+        bool succeeded = await RecomposeRegionsFromEditorAsync(
+            "Selected detail region deleted.").ConfigureAwait(true);
+        if (!succeeded)
+        {
+            RestoreWorkspaceEdit(snapshot, selectedRegionId: selected.Id);
+        }
     }
 
-    private async Task RecomposeRegionsFromEditorAsync(string completionMessage, string? selectedRegionId = null)
+    private async Task<bool> RecomposeRegionsFromEditorAsync(string completionMessage, string? selectedRegionId = null)
     {
         if (_automaticDetailMap is null)
         {
             RefreshRegionVisuals(selectedRegionId);
-            return;
+            return true;
         }
 
-        await RunAnalyzingDetailAsync(async cancellationToken =>
+        return await RunAnalyzingDetailAsync(async cancellationToken =>
         {
             await RecomposeDetailMapAsync(cancellationToken).ConfigureAwait(true);
             RefreshRegionVisuals(selectedRegionId);
@@ -1713,6 +2877,7 @@ public partial class MainWindow : Window
         _backgroundLengthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundLengthMultiplier * 100d);
         _detailedWidthTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedWidthMultiplier * 100d);
         _backgroundWidthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundWidthMultiplier * 100d);
+        _regionTransitionWidthTextBox.Text = FormatDouble(settings.DetailInfluence.RegionTransitionWidth * 100d);
         _enableSemanticAnalysisCheckBox.IsChecked = settings.SemanticAnalysis.Enabled;
         _semanticInfluenceTextBox.Text = FormatDouble(settings.SemanticAnalysis.OverallInfluence * 100d);
         _semanticSaliencyWeightTextBox.Text = FormatDouble(settings.SemanticAnalysis.SaliencyWeight);
@@ -1725,6 +2890,79 @@ public partial class MainWindow : Window
         _semanticCenterBiasTextBox.Text = FormatDouble(settings.SemanticAnalysis.CenterBias);
         _semanticSmoothingRadiusTextBox.Text = settings.SemanticAnalysis.SmoothingRadius.ToString(CultureInfo.CurrentCulture);
         _semanticBoundaryRadiusTextBox.Text = settings.SemanticAnalysis.BoundaryRadius.ToString(CultureInfo.CurrentCulture);
+        ApplyBoundaryAnalysisSettings(settings.BoundaryAnalysis);
+        ApplyBoundaryPaintingSettings(settings.BoundaryPainting);
+        ApplyBackgroundSuppressionSettings(settings.BackgroundSuppression);
+    }
+
+    private void ApplyProjectControls(FlowPainterProject project)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        bool previousSuppression = _suppressDirtyTracking;
+        _suppressDirtyTracking = true;
+        try
+        {
+            _previewQualityComboBox.SelectedItem = project.Preview.Quality;
+            ApplyFinalRenderSettings(project.FinalRender);
+            ApplyPreset(new FlowPainterPreset(project.Name, project.Settings), project.Seed);
+            ApplyPrimitiveGenerationSettings(project.PrimitiveGeneration);
+            ApplyHybridGenerationSettings(project.HybridGeneration);
+            _generativeModeComboBox.SelectedItem = project.Mode;
+            _projectNameTextBox.Text = project.Name;
+        }
+        finally
+        {
+            _suppressDirtyTracking = previousSuppression;
+        }
+    }
+
+    private void ApplyBoundaryAnalysisSettings(SceneBoundaryAnalysisSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _enableBoundaryAnalysisCheckBox.IsChecked = settings.Enabled;
+        _boundaryLuminanceWeightTextBox.Text = FormatDouble(settings.LuminanceWeight);
+        _boundaryColorWeightTextBox.Text = FormatDouble(settings.ColorWeight);
+        _boundaryMultiscaleWeightTextBox.Text = FormatDouble(settings.MultiscaleWeight);
+        _boundaryContinuityWeightTextBox.Text = FormatDouble(settings.ContinuityWeight);
+        _boundarySemanticWeightTextBox.Text = FormatDouble(settings.SemanticBoundaryWeight);
+        _boundaryTextureSuppressionTextBox.Text = FormatDouble(settings.TextureSuppression * 100d);
+        _boundaryEdgeThresholdTextBox.Text = FormatDouble(settings.EdgeThreshold * 100d);
+        _boundaryImportantThresholdTextBox.Text = FormatDouble(settings.ImportantEdgeThreshold * 100d);
+        _boundaryCoarseRadiusTextBox.Text = settings.CoarseRadius.ToString(CultureInfo.CurrentCulture);
+        _boundarySmoothingRadiusTextBox.Text = settings.SmoothingRadius.ToString(CultureInfo.CurrentCulture);
+        _boundaryProtectionRadiusTextBox.Text = settings.BoundaryProtectionRadius.ToString(CultureInfo.CurrentCulture);
+    }
+
+    private void ApplyBoundaryPaintingSettings(BoundaryPaintingSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _enableBoundaryPaintingCheckBox.IsChecked = settings.Enabled;
+        _boundaryTangentAlignmentTextBox.Text = FormatDouble(settings.TangentAlignment * 100d);
+        _boundaryAlignmentRadiusTextBox.Text = settings.AlignmentRadius.ToString(CultureInfo.CurrentCulture);
+        _boundaryCrossingPenaltyTextBox.Text = FormatDouble(settings.CrossingPenalty * 100d);
+        _boundaryHardThresholdTextBox.Text = FormatDouble(settings.HardBoundaryThreshold * 100d);
+        _boundaryTerminationStrengthTextBox.Text = FormatDouble(settings.TerminationStrength * 100d);
+        _boundaryInternalInfluenceTextBox.Text = FormatDouble(settings.InternalEdgeInfluence * 100d);
+        _boundaryTextureInfluenceTextBox.Text = FormatDouble(settings.TextureEdgeInfluence * 100d);
+        _boundaryContourReinforcementTextBox.Text = FormatDouble(settings.ContourReinforcement);
+        _boundaryCornerPreservationTextBox.Text = FormatDouble(settings.CornerPreservation * 100d);
+    }
+
+    private void ApplyBackgroundSuppressionSettings(BackgroundSuppressionSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _enableBackgroundSuppressionCheckBox.IsChecked = settings.Enabled;
+        _backgroundSuppressionStrengthTextBox.Text = FormatDouble(settings.OverallStrength * 100d);
+        _backgroundDetailFloorTextBox.Text = FormatDouble(settings.DetailFloor * 100d);
+        _backgroundUncertaintyProtectionTextBox.Text = FormatDouble(settings.UncertaintyProtection * 100d);
+        _backgroundSilhouetteProtectionTextBox.Text = FormatDouble(settings.SilhouetteProtection * 100d);
+        _backgroundTransitionSoftnessTextBox.Text = FormatDouble(settings.TransitionSoftness * 100d);
+        _backgroundPlacementWeightTextBox.Text = FormatDouble(settings.BackgroundPlacementWeight * 100d);
+        _backgroundSuppressionLengthTextBox.Text = FormatDouble(settings.StrokeLengthMultiplier * 100d);
+        _backgroundSuppressionWidthTextBox.Text = FormatDouble(settings.StrokeWidthMultiplier * 100d);
+        _backgroundSegmentMultiplierTextBox.Text = FormatDouble(settings.SegmentMultiplier * 100d);
+        _backgroundCurveFreedomTextBox.Text = FormatDouble(settings.CurveFreedomMultiplier * 100d);
+        _backgroundColorSimplificationTextBox.Text = FormatDouble(settings.ColorSimplification * 100d);
     }
 
     private void ApplyFinalRenderSettings(FinalRenderSettings settings)
@@ -1748,6 +2986,50 @@ public partial class MainWindow : Window
             ParseInteger(_jpegQualityTextBox, "JPEG quality"));
     }
 
+    private static void EnsureAnalysisMemoryBudget(
+        ImageSize sourceSize,
+        int previewMaximumDimension)
+    {
+        ImageSize proxySize = sourceSize.FitWithin(
+            previewMaximumDimension,
+            previewMaximumDimension);
+        AnalysisMemoryEstimate estimate = AnalysisMemoryEstimator.Estimate(sourceSize, proxySize);
+        WorkloadBudgetPolicy.EnsureMemoryWithinBudget(
+            estimate.KnownPeakBytes,
+            "Image analysis");
+    }
+
+    private bool TryEnsureFinalRenderMemoryBudget(
+        SkiaImage sourceImage,
+        ImageSize outputSize,
+        GenerativeMode mode)
+    {
+        try
+        {
+            ImageSize proxySize = _proxyImage?.Size
+                ?? sourceImage.Size.FitWithin(
+                    PreviewSettings.StandardMaximumDimension,
+                    PreviewSettings.StandardMaximumDimension);
+            ImageSize previewSize = _renderedImage?.Size ?? proxySize;
+            FinalRenderMemoryEstimate estimate = FinalRenderMemoryEstimator.Estimate(
+                sourceImage.Size,
+                proxySize,
+                previewSize,
+                outputSize,
+                mode,
+                includeDetailOverlay: _detailOverlayPreviewBitmap is not null);
+            WorkloadBudgetPolicy.EnsureMemoryWithinBudget(
+                estimate.KnownPeakBytes,
+                $"Final {mode} export");
+            return true;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _statusText.Text = exception.Message;
+            return false;
+        }
+    }
+
     private void UpdateFinalOutputEstimate(bool showValidationMessage = false)
     {
         SkiaImage? source = _sourceImage;
@@ -1764,19 +3046,32 @@ public partial class MainWindow : Window
             ImageSize outputSize = settings.GetOutputSize(source.Size);
             ImageSize proxySize = _proxyImage?.Size ?? source.Size.FitWithin(PreviewSettings.StandardMaximumDimension, PreviewSettings.StandardMaximumDimension);
             ImageSize previewSize = _renderedImage?.Size ?? proxySize;
+            bool hasApprovedPreviewPlan = _previewStrokePlan is not null
+                || _previewPrimitivePlan is not null
+                || _previewHybridPlan is not null;
+            GenerativeMode mode = hasApprovedPreviewPlan
+                ? _previewGenerativeMode
+                : _generativeModeComboBox.SelectedItem is GenerativeMode selectedMode
+                    ? selectedMode
+                    : GenerativeMode.FlowPainting;
             FinalRenderMemoryEstimate estimate = FinalRenderMemoryEstimator.Estimate(
                 source.Size,
                 proxySize,
                 previewSize,
                 outputSize,
+                mode,
                 includeDetailOverlay: _detailOverlayPreviewBitmap is not null);
-            _finalOutputInfoText.Text = $"{outputSize.Width:N0} × {outputSize.Height:N0} · {settings.Format}";
-            _finalMemoryInfoText.Text = $"Known peak RGBA buffers: {estimate.KnownPeakMebibytes:N0} MiB · {estimate.Risk} risk";
+            bool withinBudget = WorkloadBudgetPolicy.IsMemoryWithinBudget(estimate.KnownPeakBytes);
+            string budgetStatus = withinBudget ? "allowed" : "blocked";
+            _finalOutputInfoText.Text = $"{outputSize.Width:N0} × {outputSize.Height:N0} · {settings.Format} · {mode}";
+            _finalMemoryInfoText.Text = $"Estimated peak: {estimate.KnownPeakMebibytes:N0} MiB · "
+                + $"{estimate.OutputBufferCount:N0} output buffers · {estimate.Risk} risk · {budgetStatus}";
             if (showValidationMessage)
             {
-                _statusText.Text = estimate.Risk == FinalRenderMemoryRisk.High
-                    ? "High memory estimate. Close other applications before final rendering."
-                    : $"Final output estimate updated: {estimate.KnownPeakMebibytes:N0} MiB known RGBA buffers.";
+                _statusText.Text = withinBudget
+                    ? $"Final output estimate updated: {estimate.KnownPeakMebibytes:N0} MiB estimated peak."
+                    : $"Final export blocked: {estimate.KnownPeakMebibytes:N0} MiB exceeds the "
+                        + $"{WorkloadBudgetPolicy.MaximumPeakWorkingSetMebibytes:N0} MiB budget.";
             }
         }
         catch (FormatException exception)
@@ -1813,6 +3108,107 @@ public partial class MainWindow : Window
         HashSet<char> invalidCharacters = [.. IoPath.GetInvalidFileNameChars()];
         string sanitized = string.Concat(value.Select(character => invalidCharacters.Contains(character) ? '_' : character)).Trim();
         return string.IsNullOrWhiteSpace(sanitized) ? "flowpainter-final" : sanitized;
+    }
+
+    private void GenerativeModeChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        GenerativeMode mode = _generativeModeComboBox.SelectedItem is GenerativeMode selected
+            ? selected
+            : GenerativeMode.FlowPainting;
+        _exportSvgButton.IsEnabled = !_workspace.Operation.IsBusy
+            && mode == GenerativeMode.GeometricPrimitives
+            && _previewPrimitivePlan is not null;
+        InvalidateRenderedPreview();
+        _statusText.Text = mode switch
+        {
+            GenerativeMode.GeometricPrimitives => "Geometric primitive mode selected.",
+            GenerativeMode.Hybrid => "Hybrid mode selected: primitive masses deform the flow field before refinement.",
+            _ => "Flow painting mode selected."
+        };
+    }
+
+    private static int CountEnabledPrimitiveKinds(PrimitiveKindSet value)
+    {
+        return System.Numerics.BitOperations.PopCount((uint)value);
+    }
+
+    private GenerativeMode ReadSelectedGenerativeMode()
+    {
+        return _generativeModeComboBox.SelectedItem is GenerativeMode mode
+            ? mode
+            : throw new InvalidOperationException("Select a generative engine.");
+    }
+
+    private PrimitiveGenerationSettings ReadPrimitiveGenerationSettings()
+    {
+        PrimitiveKindSet allowedKinds = _primitiveKindsComboBox.SelectedItem is PrimitiveKindSet selectedKinds
+            ? selectedKinds
+            : throw new InvalidOperationException("Select the primitive shapes to use.");
+        return new PrimitiveGenerationSettings(
+            ParseInteger(_primitiveCountTextBox, "Primitives"),
+            ParseInteger(_primitiveCandidatesTextBox, "Primitive candidates"),
+            ParseInteger(_primitiveMutationsTextBox, "Primitive mutations"),
+            ParseDouble(_primitiveMinimumSizeTextBox, "Minimum primitive size") / 100d,
+            ParseDouble(_primitiveMaximumSizeTextBox, "Maximum primitive size") / 100d,
+            ParseDouble(_primitiveOpacityTextBox, "Primitive opacity") / 100d,
+            ParseDouble(_primitiveDetailSizeTextBox, "Primitive detail size influence") / 100d,
+            ParseDouble(_primitivePlacementBiasTextBox, "Primitive placement bias"),
+            ParseDouble(_primitiveErrorWeightTextBox, "Primitive detail error weight"),
+            ParseDouble(_primitiveSearchInfluenceTextBox, "Primitive detail search influence"),
+            allowedKinds);
+    }
+
+    private void ApplyPrimitiveGenerationSettings(PrimitiveGenerationSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _primitiveCountTextBox.Text = settings.PrimitiveCount.ToString(CultureInfo.InvariantCulture);
+        _primitiveCandidatesTextBox.Text = settings.CandidatesPerStep.ToString(CultureInfo.InvariantCulture);
+        _primitiveMutationsTextBox.Text = settings.MutationIterations.ToString(CultureInfo.InvariantCulture);
+        _primitiveMinimumSizeTextBox.Text = (settings.MinimumSize * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _primitiveMaximumSizeTextBox.Text = (settings.MaximumSize * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _primitiveOpacityTextBox.Text = (settings.Opacity * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _primitiveDetailSizeTextBox.Text = (settings.DetailSizeInfluence * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _primitivePlacementBiasTextBox.Text = settings.DetailPlacementBias.ToString("0.###", CultureInfo.InvariantCulture);
+        _primitiveErrorWeightTextBox.Text = settings.DetailErrorWeight.ToString("0.###", CultureInfo.InvariantCulture);
+        _primitiveSearchInfluenceTextBox.Text = settings.DetailSearchInfluence.ToString("0.###", CultureInfo.InvariantCulture);
+        _primitiveKindsComboBox.SelectedItem = settings.AllowedKinds;
+        if (_primitiveKindsComboBox.SelectedIndex < 0)
+        {
+            _primitiveKindsComboBox.SelectedItem = PrimitiveKindSet.All;
+        }
+    }
+
+    private HybridGenerationSettings ReadHybridGenerationSettings()
+    {
+        PrimitiveFlowInfluenceKind influenceKind = _hybridInfluenceKindComboBox.SelectedItem is PrimitiveFlowInfluenceKind selected
+            ? selected
+            : throw new InvalidOperationException("Select a primitive flow influence.");
+        return new HybridGenerationSettings(
+            ParseDouble(_hybridPrimitiveBudgetTextBox, "Hybrid primitive budget") / 100d,
+            ParseDouble(_hybridFlowBudgetTextBox, "Hybrid flow budget") / 100d,
+            ParseDouble(_hybridRefinementBudgetTextBox, "Hybrid refinement budget") / 100d,
+            influenceKind,
+            ParseDouble(_hybridInfluenceStrengthTextBox, "Hybrid flow influence") / 100d,
+            ParseDouble(_hybridInfluenceRadiusTextBox, "Hybrid influence radius"),
+            ParseInteger(_hybridMaximumInfluencesTextBox, "Maximum nearby primitives"),
+            ParseDouble(_hybridRefinementDetailBiasTextBox, "Refinement detail bias"),
+            ParseDouble(_hybridRefinementLengthTextBox, "Refinement length") / 100d,
+            ParseDouble(_hybridRefinementWidthTextBox, "Refinement width") / 100d);
+    }
+
+    private void ApplyHybridGenerationSettings(HybridGenerationSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _hybridPrimitiveBudgetTextBox.Text = (settings.PrimitiveBudgetFraction * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _hybridFlowBudgetTextBox.Text = (settings.FlowBudgetFraction * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _hybridRefinementBudgetTextBox.Text = (settings.RefinementBudgetFraction * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _hybridInfluenceKindComboBox.SelectedItem = settings.InfluenceKind;
+        _hybridInfluenceStrengthTextBox.Text = (settings.InfluenceStrength * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _hybridInfluenceRadiusTextBox.Text = settings.InfluenceRadiusMultiplier.ToString("0.###", CultureInfo.InvariantCulture);
+        _hybridMaximumInfluencesTextBox.Text = settings.MaximumInfluencesPerSample.ToString(CultureInfo.InvariantCulture);
+        _hybridRefinementDetailBiasTextBox.Text = settings.RefinementDetailBias.ToString("0.###", CultureInfo.InvariantCulture);
+        _hybridRefinementLengthTextBox.Text = (settings.RefinementLengthMultiplier * 100d).ToString("0.###", CultureInfo.InvariantCulture);
+        _hybridRefinementWidthTextBox.Text = (settings.RefinementWidthMultiplier * 100d).ToString("0.###", CultureInfo.InvariantCulture);
     }
 
     private PreviewSettings ReadPreviewSettings()
@@ -1864,7 +3260,10 @@ public partial class MainWindow : Window
             ReadDetailAnalysisSettings(),
             ReadDetailInfluenceSettings(),
             brush,
-            ReadSemanticAnalysisSettings());
+            ReadSemanticAnalysisSettings(),
+            ReadBoundaryAnalysisSettings(),
+            ReadBoundaryPaintingSettings(),
+            ReadBackgroundSuppressionSettings());
     }
 
     private DetailAnalysisSettings ReadDetailAnalysisSettings()
@@ -1883,7 +3282,8 @@ public partial class MainWindow : Window
             ParseDouble(_detailedLengthTextBox, "Detailed length") / 100d,
             ParseDouble(_backgroundLengthTextBox, "Background length") / 100d,
             ParseDouble(_detailedWidthTextBox, "Detailed width") / 100d,
-            ParseDouble(_backgroundWidthTextBox, "Background width") / 100d);
+            ParseDouble(_backgroundWidthTextBox, "Background width") / 100d,
+            ParseDouble(_regionTransitionWidthTextBox, "Region transition width") / 100d);
     }
 
     private SemanticAnalysisSettings ReadSemanticAnalysisSettings()
@@ -1901,6 +3301,55 @@ public partial class MainWindow : Window
             ParseDouble(_semanticCenterBiasTextBox, "Center bias"),
             ParseInteger(_semanticSmoothingRadiusTextBox, "Semantic smoothing"),
             ParseInteger(_semanticBoundaryRadiusTextBox, "Silhouette radius"));
+    }
+
+    private SceneBoundaryAnalysisSettings ReadBoundaryAnalysisSettings()
+    {
+        return new SceneBoundaryAnalysisSettings(
+            _enableBoundaryAnalysisCheckBox.IsChecked == true,
+            ParseDouble(_boundaryLuminanceWeightTextBox, "Boundary luminance weight"),
+            ParseDouble(_boundaryColorWeightTextBox, "Boundary colour weight"),
+            ParseDouble(_boundaryMultiscaleWeightTextBox, "Boundary multiscale weight"),
+            ParseDouble(_boundaryContinuityWeightTextBox, "Boundary continuity weight"),
+            ParseDouble(_boundarySemanticWeightTextBox, "Boundary silhouette weight"),
+            ParseDouble(_boundaryTextureSuppressionTextBox, "Texture suppression") / 100d,
+            ParseDouble(_boundaryEdgeThresholdTextBox, "Edge threshold") / 100d,
+            ParseDouble(_boundaryImportantThresholdTextBox, "Important-edge threshold") / 100d,
+            ParseInteger(_boundaryCoarseRadiusTextBox, "Boundary coarse radius"),
+            ParseInteger(_boundarySmoothingRadiusTextBox, "Boundary smoothing"),
+            ParseInteger(_boundaryProtectionRadiusTextBox, "Silhouette protection radius"));
+    }
+
+    private BoundaryPaintingSettings ReadBoundaryPaintingSettings()
+    {
+        return new BoundaryPaintingSettings(
+            _enableBoundaryPaintingCheckBox.IsChecked == true,
+            ParseDouble(_boundaryTangentAlignmentTextBox, "Tangent alignment") / 100d,
+            ParseInteger(_boundaryAlignmentRadiusTextBox, "Boundary alignment radius"),
+            ParseDouble(_boundaryCrossingPenaltyTextBox, "Boundary crossing penalty") / 100d,
+            ParseDouble(_boundaryHardThresholdTextBox, "Hard boundary threshold") / 100d,
+            ParseDouble(_boundaryTerminationStrengthTextBox, "Boundary termination strength") / 100d,
+            ParseDouble(_boundaryInternalInfluenceTextBox, "Internal edge influence") / 100d,
+            ParseDouble(_boundaryTextureInfluenceTextBox, "Texture edge influence") / 100d,
+            ParseDouble(_boundaryContourReinforcementTextBox, "Contour reinforcement"),
+            ParseDouble(_boundaryCornerPreservationTextBox, "Corner preservation") / 100d);
+    }
+
+    private BackgroundSuppressionSettings ReadBackgroundSuppressionSettings()
+    {
+        return new BackgroundSuppressionSettings(
+            _enableBackgroundSuppressionCheckBox.IsChecked == true,
+            ParseDouble(_backgroundSuppressionStrengthTextBox, "Background suppression strength") / 100d,
+            ParseDouble(_backgroundDetailFloorTextBox, "Background detail floor") / 100d,
+            ParseDouble(_backgroundUncertaintyProtectionTextBox, "Background uncertainty protection") / 100d,
+            ParseDouble(_backgroundSilhouetteProtectionTextBox, "Background silhouette protection") / 100d,
+            ParseDouble(_backgroundTransitionSoftnessTextBox, "Background transition softness") / 100d,
+            ParseDouble(_backgroundPlacementWeightTextBox, "Background placement floor") / 100d,
+            ParseDouble(_backgroundSuppressionLengthTextBox, "Background stroke length") / 100d,
+            ParseDouble(_backgroundSuppressionWidthTextBox, "Background stroke width") / 100d,
+            ParseDouble(_backgroundSegmentMultiplierTextBox, "Background retained segments") / 100d,
+            ParseDouble(_backgroundCurveFreedomTextBox, "Background curve freedom") / 100d,
+            ParseDouble(_backgroundColorSimplificationTextBox, "Background colour simplification") / 100d);
     }
 
     private DetailRegionIntent ReadSelectedDetailIntent()
@@ -1925,7 +3374,7 @@ public partial class MainWindow : Window
                 DetailAnalysisStage.Completed => "Structural analysis completed.",
                 _ => "Analyzing structure..."
             };
-            ReportOperationProgress(value.Fraction * 0.42d, message);
+            ReportOperationProgress(value.Fraction * 0.32d, message);
         });
 
         return await _detailAnalyzer.AnalyzeAsync(
@@ -1952,7 +3401,7 @@ public partial class MainWindow : Window
                 SemanticAnalysisStage.Completed => "Semantic importance analysis completed.",
                 _ => "Analyzing semantic importance..."
             };
-            ReportOperationProgress(0.42d + (value.Fraction * 0.5d), message);
+            ReportOperationProgress(0.34d + (value.Fraction * 0.30d), message);
         });
 
         return await _semanticAnalyzer.AnalyzeAsync(
@@ -1962,39 +3411,121 @@ public partial class MainWindow : Window
             cancellationToken).ConfigureAwait(true);
     }
 
+    private async Task<SceneBoundaryAnalysisResult> AnalyzeSceneBoundariesAsync(
+        SkiaImage proxy,
+        SemanticAnalysisResult semanticAnalysis,
+        SceneBoundaryAnalysisSettings settings,
+        CancellationToken cancellationToken)
+    {
+        Progress<SceneBoundaryAnalysisProgress> progress = new(value =>
+        {
+            string message = value.Stage switch
+            {
+                SceneBoundaryAnalysisStage.Preparing => "Preparing scene-boundary analysis...",
+                SceneBoundaryAnalysisStage.ComputingMultiscaleEdges => $"Computing multiscale edges {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                SceneBoundaryAnalysisStage.LinkingContours => $"Linking continuous contours {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                SceneBoundaryAnalysisStage.ClassifyingBoundaries => $"Classifying important boundaries {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                SceneBoundaryAnalysisStage.EstimatingBackground => $"Estimating background confidence {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                SceneBoundaryAnalysisStage.SmoothingMaps => "Smoothing boundary maps...",
+                SceneBoundaryAnalysisStage.Completed => "Scene-boundary analysis completed.",
+                _ => "Analyzing scene boundaries..."
+            };
+            ReportOperationProgress(0.64d + (value.Fraction * 0.32d), message);
+        });
+
+        return await _boundaryAnalyzer.AnalyzeAsync(
+            proxy,
+            semanticAnalysis,
+            settings,
+            progress,
+            cancellationToken).ConfigureAwait(true);
+    }
+
     private async Task<AutomaticAnalysisMaps> AnalyzeAutomaticMapsAsync(
         SkiaImage proxy,
         DetailAnalysisSettings detailSettings,
+        DetailInfluenceSettings detailInfluenceSettings,
         SemanticAnalysisSettings semanticSettings,
+        SceneBoundaryAnalysisSettings boundarySettings,
+        IReadOnlyList<SemanticCorrectionRegion> semanticCorrections,
         CancellationToken cancellationToken)
     {
         DetailMap structural = await AnalyzeDetailMapAsync(
             proxy,
             detailSettings,
             cancellationToken).ConfigureAwait(true);
-        SemanticAnalysisResult semantic = await AnalyzeSemanticImportanceAsync(
+        SemanticAnalysisResult automaticSemantic = await AnalyzeSemanticImportanceAsync(
             proxy,
             semanticSettings,
+            cancellationToken).ConfigureAwait(true);
+        SemanticAnalysisResult semantic = SemanticCorrectionComposer.Apply(
+            automaticSemantic,
+            semanticCorrections,
+            detailInfluenceSettings.RegionTransitionWidth,
+            cancellationToken);
+        SceneBoundaryAnalysisResult boundary = await AnalyzeSceneBoundariesAsync(
+            proxy,
+            semantic,
+            boundarySettings,
             cancellationToken).ConfigureAwait(true);
         DetailMap automatic = SemanticDetailMapComposer.Combine(
             structural,
             semantic,
             semanticSettings,
             cancellationToken);
-        ReportOperationProgress(0.94d, "Automatic importance maps combined.");
-        return new AutomaticAnalysisMaps(structural, semantic, automatic);
+        ReportOperationProgress(0.97d, "Automatic structural, semantic and boundary maps completed.");
+        return new AutomaticAnalysisMaps(structural, semantic, boundary, automatic);
+    }
+
+    private BackgroundSuppressionResult ComposeBackgroundSuppression(
+        AutomaticAnalysisMaps maps,
+        DetailMap manuallyComposedMap,
+        BackgroundSuppressionSettings settings,
+        CancellationToken cancellationToken)
+    {
+        Progress<BackgroundSuppressionProgress> progress = new(value =>
+        {
+            string message = value.Stage switch
+            {
+                BackgroundSuppressionStage.Preparing => "Preparing background suppression...",
+                BackgroundSuppressionStage.BuildingProtection => "Protecting subjects, silhouettes and uncertain areas...",
+                BackgroundSuppressionStage.EstimatingSuppression => "Estimating low-importance background...",
+                BackgroundSuppressionStage.SmoothingTransitions => "Smoothing subject-background transitions...",
+                BackgroundSuppressionStage.CombiningDetail => "Building the artistic detail field...",
+                BackgroundSuppressionStage.Completed => "Background suppression completed.",
+                _ => "Composing background suppression..."
+            };
+            ReportOperationProgress(0.97d + (value.Fraction * 0.025d), message);
+        });
+
+        return BackgroundSuppressionComposer.Compose(
+            maps.Automatic,
+            manuallyComposedMap,
+            maps.Semantic,
+            maps.Boundary,
+            settings,
+            progress,
+            cancellationToken);
     }
 
     private async Task<DetailMap> EnsureDetailMapAsync(
         SkiaImage proxy,
         DetailAnalysisSettings detailSettings,
+        DetailInfluenceSettings detailInfluenceSettings,
         SemanticAnalysisSettings semanticSettings,
+        SceneBoundaryAnalysisSettings boundarySettings,
+        BackgroundSuppressionSettings backgroundSettings,
         CancellationToken cancellationToken)
     {
         if (_automaticDetailMap is not null
             && _composedDetailMap is not null
             && DetailAnalysisSettingsEqual(_activeDetailAnalysisSettings, detailSettings)
-            && SemanticAnalysisSettingsEqual(_activeSemanticAnalysisSettings, semanticSettings))
+            && _activeDetailRegionTransitionWidth == detailInfluenceSettings.RegionTransitionWidth
+            && _activeDetailRegionRevision == _workspace.DetailRegionRevision
+            && _activeSemanticCorrectionRevision == _workspace.SemanticCorrectionRevision
+            && SemanticAnalysisSettingsEqual(_activeSemanticAnalysisSettings, semanticSettings)
+            && BoundaryAnalysisSettingsEqual(_activeBoundaryAnalysisSettings, boundarySettings)
+            && BackgroundSuppressionSettingsEqual(_activeBackgroundSuppressionSettings, backgroundSettings))
         {
             return _composedDetailMap;
         }
@@ -2002,12 +3533,18 @@ public partial class MainWindow : Window
         AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
             proxy,
             detailSettings,
+            detailInfluenceSettings,
             semanticSettings,
+            boundarySettings,
+            _workspace.SemanticCorrections.Regions,
             cancellationToken).ConfigureAwait(true);
         await ReplaceAnalyzedDetailMapsAsync(
             maps,
             detailSettings,
+            detailInfluenceSettings,
             semanticSettings,
+            boundarySettings,
+            backgroundSettings,
             cancellationToken).ConfigureAwait(true);
         return _composedDetailMap
             ?? throw new InvalidOperationException("The composed detail map was not created.");
@@ -2016,24 +3553,39 @@ public partial class MainWindow : Window
     private async Task ReplaceAnalyzedDetailMapsAsync(
         AutomaticAnalysisMaps maps,
         DetailAnalysisSettings detailSettings,
+        DetailInfluenceSettings detailInfluenceSettings,
         SemanticAnalysisSettings semanticSettings,
+        SceneBoundaryAnalysisSettings boundarySettings,
+        BackgroundSuppressionSettings backgroundSettings,
         CancellationToken cancellationToken)
     {
-        DetailMap composed = DetailMapComposer.ApplyRegions(
+        DetailMap manuallyComposed = DetailMapComposer.ApplyRegions(
             maps.Automatic,
             _workspace.Regions.Regions,
+            detailInfluenceSettings.RegionTransitionWidth,
+            cancellationToken);
+        BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
+            maps,
+            manuallyComposed,
+            backgroundSettings,
             cancellationToken);
         SkiaImage proxy = _proxyImage
             ?? throw new InvalidOperationException("The analysis proxy is not available.");
         using SkiaImage overlay = await _detailOverlayRenderer.RenderAsync(
             proxy,
-            composed,
+            backgroundSuppression.EffectiveDetailMap,
             cancellationToken: cancellationToken).ConfigureAwait(true);
-        ReplaceDetailVisualization(composed, overlay);
+        ReplaceDetailVisualization(backgroundSuppression.EffectiveDetailMap, overlay);
         _automaticDetailMap = maps.Automatic;
         _semanticAnalysisResult = maps.Semantic;
+        _sceneBoundaryAnalysisResult = maps.Boundary;
+        _backgroundSuppressionResult = backgroundSuppression;
         _activeDetailAnalysisSettings = detailSettings;
+        _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
+        CaptureActiveWorkspaceRevisions();
         _activeSemanticAnalysisSettings = semanticSettings;
+        _activeBoundaryAnalysisSettings = boundarySettings;
+        _activeBackgroundSuppressionSettings = backgroundSettings;
         ClearSemanticOverlayPreview();
         RefreshSemanticRegions();
     }
@@ -2042,66 +3594,111 @@ public partial class MainWindow : Window
     {
         DetailMap automatic = _automaticDetailMap
             ?? throw new InvalidOperationException("The automatic detail map is not available.");
-        DetailMap composed = DetailMapComposer.ApplyRegions(
+        DetailInfluenceSettings detailInfluenceSettings = ReadDetailInfluenceSettings();
+        if (_workspace.SemanticCorrections.Count > 0
+            && _activeDetailRegionTransitionWidth != detailInfluenceSettings.RegionTransitionWidth)
+        {
+            DetailAnalysisSettings detailSettings = ReadDetailAnalysisSettings();
+            SemanticAnalysisSettings semanticSettings = ReadSemanticAnalysisSettings();
+            SceneBoundaryAnalysisSettings boundarySettings = ReadBoundaryAnalysisSettings();
+            BackgroundSuppressionSettings backgroundSettings = ReadBackgroundSuppressionSettings();
+            SkiaImage currentProxy = _proxyImage
+                ?? throw new InvalidOperationException("The analysis proxy is not available.");
+            AutomaticAnalysisMaps reanalyzedMaps = await AnalyzeAutomaticMapsAsync(
+                currentProxy,
+                detailSettings,
+                detailInfluenceSettings,
+                semanticSettings,
+                boundarySettings,
+                _workspace.SemanticCorrections.Regions,
+                cancellationToken).ConfigureAwait(true);
+            await ReplaceAnalyzedDetailMapsAsync(
+                reanalyzedMaps,
+                detailSettings,
+                detailInfluenceSettings,
+                semanticSettings,
+                boundarySettings,
+                backgroundSettings,
+                cancellationToken).ConfigureAwait(true);
+            return;
+        }
+
+        DetailMap manuallyComposed = DetailMapComposer.ApplyRegions(
             automatic,
             _workspace.Regions.Regions,
+            detailInfluenceSettings.RegionTransitionWidth,
+            cancellationToken);
+        SemanticAnalysisResult semantic = _semanticAnalysisResult
+            ?? throw new InvalidOperationException("The semantic analysis is not available.");
+        SceneBoundaryAnalysisResult boundary = _sceneBoundaryAnalysisResult
+            ?? throw new InvalidOperationException("The boundary analysis is not available.");
+        BackgroundSuppressionSettings settings = ReadBackgroundSuppressionSettings();
+        AutomaticAnalysisMaps maps = new(automatic, semantic, boundary, automatic);
+        BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
+            maps,
+            manuallyComposed,
+            settings,
             cancellationToken);
         SkiaImage proxy = _proxyImage
             ?? throw new InvalidOperationException("The analysis proxy is not available.");
         using SkiaImage overlay = await _detailOverlayRenderer.RenderAsync(
             proxy,
-            composed,
+            backgroundSuppression.EffectiveDetailMap,
             cancellationToken: cancellationToken).ConfigureAwait(true);
-        ReplaceDetailVisualization(composed, overlay);
+        _backgroundSuppressionResult = backgroundSuppression;
+        _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
+        _activeBackgroundSuppressionSettings = settings;
+        CaptureActiveWorkspaceRevisions();
+        ReplaceDetailVisualization(backgroundSuppression.EffectiveDetailMap, overlay);
     }
 
-    private Task RunLoadingImageAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunLoadingImageAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.LoadingImage, "Loading image...", operation);
     }
 
-    private Task RunLoadingProjectAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunLoadingProjectAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.LoadingProject, "Loading project...", operation);
     }
 
-    private Task RunLoadingPresetAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunLoadingPresetAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.LoadingPreset, "Loading preset...", operation);
     }
 
-    private Task RunRebuildingPreviewAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunRebuildingPreviewAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.RebuildingPreview, "Rebuilding preview...", operation);
     }
 
-    private Task RunAnalyzingDetailAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunAnalyzingDetailAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.AnalyzingDetail, "Updating detail map...", operation);
     }
 
-    private Task RunRenderingPreviewAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunRenderingPreviewAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.RenderingPreview, "Rendering preview...", operation);
     }
 
-    private Task RunSavingProjectAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunSavingProjectAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.SavingProject, "Saving project...", operation);
     }
 
-    private Task RunSavingPresetAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunSavingPresetAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.SavingPreset, "Saving preset...", operation);
     }
 
-    private Task RunExportingImageAsync(Func<CancellationToken, Task> operation)
+    private Task<bool> RunExportingImageAsync(Func<CancellationToken, Task> operation)
     {
         return RunOperationAsync(WorkspaceOperationKind.ExportingImage, "Exporting image...", operation);
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The desktop UI boundary converts unexpected operation failures into structured validation and a visible status message.")]
-    private async Task RunOperationAsync(
+    private async Task<bool> RunOperationAsync(
         WorkspaceOperationKind kind,
         string initialMessage,
         Func<CancellationToken, Task> operation)
@@ -2109,7 +3706,7 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(operation);
         if (_operationCancellation is not null || _isClosed)
         {
-            return;
+            return false;
         }
 
         using CancellationTokenSource cancellation = new();
@@ -2118,6 +3715,7 @@ public partial class MainWindow : Window
         _workspace.ClearValidation();
         _statusText.Text = initialMessage;
         SetOperationState(true);
+        bool succeeded = false;
 
         try
         {
@@ -2126,6 +3724,7 @@ public partial class MainWindow : Window
                 ? "Operation completed."
                 : _statusText.Text;
             _workspace.CompleteOperation(completionMessage);
+            succeeded = true;
         }
         catch (OperationCanceledException)
         {
@@ -2157,6 +3756,8 @@ public partial class MainWindow : Window
                 SetOperationState(false);
             }
         }
+
+        return succeeded;
     }
 
     private Progress<ImageOperationProgress> CreateImageProgress()
@@ -2182,7 +3783,12 @@ public partial class MainWindow : Window
         _saveProjectButton.IsEnabled = !running && !string.IsNullOrWhiteSpace(_currentSourcePath);
         _renderButton.IsEnabled = !running && _proxyImage is not null && _composedDetailMap is not null;
         _saveButton.IsEnabled = !running && _renderedImage is not null;
-        _exportFinalButton.IsEnabled = !running && _sourceImage is not null && _previewStrokePlan is not null;
+        _exportFinalButton.IsEnabled = !running
+            && _sourceImage is not null
+            && (_previewStrokePlan is not null || _previewPrimitivePlan is not null || _previewHybridPlan is not null);
+        _exportSvgButton.IsEnabled = !running
+            && _previewGenerativeMode == GenerativeMode.GeometricPrimitives
+            && _previewPrimitivePlan is not null;
         _cancelButton.IsEnabled = running;
         _settingsPanel.IsEnabled = !running;
         _selectionCanvas.IsEnabled = !running && _composedDetailMap is not null;
@@ -2198,8 +3804,13 @@ public partial class MainWindow : Window
         DetailMap automaticDetailMap,
         DetailMap composedDetailMap,
         SemanticAnalysisResult semanticAnalysis,
+        SceneBoundaryAnalysisResult boundaryAnalysis,
+        BackgroundSuppressionResult backgroundSuppression,
         DetailAnalysisSettings detailSettings,
+        DetailInfluenceSettings detailInfluenceSettings,
         SemanticAnalysisSettings semanticSettings,
+        SceneBoundaryAnalysisSettings boundarySettings,
+        BackgroundSuppressionSettings backgroundSettings,
         SkiaImage detailOverlay)
     {
         Bitmap? preview = null;
@@ -2223,6 +3834,8 @@ public partial class MainWindow : Window
             _proxyImage = proxy;
             _renderedImage = null;
             _previewStrokePlan = null;
+            _previewPrimitivePlan = null;
+            _previewHybridPlan = null;
             _previewBrushSettings = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
@@ -2231,9 +3844,17 @@ public partial class MainWindow : Window
             _automaticDetailMap = automaticDetailMap;
             _composedDetailMap = composedDetailMap;
             _semanticAnalysisResult = semanticAnalysis;
+            _sceneBoundaryAnalysisResult = boundaryAnalysis;
+            _backgroundSuppressionResult = backgroundSuppression;
             _activeDetailAnalysisSettings = detailSettings;
+            _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
+            _activeDetailRegionRevision = -1L;
+            _activeSemanticCorrectionRevision = -1L;
             _activeSemanticAnalysisSettings = semanticSettings;
+            _activeBoundaryAnalysisSettings = boundarySettings;
+            _activeBackgroundSuppressionSettings = backgroundSettings;
             _workspace.ClearRegions();
+            _workspace.ClearSemanticCorrections();
             _imageViewportState.Reset();
 
             UpdateSourcePreviewSelection();
@@ -2271,8 +3892,13 @@ public partial class MainWindow : Window
         DetailMap automaticDetailMap,
         DetailMap composedDetailMap,
         SemanticAnalysisResult semanticAnalysis,
+        SceneBoundaryAnalysisResult boundaryAnalysis,
+        BackgroundSuppressionResult backgroundSuppression,
         DetailAnalysisSettings detailSettings,
+        DetailInfluenceSettings detailInfluenceSettings,
         SemanticAnalysisSettings semanticSettings,
+        SceneBoundaryAnalysisSettings boundarySettings,
+        BackgroundSuppressionSettings backgroundSettings,
         SkiaImage detailOverlay)
     {
         Bitmap? preview = null;
@@ -2294,6 +3920,8 @@ public partial class MainWindow : Window
             _proxyImage = proxy;
             _renderedImage = null;
             _previewStrokePlan = null;
+            _previewPrimitivePlan = null;
+            _previewHybridPlan = null;
             _previewBrushSettings = null;
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
@@ -2302,8 +3930,14 @@ public partial class MainWindow : Window
             _automaticDetailMap = automaticDetailMap;
             _composedDetailMap = composedDetailMap;
             _semanticAnalysisResult = semanticAnalysis;
+            _sceneBoundaryAnalysisResult = boundaryAnalysis;
+            _backgroundSuppressionResult = backgroundSuppression;
             _activeDetailAnalysisSettings = detailSettings;
+            _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
+            CaptureActiveWorkspaceRevisions();
             _activeSemanticAnalysisSettings = semanticSettings;
+            _activeBoundaryAnalysisSettings = boundarySettings;
+            _activeBackgroundSuppressionSettings = backgroundSettings;
 
             UpdateSourcePreviewSelection();
             _resultImageView.Source = null;
@@ -2416,7 +4050,83 @@ public partial class MainWindow : Window
             adopted = true;
             _renderedImage = rendered;
             _previewStrokePlan = plan;
+            _previewPrimitivePlan = null;
+            _previewHybridPlan = null;
             _previewBrushSettings = brush;
+            _previewGenerativeMode = GenerativeMode.FlowPainting;
+            _resultPreviewBitmap = preview;
+            _resultImageView.Source = preview;
+            UpdateFinalOutputEstimate();
+            ApplySynchronizedViewportTransforms();
+        }
+        finally
+        {
+            if (adopted)
+            {
+                previousRendered?.Dispose();
+                previousPreview?.Dispose();
+            }
+            else
+            {
+                preview.Dispose();
+            }
+        }
+    }
+
+    private void ReplaceRenderedPrimitive(SkiaImage rendered, PrimitivePlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        Bitmap preview = CreateAvaloniaBitmap(rendered);
+        SkiaImage? previousRendered = _renderedImage;
+        Bitmap? previousPreview = _resultPreviewBitmap;
+        bool adopted = false;
+
+        try
+        {
+            adopted = true;
+            _renderedImage = rendered;
+            _previewStrokePlan = null;
+            _previewPrimitivePlan = plan;
+            _previewHybridPlan = null;
+            _previewBrushSettings = null;
+            _previewGenerativeMode = GenerativeMode.GeometricPrimitives;
+            _resultPreviewBitmap = preview;
+            _resultImageView.Source = preview;
+            UpdateFinalOutputEstimate();
+            ApplySynchronizedViewportTransforms();
+        }
+        finally
+        {
+            if (adopted)
+            {
+                previousRendered?.Dispose();
+                previousPreview?.Dispose();
+            }
+            else
+            {
+                preview.Dispose();
+            }
+        }
+    }
+
+    private void ReplaceRenderedHybrid(SkiaImage rendered, HybridPlan plan, BrushSettings brush)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(brush);
+        Bitmap preview = CreateAvaloniaBitmap(rendered);
+        SkiaImage? previousRendered = _renderedImage;
+        Bitmap? previousPreview = _resultPreviewBitmap;
+        bool adopted = false;
+
+        try
+        {
+            adopted = true;
+            _renderedImage = rendered;
+            _previewStrokePlan = null;
+            _previewPrimitivePlan = null;
+            _previewHybridPlan = plan;
+            _previewBrushSettings = brush;
+            _previewGenerativeMode = GenerativeMode.Hybrid;
             _resultPreviewBitmap = preview;
             _resultImageView.Source = preview;
             UpdateFinalOutputEstimate();
@@ -2442,12 +4152,15 @@ public partial class MainWindow : Window
         Bitmap? preview = _resultPreviewBitmap;
         _renderedImage = null;
         _previewStrokePlan = null;
+        _previewPrimitivePlan = null;
+        _previewHybridPlan = null;
         _previewBrushSettings = null;
         _resultPreviewBitmap = null;
         _resultImageView.Source = null;
         _resultInfoText.Text = "Not rendered";
         _saveButton.IsEnabled = false;
         _exportFinalButton.IsEnabled = false;
+        _exportSvgButton.IsEnabled = false;
         rendered?.Dispose();
         preview?.Dispose();
         UpdateFinalOutputEstimate();
@@ -2461,8 +4174,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        SemanticOverlayMode mode = ReadSelectedSemanticOverlayMode();
-        _sourceImageView.Source = mode == SemanticOverlayMode.CombinedDetail
+        SceneBoundaryOverlayMode mode = ReadSelectedAnalysisOverlayMode();
+        _sourceImageView.Source = mode == SceneBoundaryOverlayMode.CombinedDetail
             ? _detailOverlayPreviewBitmap ?? _sourcePreviewBitmap
             : _semanticOverlayPreviewBitmap ?? _detailOverlayPreviewBitmap ?? _sourcePreviewBitmap;
     }
@@ -2470,6 +4183,8 @@ public partial class MainWindow : Window
     private void RefreshRegionVisuals(string? selectedRegionId = null)
     {
         selectedRegionId ??= GetSelectedRegion()?.Id;
+        string? selectedSemanticRegionId = GetSelectedSemanticRegion()?.Id;
+        string? selectedCorrectionId = GetSelectedSemanticCorrection()?.Id;
         _selectionCanvas.Children.Clear();
         UniformImageViewport? viewport = CreateSourceViewport();
         if (viewport is not null)
@@ -2479,13 +4194,37 @@ public partial class MainWindow : Window
             {
                 foreach (SemanticRegion semanticRegion in _semanticAnalysisResult.Regions)
                 {
-                    AddSemanticRegionRectangle(viewport, semanticRegion);
+                    AddSemanticRegionRectangle(
+                        viewport,
+                        semanticRegion,
+                        string.Equals(
+                            semanticRegion.Id,
+                            selectedSemanticRegionId,
+                            StringComparison.OrdinalIgnoreCase));
                 }
+            }
+
+            foreach (SemanticCorrectionRegion correction in _workspace.SemanticCorrections.Regions)
+            {
+                AddSemanticCorrectionRectangle(
+                    viewport,
+                    correction,
+                    string.Equals(
+                        correction.Id,
+                        selectedCorrectionId,
+                        StringComparison.OrdinalIgnoreCase));
             }
 
             foreach (DetailRegion region in _workspace.Regions.Regions)
             {
-                AddRegionRectangle(viewport, region.Bounds, region.Intent, active: false);
+                AddRegionRectangle(
+                    viewport,
+                    region.Bounds,
+                    region.Intent,
+                    string.Equals(
+                        region.Id,
+                        selectedRegionId,
+                        StringComparison.OrdinalIgnoreCase));
             }
 
             if (_selectionStart is NormalizedPoint start
@@ -2505,18 +4244,37 @@ public partial class MainWindow : Window
             ? "1 manual region"
             : $"{_workspace.Regions.Count:N0} manual regions";
         RefreshRegionList(selectedRegionId);
+        RefreshSemanticCorrections(selectedCorrectionId);
+        RefreshDirtyIndicator();
     }
 
-    private void RefreshSemanticRegions()
+    private void RefreshSemanticRegions(string? selectedRegionId = null)
     {
+        selectedRegionId ??= GetSelectedSemanticRegion()?.Id;
         SemanticRegion[] regions = _semanticAnalysisResult?.Regions.ToArray() ?? [];
         SemanticRegionDisplayItem[] items = regions
             .Select(region => new SemanticRegionDisplayItem(
                 region.Id,
                 $"{region.Label ?? region.Id} · {region.Role} · {region.Confidence:P0}"))
             .ToArray();
-        _semanticRegionListBox.ItemsSource = items;
-        _semanticRegionListBox.SelectedIndex = items.Length > 0 ? 0 : -1;
+        int selectedIndex = selectedRegionId is null
+            ? -1
+            : Array.FindIndex(items, item => string.Equals(
+                item.Id,
+                selectedRegionId,
+                StringComparison.OrdinalIgnoreCase));
+
+        _suppressSemanticRegionSelectionChange = true;
+        try
+        {
+            _semanticRegionListBox.ItemsSource = items;
+            _semanticRegionListBox.SelectedIndex = selectedIndex;
+        }
+        finally
+        {
+            _suppressSemanticRegionSelectionChange = false;
+        }
+
         _semanticRegionCountText.Text = items.Length switch
         {
             0 => "No semantic subjects detected",
@@ -2537,6 +4295,50 @@ public partial class MainWindow : Window
             region.Id,
             item.Id,
             StringComparison.OrdinalIgnoreCase));
+    }
+
+    private SemanticCorrectionRegion? GetSelectedSemanticCorrection()
+    {
+        if (_semanticCorrectionListBox.SelectedItem is not SemanticCorrectionDisplayItem item)
+        {
+            return null;
+        }
+
+        return _workspace.SemanticCorrections.Regions.FirstOrDefault(correction => string.Equals(
+            correction.Id,
+            item.Id,
+            StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void RefreshSemanticCorrections(string? selectedCorrectionId = null)
+    {
+        selectedCorrectionId ??= GetSelectedSemanticCorrection()?.Id;
+        SemanticCorrectionDisplayItem[] items = _workspace.SemanticCorrections.Regions
+            .Select(correction => new SemanticCorrectionDisplayItem(
+                correction.Id,
+                $"{correction.Label ?? correction.Id} · {correction.Kind}"))
+            .ToArray();
+        int selectedIndex = selectedCorrectionId is null
+            ? -1
+            : Array.FindIndex(items, item => string.Equals(
+                item.Id,
+                selectedCorrectionId,
+                StringComparison.OrdinalIgnoreCase));
+
+        _suppressSemanticCorrectionSelectionChange = true;
+        try
+        {
+            _semanticCorrectionListBox.ItemsSource = items;
+            _semanticCorrectionListBox.SelectedIndex = selectedIndex;
+        }
+        finally
+        {
+            _suppressSemanticCorrectionSelectionChange = false;
+        }
+
+        _semanticCorrectionCountText.Text = items.Length == 1
+            ? "1 semantic correction"
+            : $"{items.Length:N0} semantic corrections";
     }
 
     private void RefreshRegionList(string? selectedRegionId)
@@ -2583,6 +4385,102 @@ public partial class MainWindow : Window
             StringComparison.OrdinalIgnoreCase));
     }
 
+    private void SelectSemanticRegionInList(string id)
+    {
+        if (_semanticRegionListBox.ItemsSource is not IEnumerable<SemanticRegionDisplayItem> source)
+        {
+            return;
+        }
+
+        SemanticRegionDisplayItem[] items = source.ToArray();
+        int index = Array.FindIndex(items, item => string.Equals(
+            item.Id,
+            id,
+            StringComparison.OrdinalIgnoreCase));
+        _suppressSemanticRegionSelectionChange = true;
+        try
+        {
+            _semanticRegionListBox.SelectedIndex = index;
+        }
+        finally
+        {
+            _suppressSemanticRegionSelectionChange = false;
+        }
+    }
+
+    private void ClearSemanticSelections()
+    {
+        _suppressSemanticRegionSelectionChange = true;
+        _suppressSemanticCorrectionSelectionChange = true;
+        try
+        {
+            _semanticRegionListBox.SelectedIndex = -1;
+            _semanticCorrectionListBox.SelectedIndex = -1;
+        }
+        finally
+        {
+            _suppressSemanticRegionSelectionChange = false;
+            _suppressSemanticCorrectionSelectionChange = false;
+        }
+    }
+
+    private void ClearDetailAndAutomaticSemanticSelections()
+    {
+        _suppressRegionSelectionChange = true;
+        _suppressSemanticRegionSelectionChange = true;
+        try
+        {
+            _regionListBox.SelectedIndex = -1;
+            _semanticRegionListBox.SelectedIndex = -1;
+        }
+        finally
+        {
+            _suppressRegionSelectionChange = false;
+            _suppressSemanticRegionSelectionChange = false;
+        }
+
+        PopulateRegionEditorControls(null);
+    }
+
+    private void ClearDetailAndCorrectionSelections()
+    {
+        _suppressRegionSelectionChange = true;
+        _suppressSemanticCorrectionSelectionChange = true;
+        try
+        {
+            _regionListBox.SelectedIndex = -1;
+            _semanticCorrectionListBox.SelectedIndex = -1;
+        }
+        finally
+        {
+            _suppressRegionSelectionChange = false;
+            _suppressSemanticCorrectionSelectionChange = false;
+        }
+
+        PopulateRegionEditorControls(null);
+    }
+
+    private void ClearAllOverlaySelections()
+    {
+        _suppressRegionSelectionChange = true;
+        _suppressSemanticRegionSelectionChange = true;
+        _suppressSemanticCorrectionSelectionChange = true;
+        try
+        {
+            _regionListBox.SelectedIndex = -1;
+            _semanticRegionListBox.SelectedIndex = -1;
+            _semanticCorrectionListBox.SelectedIndex = -1;
+        }
+        finally
+        {
+            _suppressRegionSelectionChange = false;
+            _suppressSemanticRegionSelectionChange = false;
+            _suppressSemanticCorrectionSelectionChange = false;
+        }
+
+        PopulateRegionEditorControls(null);
+    }
+
     private void PopulateRegionEditorControls(DetailRegion? region)
     {
         if (region is null)
@@ -2611,7 +4509,8 @@ public partial class MainWindow : Window
 
     private void AddSemanticRegionRectangle(
         UniformImageViewport viewport,
-        SemanticRegion region)
+        SemanticRegion region,
+        bool active)
     {
         ViewportRect mapped = viewport.MapToViewport(region.Bounds);
         Color color = region.Role switch
@@ -2629,8 +4528,36 @@ public partial class MainWindow : Window
             Width = mapped.Width,
             Height = mapped.Height,
             Stroke = new SolidColorBrush(color),
-            StrokeThickness = 1.5d / _imageViewportState.Zoom,
-            Fill = new SolidColorBrush(Color.FromArgb(18, color.R, color.G, color.B)),
+            StrokeThickness = (active ? 3d : 1.5d) / _imageViewportState.Zoom,
+            Fill = new SolidColorBrush(Color.FromArgb(active ? (byte)48 : (byte)18, color.R, color.G, color.B)),
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(rectangle, mapped.X);
+        Canvas.SetTop(rectangle, mapped.Y);
+        _selectionCanvas.Children.Add(rectangle);
+    }
+
+    private void AddSemanticCorrectionRectangle(
+        UniformImageViewport viewport,
+        SemanticCorrectionRegion correction,
+        bool active)
+    {
+        ViewportRect mapped = viewport.MapToViewport(correction.Bounds);
+        Color color = correction.Kind switch
+        {
+            SemanticCorrectionKind.ForcePrimarySubject => Color.FromRgb(90, 255, 130),
+            SemanticCorrectionKind.ForceSubject => Color.FromRgb(255, 220, 80),
+            SemanticCorrectionKind.ForceBackground => Color.FromRgb(70, 150, 255),
+            SemanticCorrectionKind.IgnoreAutomaticDetection => Color.FromRgb(185, 185, 185),
+            _ => Color.FromRgb(255, 255, 255)
+        };
+        Rectangle rectangle = new()
+        {
+            Width = mapped.Width,
+            Height = mapped.Height,
+            Stroke = new SolidColorBrush(color),
+            StrokeThickness = (active ? 4d : 2.5d) / _imageViewportState.Zoom,
+            Fill = new SolidColorBrush(Color.FromArgb(active ? (byte)62 : (byte)34, color.R, color.G, color.B)),
             IsHitTestVisible = false
         };
         Canvas.SetLeft(rectangle, mapped.X);
@@ -2715,26 +4642,42 @@ public partial class MainWindow : Window
     }
 
 
-    private SemanticOverlayMode ReadSelectedSemanticOverlayMode()
+    private SceneBoundaryOverlayMode ReadSelectedAnalysisOverlayMode()
     {
-        return _semanticOverlayModeComboBox.SelectedItem is SemanticOverlayMode mode
+        return _semanticOverlayModeComboBox.SelectedItem is SceneBoundaryOverlayMode mode
             ? mode
-            : SemanticOverlayMode.CombinedDetail;
+            : SceneBoundaryOverlayMode.CombinedDetail;
     }
 
-    private static DetailMap SelectSemanticOverlayMap(
+    private static DetailMap SelectAnalysisOverlayMap(
         SemanticAnalysisResult semantic,
-        SemanticOverlayMode mode)
+        SceneBoundaryAnalysisResult boundary,
+        BackgroundSuppressionResult? backgroundSuppression,
+        SceneBoundaryOverlayMode mode)
     {
         return mode switch
         {
-            SemanticOverlayMode.SemanticImportance => semantic.ImportanceMap,
-            SemanticOverlayMode.Saliency => semantic.SaliencyMap,
-            SemanticOverlayMode.Subjects => semantic.SubjectMap,
-            SemanticOverlayMode.Silhouettes => semantic.SilhouetteMap,
-            SemanticOverlayMode.FocalAreas => semantic.FocalMap,
-            SemanticOverlayMode.CombinedDetail => semantic.ImportanceMap,
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown semantic overlay mode.")
+            SceneBoundaryOverlayMode.SemanticImportance => semantic.ImportanceMap,
+            SceneBoundaryOverlayMode.Saliency => semantic.SaliencyMap,
+            SceneBoundaryOverlayMode.Subjects => semantic.SubjectMap,
+            SceneBoundaryOverlayMode.Silhouettes => semantic.SilhouetteMap,
+            SceneBoundaryOverlayMode.FocalAreas => semantic.FocalMap,
+            SceneBoundaryOverlayMode.EdgeStrength => boundary.EdgeStrengthMap,
+            SceneBoundaryOverlayMode.ImportantEdges => boundary.EdgeImportanceMap,
+            SceneBoundaryOverlayMode.SubjectBoundaries => boundary.SubjectBoundaryMap,
+            SceneBoundaryOverlayMode.InternalStructure => boundary.InternalStructureMap,
+            SceneBoundaryOverlayMode.TextureEdges => boundary.TextureEdgeMap,
+            SceneBoundaryOverlayMode.BackgroundConfidence => boundary.BackgroundConfidenceMap,
+            SceneBoundaryOverlayMode.Uncertainty => boundary.UncertaintyMap,
+            SceneBoundaryOverlayMode.CombinedDetail => semantic.ImportanceMap,
+            SceneBoundaryOverlayMode.EdgeDirections => boundary.EdgeImportanceMap,
+            SceneBoundaryOverlayMode.BackgroundSuppression => backgroundSuppression?.SuppressionMap
+                ?? DetailMap.CreateUniform(boundary.BackgroundConfidenceMap.Size, 0f),
+            SceneBoundaryOverlayMode.BackgroundProtection => backgroundSuppression?.ProtectionMap
+                ?? DetailMap.CreateUniform(boundary.BackgroundConfidenceMap.Size, 0f),
+            SceneBoundaryOverlayMode.ArtisticDetail => backgroundSuppression?.EffectiveDetailMap
+                ?? semantic.ImportanceMap,
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown analysis overlay mode.")
         };
     }
 
@@ -2747,6 +4690,25 @@ public partial class MainWindow : Window
             && first.EdgeWeight == second.EdgeWeight
             && first.ContrastWeight == second.ContrastWeight
             && first.SmoothingRadius == second.SmoothingRadius;
+    }
+
+    private void CaptureActiveWorkspaceRevisions()
+    {
+        _activeDetailRegionRevision = _workspace.DetailRegionRevision;
+        _activeSemanticCorrectionRevision = _workspace.SemanticCorrectionRevision;
+    }
+
+    private void RestoreWorkspaceEdit(
+        WorkspaceEditSnapshot snapshot,
+        string? selectedRegionId = null,
+        string? selectedCorrectionId = null,
+        string? selectedSemanticRegionId = null)
+    {
+        _workspace.RestoreEditState(snapshot);
+        CaptureActiveWorkspaceRevisions();
+        RefreshSemanticRegions(selectedSemanticRegionId);
+        RefreshSemanticCorrections(selectedCorrectionId);
+        RefreshRegionVisuals(selectedRegionId);
     }
 
 
@@ -2767,6 +4729,44 @@ public partial class MainWindow : Window
             && first.CenterBias == second.CenterBias
             && first.SmoothingRadius == second.SmoothingRadius
             && first.BoundaryRadius == second.BoundaryRadius;
+    }
+
+    private static bool BoundaryAnalysisSettingsEqual(
+        SceneBoundaryAnalysisSettings? first,
+        SceneBoundaryAnalysisSettings second)
+    {
+        return first is not null
+            && first.Enabled == second.Enabled
+            && first.LuminanceWeight == second.LuminanceWeight
+            && first.ColorWeight == second.ColorWeight
+            && first.MultiscaleWeight == second.MultiscaleWeight
+            && first.ContinuityWeight == second.ContinuityWeight
+            && first.SemanticBoundaryWeight == second.SemanticBoundaryWeight
+            && first.TextureSuppression == second.TextureSuppression
+            && first.EdgeThreshold == second.EdgeThreshold
+            && first.ImportantEdgeThreshold == second.ImportantEdgeThreshold
+            && first.CoarseRadius == second.CoarseRadius
+            && first.SmoothingRadius == second.SmoothingRadius
+            && first.BoundaryProtectionRadius == second.BoundaryProtectionRadius;
+    }
+
+    private static bool BackgroundSuppressionSettingsEqual(
+        BackgroundSuppressionSettings? first,
+        BackgroundSuppressionSettings second)
+    {
+        return first is not null
+            && first.Enabled == second.Enabled
+            && first.OverallStrength == second.OverallStrength
+            && first.DetailFloor == second.DetailFloor
+            && first.UncertaintyProtection == second.UncertaintyProtection
+            && first.SilhouetteProtection == second.SilhouetteProtection
+            && first.TransitionSoftness == second.TransitionSoftness
+            && first.BackgroundPlacementWeight == second.BackgroundPlacementWeight
+            && first.StrokeLengthMultiplier == second.StrokeLengthMultiplier
+            && first.StrokeWidthMultiplier == second.StrokeWidthMultiplier
+            && first.SegmentMultiplier == second.SegmentMultiplier
+            && first.CurveFreedomMultiplier == second.CurveFreedomMultiplier
+            && first.ColorSimplification == second.ColorSimplification;
     }
 
     private static Bitmap CreateAvaloniaBitmap(SkiaImage image)
@@ -2802,6 +4802,220 @@ public partial class MainWindow : Window
         string normalized = text?.Trim() ?? string.Empty;
         return ulong.TryParse(normalized, NumberStyles.Integer, CultureInfo.CurrentCulture, out value)
             || ulong.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+    }
+
+    private void AttachProjectDirtyTracking()
+    {
+        TextBox[] textBoxes =
+        [
+            _projectNameTextBox,
+            _primitiveCountTextBox,
+            _primitiveCandidatesTextBox,
+            _primitiveMutationsTextBox,
+            _primitiveMinimumSizeTextBox,
+            _primitiveMaximumSizeTextBox,
+            _primitiveOpacityTextBox,
+            _primitiveDetailSizeTextBox,
+            _primitivePlacementBiasTextBox,
+            _primitiveErrorWeightTextBox,
+            _primitiveSearchInfluenceTextBox,
+            _hybridPrimitiveBudgetTextBox,
+            _hybridFlowBudgetTextBox,
+            _hybridRefinementBudgetTextBox,
+            _hybridInfluenceStrengthTextBox,
+            _hybridInfluenceRadiusTextBox,
+            _hybridMaximumInfluencesTextBox,
+            _hybridRefinementDetailBiasTextBox,
+            _hybridRefinementLengthTextBox,
+            _hybridRefinementWidthTextBox,
+            _finalMaximumDimensionTextBox,
+            _jpegQualityTextBox,
+            _seedTextBox,
+            _strokeCountTextBox,
+            _segmentCountTextBox,
+            _fieldScaleTextBox,
+            _octavesTextBox,
+            _persistenceTextBox,
+            _lacunarityTextBox,
+            _angleOffsetTextBox,
+            _densityTextBox,
+            _lengthScaleTextBox,
+            _maximumCurveTextBox,
+            _minimumWidthTextBox,
+            _maximumWidthTextBox,
+            _opacityTextBox,
+            _brushHardnessTextBox,
+            _brushSizeJitterTextBox,
+            _brushOpacityJitterTextBox,
+            _brushBristleCountTextBox,
+            _brushBristleSpreadTextBox,
+            _baseDetailTextBox,
+            _edgeWeightTextBox,
+            _contrastWeightTextBox,
+            _smoothingRadiusTextBox,
+            _placementBiasTextBox,
+            _detailedLengthTextBox,
+            _backgroundLengthTextBox,
+            _detailedWidthTextBox,
+            _backgroundWidthTextBox,
+            _regionTransitionWidthTextBox,
+            _semanticInfluenceTextBox,
+            _semanticSaliencyWeightTextBox,
+            _semanticSubjectWeightTextBox,
+            _semanticSilhouetteWeightTextBox,
+            _semanticFocalWeightTextBox,
+            _semanticThresholdTextBox,
+            _semanticMinimumAreaTextBox,
+            _semanticMaximumSubjectsTextBox,
+            _semanticCenterBiasTextBox,
+            _semanticSmoothingRadiusTextBox,
+            _semanticBoundaryRadiusTextBox,
+            _boundaryLuminanceWeightTextBox,
+            _boundaryColorWeightTextBox,
+            _boundaryMultiscaleWeightTextBox,
+            _boundaryContinuityWeightTextBox,
+            _boundarySemanticWeightTextBox,
+            _boundaryTextureSuppressionTextBox,
+            _boundaryEdgeThresholdTextBox,
+            _boundaryImportantThresholdTextBox,
+            _boundaryCoarseRadiusTextBox,
+            _boundarySmoothingRadiusTextBox,
+            _boundaryProtectionRadiusTextBox,
+            _boundaryTangentAlignmentTextBox,
+            _boundaryAlignmentRadiusTextBox,
+            _boundaryCrossingPenaltyTextBox,
+            _boundaryHardThresholdTextBox,
+            _boundaryTerminationStrengthTextBox,
+            _boundaryInternalInfluenceTextBox,
+            _boundaryTextureInfluenceTextBox,
+            _boundaryContourReinforcementTextBox,
+            _boundaryCornerPreservationTextBox,
+            _backgroundSuppressionStrengthTextBox,
+            _backgroundDetailFloorTextBox,
+            _backgroundUncertaintyProtectionTextBox,
+            _backgroundSilhouetteProtectionTextBox,
+            _backgroundTransitionSoftnessTextBox,
+            _backgroundPlacementWeightTextBox,
+            _backgroundSuppressionLengthTextBox,
+            _backgroundSuppressionWidthTextBox,
+            _backgroundSegmentMultiplierTextBox,
+            _backgroundCurveFreedomTextBox,
+            _backgroundColorSimplificationTextBox
+        ];
+        foreach (TextBox textBox in textBoxes)
+        {
+            textBox.TextChanged += ProjectTextChanged;
+        }
+
+        ComboBox[] comboBoxes =
+        [
+            _generativeModeComboBox,
+            _primitiveKindsComboBox,
+            _hybridInfluenceKindComboBox,
+            _previewQualityComboBox,
+            _finalFormatComboBox,
+            _flowFieldComboBox,
+            _backgroundComboBox,
+            _brushKindComboBox
+        ];
+        foreach (ComboBox comboBox in comboBoxes)
+        {
+            comboBox.SelectionChanged += ProjectSelectionChanged;
+        }
+
+        CheckBox[] checkBoxes =
+        [
+            _enableSemanticAnalysisCheckBox,
+            _enableBoundaryAnalysisCheckBox,
+            _enableBoundaryPaintingCheckBox,
+            _enableBackgroundSuppressionCheckBox
+        ];
+        foreach (CheckBox checkBox in checkBoxes)
+        {
+            checkBox.IsCheckedChanged += ProjectCheckBoxChanged;
+        }
+    }
+
+    private void ProjectTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        MarkPresentationDirty();
+    }
+
+    private void ProjectSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        MarkPresentationDirty();
+    }
+
+    private void ProjectCheckBoxChanged(object? sender, RoutedEventArgs e)
+    {
+        MarkPresentationDirty();
+    }
+
+    private void MarkPresentationDirty()
+    {
+        if (_suppressDirtyTracking)
+        {
+            return;
+        }
+
+        _projectSessionController.NotifyProjectEdited();
+        RefreshDirtyIndicator();
+    }
+
+    private void RefreshDirtyIndicator()
+    {
+        Title = _projectSessionController.HasUnsavedChanges
+            ? "FlowPainter *"
+            : "FlowPainter";
+    }
+
+    private Task<bool> ConfirmSessionReplacementAsync()
+    {
+        return _projectSessionController.ConfirmDestructiveActionAsync(
+            _ => ShowUnsavedChangesDialogAsync(),
+            _ => SaveProjectAsync());
+    }
+
+    private Task<UnsavedChangesDecision> ShowUnsavedChangesDialogAsync()
+    {
+        string projectName = _projectNameTextBox.Text?.Trim() ?? string.Empty;
+        UnsavedChangesDialog dialog = new(projectName);
+        return dialog.ShowDialog<UnsavedChangesDecision>(this);
+    }
+
+    private async void WindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_allowClose || _isClosed)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        if (_closeGuardRunning)
+        {
+            return;
+        }
+
+        if (_operationCancellation is not null)
+        {
+            _operationCancellation.Cancel();
+            _statusText.Text = "Operation cancellation requested. Close again after it stops.";
+            return;
+        }
+
+        _closeGuardRunning = true;
+        try
+        {
+            if (await ConfirmSessionReplacementAsync().ConfigureAwait(true))
+            {
+                _allowClose = true;
+                Close();
+            }
+        }
+        finally
+        {
+            _closeGuardRunning = false;
+        }
     }
 
     private static double ParseDouble(TextBox textBox, string displayName)
@@ -2840,6 +5054,14 @@ public partial class MainWindow : Window
     }
 
 
+    private sealed record SemanticCorrectionDisplayItem(string Id, string DisplayText)
+    {
+        public override string ToString()
+        {
+            return DisplayText;
+        }
+    }
+
     private sealed record SemanticRegionDisplayItem(string Id, string DisplayText)
     {
         public override string ToString()
@@ -2851,6 +5073,7 @@ public partial class MainWindow : Window
     private sealed record AutomaticAnalysisMaps(
         DetailMap Structural,
         SemanticAnalysisResult Semantic,
+        SceneBoundaryAnalysisResult Boundary,
         DetailMap Automatic);
 
     private T FindRequiredControl<T>(string name)
@@ -2890,10 +5113,22 @@ public partial class MainWindow : Window
         _automaticDetailMap = null;
         _composedDetailMap = null;
         _semanticAnalysisResult = null;
+        _sceneBoundaryAnalysisResult = null;
+        _backgroundSuppressionResult = null;
         _previewStrokePlan = null;
+        _previewPrimitivePlan = null;
+        _previewHybridPlan = null;
         _previewBrushSettings = null;
         _activeDetailAnalysisSettings = null;
+        _activeDetailRegionTransitionWidth = double.NaN;
+        _activeDetailRegionRevision = -1L;
+        _activeSemanticCorrectionRevision = -1L;
         _activeSemanticAnalysisSettings = null;
+        _activeBoundaryAnalysisSettings = null;
+        _activeBackgroundSuppressionSettings = null;
+        _selectionStart = null;
+        _selectionCurrent = null;
+        _selectionPointerStartPosition = null;
         _imageViewportState.Reset();
     }
 }

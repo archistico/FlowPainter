@@ -7,25 +7,29 @@ public sealed class DetailInfluenceSettings
     public const double DefaultBackgroundLengthMultiplier = 1.35d;
     public const double DefaultDetailedWidthMultiplier = 0.65d;
     public const double DefaultBackgroundWidthMultiplier = 1.45d;
+    public const double DefaultRegionTransitionWidth = 0.05d;
 
     public DetailInfluenceSettings(
         double placementBias = DefaultPlacementBias,
         double detailedLengthMultiplier = DefaultDetailedLengthMultiplier,
         double backgroundLengthMultiplier = DefaultBackgroundLengthMultiplier,
         double detailedWidthMultiplier = DefaultDetailedWidthMultiplier,
-        double backgroundWidthMultiplier = DefaultBackgroundWidthMultiplier)
+        double backgroundWidthMultiplier = DefaultBackgroundWidthMultiplier,
+        double regionTransitionWidth = DefaultRegionTransitionWidth)
     {
         ValidateRange(placementBias, 0d, 20d, nameof(placementBias));
         ValidateRange(detailedLengthMultiplier, 0.05d, 4d, nameof(detailedLengthMultiplier));
         ValidateRange(backgroundLengthMultiplier, 0.05d, 4d, nameof(backgroundLengthMultiplier));
         ValidateRange(detailedWidthMultiplier, 0.05d, 4d, nameof(detailedWidthMultiplier));
         ValidateRange(backgroundWidthMultiplier, 0.05d, 4d, nameof(backgroundWidthMultiplier));
+        ValidateRange(regionTransitionWidth, 0d, 0.5d, nameof(regionTransitionWidth));
 
         PlacementBias = placementBias;
         DetailedLengthMultiplier = detailedLengthMultiplier;
         BackgroundLengthMultiplier = backgroundLengthMultiplier;
         DetailedWidthMultiplier = detailedWidthMultiplier;
         BackgroundWidthMultiplier = backgroundWidthMultiplier;
+        RegionTransitionWidth = regionTransitionWidth;
     }
 
     public double PlacementBias { get; }
@@ -37,6 +41,13 @@ public sealed class DetailInfluenceSettings
     public double DetailedWidthMultiplier { get; }
 
     public double BackgroundWidthMultiplier { get; }
+
+    /// <summary>
+    /// Gets the feather radius around manual detail-region borders, expressed as a fraction
+    /// of the shorter analysis-map dimension. The transition extends both inside and outside
+    /// each region and uses a smooth-step curve.
+    /// </summary>
+    public double RegionTransitionWidth { get; }
 
     public double GetPlacementWeight(double detail)
     {

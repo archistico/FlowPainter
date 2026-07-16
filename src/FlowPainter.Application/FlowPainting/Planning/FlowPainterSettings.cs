@@ -1,3 +1,5 @@
+using FlowPainter.Application.Background;
+using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Domain.Brushes;
 using FlowPainter.Application.FlowPainting.Fields;
@@ -37,7 +39,10 @@ public sealed class FlowPainterSettings
         DetailAnalysisSettings? detailAnalysis = null,
         DetailInfluenceSettings? detailInfluence = null,
         BrushSettings? brush = null,
-        SemanticAnalysisSettings? semanticAnalysis = null)
+        SemanticAnalysisSettings? semanticAnalysis = null,
+        SceneBoundaryAnalysisSettings? boundaryAnalysis = null,
+        BoundaryPaintingSettings? boundaryPainting = null,
+        BackgroundSuppressionSettings? backgroundSuppression = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(strokeCount, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(strokeCount, MaximumStrokeCount);
@@ -104,6 +109,9 @@ public sealed class FlowPainterSettings
         DetailInfluence = detailInfluence ?? new DetailInfluenceSettings();
         Brush = brush ?? new BrushSettings();
         SemanticAnalysis = semanticAnalysis ?? new SemanticAnalysisSettings();
+        BoundaryAnalysis = boundaryAnalysis ?? new SceneBoundaryAnalysisSettings();
+        BoundaryPainting = boundaryPainting ?? new BoundaryPaintingSettings();
+        BackgroundSuppression = backgroundSuppression ?? new BackgroundSuppressionSettings();
     }
 
     public FlowFieldSettings Field { get; }
@@ -135,6 +143,12 @@ public sealed class FlowPainterSettings
     public BrushSettings Brush { get; }
 
     public SemanticAnalysisSettings SemanticAnalysis { get; }
+
+    public SceneBoundaryAnalysisSettings BoundaryAnalysis { get; }
+
+    public BoundaryPaintingSettings BoundaryPainting { get; }
+
+    public BackgroundSuppressionSettings BackgroundSuppression { get; }
 
     private static void ValidateFinitePositive(double value, string parameterName)
     {

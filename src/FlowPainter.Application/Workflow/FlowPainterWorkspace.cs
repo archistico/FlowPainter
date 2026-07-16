@@ -1,6 +1,10 @@
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Hybrid;
+using FlowPainter.Application.PrimitiveGeneration;
 using FlowPainter.Application.Projects;
 using FlowPainter.Domain.Detail;
+using FlowPainter.Domain.Generation;
+using FlowPainter.Domain.Semantics;
 
 namespace FlowPainter.Application.Workflow;
 
@@ -13,15 +17,27 @@ public sealed class FlowPainterWorkspace
         ulong seed,
         FlowPainterSettings settings,
         PreviewSettings? preview = null,
-        FinalRenderSettings? finalRender = null)
+        FinalRenderSettings? finalRender = null,
+        GenerativeMode mode = GenerativeMode.FlowPainting,
+        PrimitiveGenerationSettings? primitiveGeneration = null,
+        HybridGenerationSettings? hybridGeneration = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown generative mode.");
+        }
+
         _readOnlyValidationMessages = _validationMessages.AsReadOnly();
         Seed = seed;
         Settings = settings;
         Preview = preview ?? new PreviewSettings();
         FinalRender = finalRender ?? new FinalRenderSettings();
+        Mode = mode;
+        PrimitiveGeneration = primitiveGeneration ?? new PrimitiveGenerationSettings();
+        HybridGeneration = hybridGeneration ?? new HybridGenerationSettings();
         Regions = new DetailRegionEditor();
+        SemanticCorrections = new SemanticCorrectionRegionEditor();
         Operation = WorkspaceOperationState.Idle;
     }
 
@@ -39,7 +55,15 @@ public sealed class FlowPainterWorkspace
 
     public FinalRenderSettings FinalRender { get; private set; }
 
+    public GenerativeMode Mode { get; private set; }
+
+    public PrimitiveGenerationSettings PrimitiveGeneration { get; private set; }
+
+    public HybridGenerationSettings HybridGeneration { get; private set; }
+
     public DetailRegionEditor Regions { get; }
+
+    public SemanticCorrectionRegionEditor SemanticCorrections { get; }
 
     public WorkspaceOperationState Operation { get; private set; }
 
@@ -47,11 +71,23 @@ public sealed class FlowPainterWorkspace
 
     public bool IsDirty { get; private set; }
 
+    public long DetailRegionRevision { get; private set; }
+
+    public long SemanticCorrectionRevision { get; private set; }
+
     public bool HasSource => !string.IsNullOrWhiteSpace(SourcePath);
 
     public bool CanSaveProject => HasSource;
 
     public bool CanRender => HasSource && !Operation.IsBusy;
+
+    public void MarkProjectEdited()
+    {
+        if (HasSource)
+        {
+            MarkDirty();
+        }
+    }
 
     public void SetSource(string sourcePath)
     {
@@ -64,6 +100,9 @@ public sealed class FlowPainterWorkspace
         ProjectPath = null;
         ProjectName = null;
         Regions.Clear();
+        SemanticCorrections.Clear();
+        AdvanceDetailRegionRevision();
+        AdvanceSemanticCorrectionRevision();
         MarkDirty();
         ClearValidation();
     }
@@ -82,7 +121,7 @@ public sealed class FlowPainterWorkspace
     public void SetSettings(FlowPainterSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        if (ReferenceEquals(Settings, settings))
+        if (ProjectSettingsEquality.AreEquivalent(Settings, settings))
         {
             return;
         }
@@ -118,6 +157,47 @@ public sealed class FlowPainterWorkspace
         MarkDirty();
     }
 
+
+    public void SetGenerativeMode(GenerativeMode mode)
+    {
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown generative mode.");
+        }
+
+        if (Mode == mode)
+        {
+            return;
+        }
+
+        Mode = mode;
+        MarkDirty();
+    }
+
+    public void SetPrimitiveGeneration(PrimitiveGenerationSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (ProjectSettingsEquality.AreEquivalent(PrimitiveGeneration, settings))
+        {
+            return;
+        }
+
+        PrimitiveGeneration = settings;
+        MarkDirty();
+    }
+
+    public void SetHybridGeneration(HybridGenerationSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (ProjectSettingsEquality.AreEquivalent(HybridGeneration, settings))
+        {
+            return;
+        }
+
+        HybridGeneration = settings;
+        MarkDirty();
+    }
+
     public DetailRegion AddRegion(
         FlowPainter.Domain.Geometry.NormalizedRect bounds,
         double strength,
@@ -125,6 +205,7 @@ public sealed class FlowPainterWorkspace
         string? label = null)
     {
         DetailRegion region = Regions.Add(bounds, strength, intent, label);
+        AdvanceDetailRegionRevision();
         MarkDirty();
         return region;
     }
@@ -137,6 +218,7 @@ public sealed class FlowPainterWorkspace
         string? label)
     {
         DetailRegion region = Regions.Update(id, bounds, strength, intent, label);
+        AdvanceDetailRegionRevision();
         MarkDirty();
         return region;
     }
@@ -146,6 +228,7 @@ public sealed class FlowPainterWorkspace
         bool removed = Regions.Remove(id);
         if (removed)
         {
+            AdvanceDetailRegionRevision();
             MarkDirty();
         }
 
@@ -157,6 +240,7 @@ public sealed class FlowPainterWorkspace
         DetailRegion? removed = Regions.RemoveLast();
         if (removed is not null)
         {
+            AdvanceDetailRegionRevision();
             MarkDirty();
         }
 
@@ -168,6 +252,7 @@ public sealed class FlowPainterWorkspace
         bool moved = Regions.MoveEarlier(id);
         if (moved)
         {
+            AdvanceDetailRegionRevision();
             MarkDirty();
         }
 
@@ -179,6 +264,7 @@ public sealed class FlowPainterWorkspace
         bool moved = Regions.MoveLater(id);
         if (moved)
         {
+            AdvanceDetailRegionRevision();
             MarkDirty();
         }
 
@@ -193,7 +279,74 @@ public sealed class FlowPainterWorkspace
         }
 
         Regions.Clear();
+        AdvanceDetailRegionRevision();
         MarkDirty();
+    }
+
+    public SemanticCorrectionRegion AddSemanticCorrection(
+        FlowPainter.Domain.Geometry.NormalizedRect bounds,
+        SemanticCorrectionKind kind,
+        string? label = null,
+        string? sourceSemanticRegionId = null)
+    {
+        SemanticCorrectionRegion correction = SemanticCorrections.Add(
+            bounds,
+            kind,
+            label,
+            sourceSemanticRegionId);
+        AdvanceSemanticCorrectionRevision();
+        MarkDirty();
+        return correction;
+    }
+
+    public bool RemoveSemanticCorrection(string id)
+    {
+        bool removed = SemanticCorrections.Remove(id);
+        if (removed)
+        {
+            AdvanceSemanticCorrectionRevision();
+            MarkDirty();
+        }
+
+        return removed;
+    }
+
+    public void ClearSemanticCorrections()
+    {
+        if (SemanticCorrections.Count == 0)
+        {
+            return;
+        }
+
+        SemanticCorrections.Clear();
+        AdvanceSemanticCorrectionRevision();
+        MarkDirty();
+    }
+
+    public WorkspaceEditSnapshot CaptureEditState()
+    {
+        return new WorkspaceEditSnapshot(
+            Regions.Regions,
+            SemanticCorrections.Regions,
+            IsDirty);
+    }
+
+    public void RestoreEditState(WorkspaceEditSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!Regions.Regions.SequenceEqual(snapshot.DetailRegions))
+        {
+            Regions.ReplaceAll(snapshot.DetailRegions);
+            AdvanceDetailRegionRevision();
+        }
+
+        if (!SemanticCorrections.Regions.SequenceEqual(snapshot.SemanticCorrections))
+        {
+            SemanticCorrections.ReplaceAll(snapshot.SemanticCorrections);
+            AdvanceSemanticCorrectionRevision();
+        }
+
+        IsDirty = snapshot.IsDirty;
     }
 
     public FlowPainterProject CreateProject(string? projectName = null)
@@ -211,20 +364,48 @@ public sealed class FlowPainterWorkspace
             Settings,
             Preview,
             Regions.Regions,
-            FinalRender);
+            FinalRender,
+            Mode,
+            PrimitiveGeneration,
+            HybridGeneration,
+            SemanticCorrections.Regions);
     }
 
     public void LoadProject(FlowPainterProject project, string? projectPath = null)
     {
+        LoadProject(PrepareProjectLoad(project, projectPath));
+    }
+
+    public static WorkspaceProjectCandidate PrepareProjectLoad(
+        FlowPainterProject project,
+        string? projectPath = null)
+    {
         ArgumentNullException.ThrowIfNull(project);
+        DetailRegionEditor validatedRegions = new();
+        validatedRegions.ReplaceAll(project.DetailRegions);
+        SemanticCorrectionRegionEditor validatedCorrections = new();
+        validatedCorrections.ReplaceAll(project.SemanticCorrections);
+        return new WorkspaceProjectCandidate(project, NormalizeOptionalPath(projectPath));
+    }
+
+    public void LoadProject(WorkspaceProjectCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        FlowPainterProject project = candidate.Project;
         ProjectName = project.Name;
-        ProjectPath = NormalizeOptionalPath(projectPath);
+        ProjectPath = candidate.ProjectPath;
         SourcePath = project.SourcePath;
         Seed = project.Seed;
         Settings = project.Settings;
         Preview = project.Preview;
         FinalRender = project.FinalRender;
+        Mode = project.Mode;
+        PrimitiveGeneration = project.PrimitiveGeneration;
+        HybridGeneration = project.HybridGeneration;
         Regions.ReplaceAll(project.DetailRegions);
+        SemanticCorrections.ReplaceAll(project.SemanticCorrections);
+        AdvanceDetailRegionRevision();
+        AdvanceSemanticCorrectionRevision();
         IsDirty = false;
         ClearValidation();
         Operation = WorkspaceOperationState.Idle;
@@ -308,6 +489,16 @@ public sealed class FlowPainterWorkspace
     private void MarkDirty()
     {
         IsDirty = true;
+    }
+
+    private void AdvanceDetailRegionRevision()
+    {
+        DetailRegionRevision = checked(DetailRegionRevision + 1L);
+    }
+
+    private void AdvanceSemanticCorrectionRevision()
+    {
+        SemanticCorrectionRevision = checked(SemanticCorrectionRevision + 1L);
     }
 
     private string ResolveProjectName(string? projectName)

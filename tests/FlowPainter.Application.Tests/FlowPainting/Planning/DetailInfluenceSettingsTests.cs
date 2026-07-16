@@ -14,6 +14,7 @@ public sealed class DetailInfluenceSettingsTests
         Assert.Equal(DetailInfluenceSettings.DefaultBackgroundLengthMultiplier, settings.BackgroundLengthMultiplier);
         Assert.Equal(DetailInfluenceSettings.DefaultDetailedWidthMultiplier, settings.DetailedWidthMultiplier);
         Assert.Equal(DetailInfluenceSettings.DefaultBackgroundWidthMultiplier, settings.BackgroundWidthMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultRegionTransitionWidth, settings.RegionTransitionWidth);
     }
 
     [Fact]
@@ -66,6 +67,17 @@ public sealed class DetailInfluenceSettingsTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new DetailInfluenceSettings(detailedLengthMultiplier: value));
+    }
+
+
+    [Theory]
+    [InlineData(-0.001d)]
+    [InlineData(0.501d)]
+    [InlineData(double.NaN)]
+    public void ConstructorRejectsInvalidRegionTransitionWidth(double value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new DetailInfluenceSettings(regionTransitionWidth: value));
     }
 
     [Theory]

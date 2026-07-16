@@ -1,5 +1,21 @@
 # Validation checklist
 
+## M13.4.2 memory and work budgets
+
+**Status: READY FOR VALIDATION**
+
+Expected automated suite: **782 cases** (765 validated baseline + 17 new/expanded budget cases).
+
+Required commands:
+
+```bash
+dotnet restore FlowPainter.sln
+dotnet build FlowPainter.sln -c Release --no-restore
+dotnet test FlowPainter.sln -c Release --no-build
+```
+
+Manual acceptance is defined in [`M13_4_2_MEMORY_AND_WORK_BUDGETS.md`](M13_4_2_MEMORY_AND_WORK_BUDGETS.md). Validation must cover ordinary image loading, preview-quality rebuilds, mode-aware final estimates, over-budget export rejection and planner rejection of excessive work settings.
+
 Run from the repository root with the .NET 10 SDK installed.
 
 ```bash
@@ -10,26 +26,127 @@ dotnet test FlowPainter.sln -c Release --no-build --logger "console;verbosity=no
 dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 ```
 
-## M8 expected result
+## Current validated baseline — M13.4.1
 
 - restore succeeds;
-- all nine projects build;
-- build emits zero warnings and zero errors;
-- all 496 test cases pass;
-- the Avalonia window opens;
-- source/result synchronized zoom and pan remain operational;
-- source/result synchronized zoom and all M7 brush families remain operational;
-- the combined detail overlay includes structural and semantic importance;
-- saliency, subject, silhouette and focal diagnostic overlays can be selected;
-- detected semantic regions can be promoted to editable manual regions;
-- equal source and semantic settings produce equal maps and regions;
-- project and preset schema 4 round-trip every brush and semantic-analysis parameter;
-- schema-1 through schema-3 documents load with explicit compatibility defaults;
-- Domain and Application contain no Avalonia, SkiaSharp or LibNoiseCore dependency.
+- all nine projects build with zero warnings and zero errors;
+- all **765** test cases pass with zero failures and zero skips;
+- project schema remains 11 and preset schema remains 8;
+- dirty state covers persisted controls and committed region/correction edits;
+- Open image, Open project, recent-project open and window close are guarded by Save / Discard / Cancel;
+- cancelled, invalid or failed Save attempts retain the active session;
+- Domain and Application remain free of Avalonia, SkiaSharp, LibNoiseCore, machine-learning runtimes and model files.
 
-After successful validation, update M8 in `PROJECT_VISION_AND_ROADMAP.md` from `READY FOR VALIDATION` to `DONE` and record the result below.
+M13.3 plus the audit corrections established 755 cases. M13.4.1 added ten Application workflow cases, establishing the current validated baseline of 765.
+
+## Next validation target — M13.4 pre-SLIC stabilization
+
+M13.4 must be validated before any SLIC label-map implementation is adopted. Its exit checks are:
+
+- complete dirty-state guards and no silent data loss;
+- detached, transactional project/session adoption;
+- conservative analysis/segmentation/planning/rendering work and memory budgets;
+- bounded encoded input;
+- atomic local writes preserving previous valid files;
+- extracted, non-UI `AnalysisCoordinator` tests for success, cancellation, failure and stale results.
 
 ## Validation history
+
+### 2026-07-16 — M13.4.1 validated on Windows
+
+The user confirmed that the Release build succeeds and all **765** tests pass. Dirty tracking and the guarded Save / Discard / Cancel navigation are accepted as the baseline for M13.4.2.
+
+### 2026-07-16 — Documentation and roadmap realigned around SLIC
+
+M13.3 is recorded as DONE and the 755-test audit baseline is authoritative. The future M13.4–M17 roadmap now uses deterministic SLIC regional segmentation, regional descriptors, a Region Adjacency Graph and hierarchical merging. SAM, MobileSAM, ONNX/model-backed providers, Python inference and Felzenszwalb are not part of the approved implementation path. M8 and M13.3 remain supported historical/schema compatibility behaviour until M14.7 replaces their active automatic contribution.
+
+No production code or schema changed in this documentation-only update.
+
+### 2026-07-16 — M13.3 validated baseline and audit remediation
+
+Release build succeeded with zero warnings/errors and all 755 tests passed. M13.3 supplied 748 cases; seven additional Application tests cover workspace revision, transaction and project-load behaviour identified during the audit. Project schema remains 11 and preset schema remains 8.
+
+### 2026-07-14 — M13.3 region selection and semantic corrections prepared (historical)
+
+M13.3 separates painterly detail regions from semantic corrections. Clicks below a six-pixel display-space threshold select existing overlays, while larger drags create detail rectangles. Pure Application hit testing defines deterministic priority and repeated-click cycling. Selected manual detail regions and semantic corrections can be removed with `Delete` or the existing controls.
+
+Four persistent correction intentions modify copied semantic maps before boundary analysis: forced primary subject, subject, background and ignored detection. The original automatic-region list remains inspectable. Corrections reuse the M13.2 SmoothStep transition field, same-kind overlaps merge by maximum influence and explicit kind precedence keeps the forced primary subject authoritative. Project schema advances to 11 with schema-10 empty-list compatibility; preset schema remains 8. Thirty-five focused cases increase the expected suite from 713 to 748.
+
+Executable validation could not be run in the packaging container because no usable .NET SDK is installed and the official SDK archive could not be installed through the available download channel. XML/XAML, named-control/handler, schema, source-structure, test-count and ZIP-integrity checks are performed before packaging.
+
+### 2026-07-14 — M13.2 validated on Windows
+
+The user confirmed that M13.2 compiles successfully and all 713 tests pass. Soft manual-region transitions are accepted as the baseline for M13.3.
+
+### 2026-07-14 — M13.2 soft manual detail regions prepared
+
+M13.2 replaces hard rectangular detail masks with a continuous distance-based influence field. The configurable transition radius defaults to 5% of the shorter proxy dimension, uses SmoothStep inside and outside the border and applies Euclidean falloff around corners. Same-intent overlaps merge by maximum influence; opposing intent groups retain deterministic latest-edit ordering. Project schema moves to 10 and preset schema to 8 with schema-9/schema-7 defaults. Thirteen focused cases increase the expected suite from 700 to 713.
+
+The desktop UI exposes **Region transition (%)**. The composed-map cache now includes this value, so Flow, Primitive and Hybrid previews recompose whenever it changes. The roadmap records separate next steps for region selection/semantic corrections, primary-subject ranking, stronger high-detail stroke policy, staged base-to-refinement rendering and primitive coarse-to-fine ordering.
+
+Executable validation could not be run in the packaging container because no .NET SDK is installed; XML/XAML, schema, reference and static source checks are performed before packaging.
+
+### 2026-07-14 — M13 validated on Windows
+
+The user confirmed that the corrected M13.1 build and test suite pass. The 700-case background-suppression baseline is accepted and M13 is marked DONE before M13.2.
+
+### 2026-07-14 — M13.1 floating-point multiplier assertion correction
+
+The first Windows M13 test run built all projects and executed 700 cases. One settings test compared the derived segment multiplier `0.44999999999999996` with the mathematically equivalent literal `0.45` using exact `double` equality. M13.1 applies the established 12-decimal precision policy to all four derived painterly multipliers in that test. Production background-suppression logic, schemas and test count are unchanged.
+
+
+### 2026-07-14 — M13 background suppression prepared
+
+M13 adds an immutable signed `ArtisticDetailField` and a separate `BackgroundSuppressionComposer`. Background confidence is attenuated by manual focus, semantic subject/importance, silhouette and uncertainty protection. The result exposes suppression, protection and effective-detail diagnostics while retaining a signed field for the planner. Confident background receives fewer starts, longer/wider marks, fewer segments, freer curvature and deterministic colour simplification. Primitive and Hybrid modes reuse the same effective-detail policy. Project schema moves to 9 and preset schema to 7 with older files loading disabled defaults. Thirty-four focused cases increase the expected suite from 666 to 700.
+
+The living roadmap, architecture, tests and ADR-0014 document the signed policy and retain M14-M16 as separate stages. Static packaging validation covers syntax structure, XAML/XML/JSON, named controls and handlers, schema literals, pure-layer dependencies, test counts and ZIP integrity. Executable validation remains assigned to the target Windows .NET 10 environment.
+
+### 2026-07-14 — M12 validated on Windows
+
+The user confirmed that M12 builds successfully and all 666 tests pass. Boundary-aware painting is accepted as the production baseline for M13.
+
+### 2026-07-14 — M12 boundary-aware painting prepared
+
+M12 converts the M11 diagnostic result into a deterministic Application-layer `BoundaryGuidanceField`. The field carries tangent direction, influence, hardness, subject-boundary confidence and corner strength. `FlowPainterPlanner` can now blend its artistic field toward the closest tangent orientation, sample proposed segments for crossing risk, deflect or terminate at hard boundaries, shorten marks near corners and reinforce contour detail without drawing an artificial outline. The same precomputed guidance is reused by both hybrid stroke layers.
+
+Project schema moves to 8 and preset schema to 6. Previous files receive disabled compatibility defaults, preserving the validated pre-M12 plan and random sequence. Soft contour, Strong silhouette and Loose background demonstrate progressively stronger boundary policies. Thirty-five focused cases increase the expected suite from 631 to 666.
+
+The living roadmap, architecture, test strategy and ADR-0013 document the implemented policy and retain M13-M16 as separate stages. Static preparation checks include syntax parsing of all non-legacy C# sources, XAML/XML/JSON parsing, named-control/event resolution, cancellation-token ordering, common .NET/xUnit analyzer scans, schema compatibility, pure-layer dependency scans, exact test-case counts and ZIP integrity. The packaging environment does not contain a usable .NET SDK, so executable validation remains assigned to the target Windows environment.
+
+### 2026-07-14 — M11.1 SkiaSharp sampling-overload correction
+
+The first Windows build of M11 completed Domain, Application, imaging and their tests, then stopped in `BoundaryDirectionOverlayRenderer` because SkiaSharp 4 marks `SKCanvas.DrawImage(SKImage, SKRect, SKPaint)` obsolete. M11.1 now supplies an explicit reusable `SKSamplingOptions` value, matching the already validated proxy, background and JPEG composition paths. No rendering semantics, schemas or test counts change; the expected suite remains 631 cases.
+
+### 2026-07-14 — M11 scene-boundary analysis prepared
+
+M11 adds a pure normalized boundary direction field, replaceable scene-boundary analyzer, deterministic multiscale luminance/colour analysis, contour-continuity and semantic-silhouette weighting, separate silhouette/internal-structure/texture maps, background confidence, uncertainty and a Skia tangent-direction diagnostic overlay. Project schema moves to 7 and preset schema to 5 while all previous schemas remain readable. Fifty-five focused cases increase the expected suite from 576 to 631.
+
+The living roadmap, architecture, test strategy and ADR now contain the complete M11-M16 plan: diagnostic boundary separation, boundary-aware painting, background suppression, advanced manual editing, artistic hierarchy and release consolidation. Static preparation checks include C# syntax parsing, XAML/XML/JSON parsing, named-control/event resolution, project references, common analyzer patterns, pure-layer dependency scans, schema migration review, exact test-case counts and ZIP integrity. The packaging environment cannot resolve the official SDK host, so executable validation remains assigned to the target Windows environment.
+
+### 2026-07-14 — M10 hybrid mode accepted
+
+The user confirmed that the hybrid primitive/flow result works and is visually successful. The M10 baseline is accepted and marked DONE before M11 begins.
+
+### 2026-07-14 — M10 hybrid primitive/flow engine prepared
+
+M10 introduces the immutable `HybridPlan`, deterministic three-layer composition, primitive-derived axis/boundary/vortex/mixed flow deformation, configurable layer budgets, refinement controls, schema-6 project persistence and layered Skia preview/final rendering. Thirty-one focused cases increase the expected suite from 545 to 576.
+
+Static preparation checks cover 235 non-legacy C# files, delimiter-balanced C# source, XAML/XML/JSON parsing, all 109 named controls, all 35 event handlers, solution/project references with platform-normalized paths, cancellation-token ordering, common .NET/xUnit analyzer patterns, pure-layer dependency boundaries, exact test-case counts and ZIP integrity. The packaging environment cannot resolve the official SDK download host, so executable build/test validation remains assigned to the target Windows environment.
+
+### 2026-07-14 — M9.1 validated on Windows
+
+The user confirmed that M9.1 compiles, all 545 tests pass and the geometric-primitive workflow functions correctly. M9 is marked DONE before M10 begins.
+
+
+### 2026-07-13 — M9 geometric primitive engine prepared
+
+M9 adds a second deterministic generative engine. Proxy-space candidate search, analytical colour estimation, weighted local error scoring and hill-climbing mutation produce a normalized immutable `PrimitivePlan`. The same plan drives synchronized preview, high-resolution PNG/JPEG rendering and SVG export. Detail guidance controls placement, size, error priority and local search effort. Project schema moves to version 5 while versions 1–4 remain readable. Forty-nine focused cases increase the expected suite from 496 to 545.
+
+Static preparation checks cover 216 non-legacy C# files, C# syntax parsing, XAML/XML/JSON parsing, all 99 named controls, all 35 event handlers, solution/project references, cancellation-token ordering, common .NET/xUnit analyzer patterns, forbidden dependencies, deterministic SVG line endings and ZIP integrity. The packaging environment has no usable .NET SDK, so executable validation remains assigned to the target Windows environment.
+
+### 2026-07-13 — M8.2 validated on Windows
+
+The user confirmed that M8.2 builds successfully and all 496 tests pass. The semantic-importance baseline is accepted and M8 is marked DONE.
 
 ### 2026-07-13 — M8.2 xUnit analyzer correction
 

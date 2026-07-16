@@ -2,7 +2,7 @@
 
 ## Status
 
-**READY FOR VALIDATION**
+**DONE — validated on Windows with 400 passing tests**
 
 M6 separates the interactive preview from the final raster output. A preview creates and displays one deterministic, resolution-independent `StrokePlan`; final export reuses that exact plan and rasterizes it against the original source image at a separately configured size.
 

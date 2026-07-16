@@ -1,5 +1,11 @@
 # M8 — Semantic importance and generic subject analysis
 
+## Status
+
+DONE — validated historical milestone with 496 passing tests.
+
+**Future direction:** superseded for new automatic segmentation by ADR-0017 and the M14 SLIC roadmap. The implementation remains supported as part of the current M8–M13.3/schema-11 compatibility baseline until M14.7.
+
 ## Purpose
 
 M8 adds the first subject-aware importance layer. The goal is not to classify every object or facial landmark yet. The built-in analyzer identifies visually salient subject-like regions, their silhouettes and internal focal points, then combines those signals with the existing structural detail map.
@@ -34,18 +40,11 @@ This is the first step toward the project’s visual hierarchy: broad and painte
 
 The implementation uses global/local colour contrast, luminance gradients, configurable centre bias, connected-component segmentation and focal peaks. It does not claim class labels such as person, animal or vehicle. Detected regions are intentionally labelled as generic subjects.
 
-## Provider boundary
+## Provider boundary — historical decision
 
-`ISemanticImportanceAnalyzer` isolates the rest of the application from the implementation. Future local providers can add class-aware masks and confidence values without changing projects, the planner or rendering code.
+`ISemanticImportanceAnalyzer` isolated the rest of the application from the M8 implementation and allowed M8–M13.3 to evolve without coupling Domain or renderers to the heuristic analyzer.
 
-Potential later providers include:
-
-- foreground/salient-object segmentation;
-- object detection and instance segmentation;
-- face and landmark refinement;
-- user-supplied ONNX models.
-
-No machine-learning runtime or model file is bundled in M8.
+The provider boundary remains in the validated code for compatibility, but new class-aware, ONNX or model-backed providers are no longer planned. No machine-learning runtime or model file is bundled, and ADR-0017 explicitly selects deterministic SLIC regional segmentation for future development.
 
 ## Semantic regions
 
@@ -83,6 +82,12 @@ Project and preset schemas move to version 4. Semantic settings are serialized w
 
 Detected regions themselves are analysis output and are not persisted. Promoted manual regions are persisted normally because they represent an intentional artistic decision tied to the source image.
 
+## M13.3 evolution: persistent semantic corrections
+
+M13.3 keeps M8 analyzer output immutable and adds a separate project-level correction layer. The user can select a detected rectangle and force it to primary subject, subject, background or ignored-detection status. Corrections are applied to copied semantic maps before scene-boundary analysis and background suppression, while the original detected-region list remains inspectable.
+
+Semantic corrections are not painterly detail regions: they express scene role, not requested mark density. They use soft rectangular influence and are persisted in project schema 11, while detected analyzer output remains derived state. See [`M13_3_REGION_SELECTION_AND_SEMANTIC_CORRECTIONS.md`](M13_3_REGION_SELECTION_AND_SEMANTIC_CORRECTIONS.md) and ADR-0016.
+
 ## Deliberate limitations
 
 M8 does not yet provide:
@@ -93,7 +98,17 @@ M8 does not yet provide:
 - non-rectangular editing masks;
 - primitive generation.
 
-These remain compatible extensions of the provider and artistic-focus boundaries introduced here.
+These limitations are accepted as historical characteristics. They will not be addressed by adding a trained semantic provider; M14 instead replaces the active automatic path with class-agnostic SLIC regions, graph structure and manual artistic roles.
+
+## M14 migration policy
+
+M8 output is derived automatic evidence, not durable user intent. During M14.7:
+
+- the active automatic contribution is replaced by SLIC regional segmentation;
+- semantic settings remain readable for older projects but no longer drive new planning;
+- M13.3 manual corrections are converted to generalized region-role overrides;
+- existing generated plans are still derived and are rebuilt from the current pipeline;
+- this document remains an accurate record of the implemented historical milestone.
 
 ## Validation
 
@@ -119,4 +134,3 @@ The generic object category is named `SceneObject` rather than `Object`. This av
 ## M8.2 xUnit analyzer correction
 
 The subject-count regression test now uses the predicate overload of `Assert.Single`, as required by xUnit analyzer rule `xUnit2031`. This is a test-only compatibility correction and does not change semantic analysis behavior or the expected total of 496 cases.
-

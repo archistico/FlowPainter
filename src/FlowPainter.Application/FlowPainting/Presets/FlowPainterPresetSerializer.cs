@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using FlowPainter.Application.FlowPainting.Planning;
 
 namespace FlowPainter.Application.FlowPainting.Presets;
 
@@ -65,9 +67,30 @@ public static class FlowPainterPresetSerializer
                 $"Preset schema version {schemaVersion} is not supported. Supported versions are {FlowPainterPresetDocument.MinimumSupportedSchemaVersion} through {FlowPainterPresetDocument.CurrentSchemaVersion}.");
         }
 
-        FlowPainterPresetDocument? document = root.Deserialize<FlowPainterPresetDocument>(SerializerOptions);
+        JsonNode documentNode = JsonNode.Parse(root.GetRawText())
+            ?? throw new InvalidDataException("The preset document is empty or invalid.");
+        ApplyCompatibilityDefaults(documentNode, schemaVersion);
+        FlowPainterPresetDocument? document = JsonSerializer.Deserialize<FlowPainterPresetDocument>(
+            documentNode.ToJsonString(),
+            SerializerOptions);
         return document?.Preset
             ?? throw new InvalidDataException("The preset document is empty or invalid.");
+    }
+
+    private static void ApplyCompatibilityDefaults(JsonNode documentNode, int schemaVersion)
+    {
+        if (schemaVersion >= FlowPainterPresetDocument.CurrentSchemaVersion
+            || documentNode is not JsonObject document
+            || document["preset"] is not JsonObject preset
+            || preset["settings"] is not JsonObject settings
+            || settings["detailInfluence"] is not JsonObject detailInfluence
+            || detailInfluence.ContainsKey("regionTransitionWidth"))
+        {
+            return;
+        }
+
+        detailInfluence["regionTransitionWidth"] =
+            DetailInfluenceSettings.DefaultRegionTransitionWidth;
     }
 
     private static JsonSerializerOptions CreateOptions()

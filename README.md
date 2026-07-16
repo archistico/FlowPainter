@@ -6,30 +6,66 @@ The planned engine combines:
 
 - flow-guided brush strokes;
 - optimized geometric primitives;
-- automatic and manually edited detail maps;
-- hybrid rendering in which broad background masses and important subjects receive different artistic treatment.
+- deterministic SLIC regional segmentation with hierarchical merging;
+- automatic structural fields and manually edited artistic roles;
+- hybrid rendering in which broad masses, protected boundaries and focal regions receive different treatment.
 
-## Current milestone: M8
+## Current validated baseline: M13.4.1
 
-M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved stroke plan for high-resolution PNG/JPEG export. M6.1 adds synchronized zoom and pan for direct source/result comparison. M7 separates stroke geometry from material rendering and adds four deterministic procedural brush families. M8 adds deterministic generic subject, silhouette and focal-area analysis through a replaceable semantic-provider boundary.
+**Current milestone:** M13.4.2 — Memory and work budgets — READY FOR VALIDATION
 
-Implemented through M8:
+M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved plan for high-resolution PNG/JPEG export. M6.1 adds synchronized zoom and pan for direct source/result comparison. M7 separates stroke geometry from material rendering and adds four deterministic procedural brush families. M8 adds deterministic generic subject, silhouette and focal-area analysis through a replaceable semantic-provider boundary. M9 adds a deterministic geometric-primitive optimizer with resolution-independent raster and SVG output. M10 combines primitive colour masses, primitive-derived flow deformation and a detail-biased brush refinement pass in a third deterministic hybrid mode. M11 added multiscale scene-boundary analysis, important-edge classification, background confidence, uncertainty and a contour-tangent direction field. M12 uses that evidence to align strokes with important contours, resist silhouette crossings, preserve corners and reinforce subject boundaries without drawing a mechanical outline. M13 counterbalances positive importance with explicit background suppression, preserving subjects and uncertain transitions while simplifying confident background. M13.2 softens manual detail-region borders so rectangular editing controls do not leave visible seams in the painting. M13.3 adds direct click selection, deletion and persistent non-destructive semantic corrections for primary subject, subject, background and ignored detections. The 2026-07-16 audit corrections brought the baseline to 755 passing tests. M13.4.1 then added complete presentation dirty tracking and guarded Save / Discard / Cancel navigation; it was validated with all 765 tests passing. M13.4.2 introduces shared memory/work budgets, mode-aware final-render estimates, future SLIC memory reservation, bounded encoded input and planner-level pre-allocation rejection, with 17 additional cases and an expected total of 782 tests pending local validation. The semantic subsystem remains part of the current schema-11 compatibility baseline, but future automatic segmentation is planned around deterministic SLIC regions rather than SAM, ONNX or any machine-learning provider.
+
+Implemented and validated through M13.4.1, plus M13.4.2 pending validation:
 
 - local PNG, JPEG, WebP and BMP loading;
 - hard decoded-size limit of 10,000 × 10,000 RGBA;
 - aspect-ratio-preserving Draft, Standard and High analysis proxies (256, 512 and 1,024 px maximum side);
 - resolution-independent deterministic `StrokePlan` data;
+- resolution-independent immutable `PrimitivePlan` data;
+- deterministic hill-climbing reconstruction with any non-empty combination of triangle, rectangle, rotated rectangle, circle and ellipse forms;
+- detail-aware primitive placement, size, error weighting and local search budget;
+- replaceable primitive candidate, mutation, mask-rasterization and scoring contracts;
+- high-resolution primitive rasterization and SVG vector export;
+- immutable `HybridPlan` composition with primitive, flow and refinement layers;
+- primitive-derived AxisAlignment, BoundaryTangent, Vortex and Mixed vector-field influences;
+- configurable hybrid layer budgets, influence falloff and refinement detail/size controls;
+- high-resolution hybrid PNG/JPEG rendering from the same plan approved in preview;
 - internal coherent-noise flow field with no LibNoiseCore dependency;
 - configurable flow, stroke, brush and background parameters;
 - built-in and versioned JSON presets;
 - structural detail analysis based on luminance edges and local RGB contrast;
 - deterministic generic saliency, subject, silhouette and focal-area maps;
-- replaceable `ISemanticImportanceAnalyzer` provider boundary with no bundled ML runtime;
+- legacy `ISemanticImportanceAnalyzer` provider boundary retained for the validated M8–M13.3 compatibility baseline;
 - semantic-region promotion to editable manual focus or critical-detail regions;
+- direct click selection and deterministic cycling of overlapping detail, correction and automatic semantic overlays;
+- persistent non-destructive semantic corrections for primary subject, subject, background and ignored detections;
+- soft semantic-correction borders applied before scene-boundary and detail composition;
 - diagnostic overlays for each semantic contribution;
+- deterministic multiscale luminance/colour boundary analysis;
+- separate important-edge, subject-boundary, internal-structure and texture maps;
+- background-confidence and uncertainty maps with silhouette protection;
+- normalized tangent direction field and diagnostic direction overlay;
+- replaceable `ISceneBoundaryAnalyzer` provider boundary;
+- derived `BoundaryGuidanceField` with tangent, influence, hardness, silhouette and corner signals;
+- progressive tangent alignment near important contours;
+- deterministic crossing deflection and optional hard-boundary termination;
+- contour-driven detail reinforcement without an artificial outline;
+- corner-aware stroke shortening;
+- boundary guidance composed with primitive-derived flow in both hybrid stroke layers;
+- signed `ArtisticDetailField` combining positive protection and negative background suppression;
+- explicit subject, silhouette, uncertainty and manual-focus protection priority;
+- configurable background detail floor and softened suppression transitions;
+- fewer starts, longer/wider strokes, fewer segments and freer curvature in confident background;
+- deterministic colour simplification away from protected forms;
+- effective-detail reuse by primitive and hybrid planning;
+- diagnostic overlays for suppression, protection and effective artistic detail;
+- Soft contour, Strong silhouette and Loose background policies;
 - deterministic smoothing of the proxy detail map;
 - heat-map visualization over the source image;
-- rectangular mouse selections that increase or reduce local detail;
+- click-to-select and drag-to-create rectangular mouse interaction for manual regions;
+- configurable SmoothStep transition bands inside and outside manual-region borders;
+- full-strength region cores, Euclidean corner falloff and maximum merging of same-intent overlaps;
 - normalized manual regions that survive window resizing;
 - detail-weighted stroke placement;
 - shorter and thinner strokes in detailed areas;
@@ -37,20 +73,29 @@ Implemented through M8:
 - SkiaSharp 4 preview rendering through SolidRound, SoftRound, Flat and Bristle brush strategies;
 - deterministic per-stroke size and opacity jitter shared by preview and final export;
 - independent final PNG/JPEG export;
-- versioned `*.flowpainter.json` projects containing source reference, seed, settings, preview quality and manual regions;
+- versioned `*.flowpainter.json` projects containing source reference, seed, settings, preview quality, manual detail regions and semantic corrections;
 - portable project-relative source-image paths;
 - Draft, Standard and High preview qualities;
-- region list with relabel, percentage resize, reorder and delete operations;
+- region list with relabel, percentage resize, reorder and delete operations, plus `Delete` shortcut support;
 - persistent recent-project and recent-preset lists;
 - structured application workspace, operation and validation state;
+- guarded dirty-session replacement and close workflow through a testable `ProjectSessionController`;
+- project-title dirty indicator and persisted-control tracking distinct from transient viewport/overlay state;
+- shared 2 GiB peak-memory admission policy for analysis and final export;
+- mode-aware Flow, Primitive and Hybrid output-buffer estimates;
+- explicit current-analysis and future SLIC proxy-memory reserves;
+- planner-level Flow segment, primitive scoring and primitive pixel-evaluation budgets;
+- bounded 256 MiB encoded-image input with cancellation-aware streaming;
 - final output up to 10,000 × 10,000 with preserved aspect ratio;
 - cached preview `StrokePlan` reused unchanged for final rasterization;
 - synchronized source/result zoom with the mouse wheel and pan with the middle mouse button;
-- known-RGBA memory estimate and risk indication before allocation;
-- project and preset schema 4 with compatibility for schema 1, 2 and 3;
-- 496 automated test cases across Domain, Application, Imaging and Rendering.
+- combined analysis/render memory estimate, risk indication and supported/blocked status before allocation;
+- project schema 11 with compatibility for schemas 1–10;
+- flow-preset schema 8 with compatibility for schemas 1–7;
+- 765 validated automated test cases across Domain, Application, Imaging and Rendering;
+- 782 expected cases after M13.4.2, pending local build/test validation.
 
-M8 provides generic subject-aware importance but does not claim class-specific recognition. Future local providers can add people, animals, objects, faces and landmarks through `ISemanticImportanceAnalyzer` without changing the planner or project format.
+M8–M13.3 remain the validated historical path currently implemented by the application. New development does not extend class-aware or model-backed recognition. M13.4 first hardens state, memory, persistence and analysis orchestration; M14 then introduces deterministic SLIC superpixels, regional descriptors, a Region Adjacency Graph and hierarchical merging. M14.7 will replace the active automatic semantic contribution while preserving older project schemas and converting manual semantic decisions into generalized region-role overrides.
 
 ## Requirements
 
@@ -94,19 +139,27 @@ dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 Then:
 
 1. choose **Open image**, or **Open project** for an existing `*.flowpainter.json` file;
-2. inspect the combined detail heat map or individual semantic overlays;
-3. promote a detected subject/focal region or create `IncreaseDetail` / `ReduceDetail` regions by dragging over the source;
-4. select a region to relabel, resize, reorder or delete it;
-5. choose Draft, Standard or High and use **Rebuild preview** when required;
-6. choose SolidRound, SoftRound, Flat or Bristle and edit deterministic material parameters;
-7. edit analysis/painting parameters and explicitly reanalyze or render;
-8. save/load reusable `*.flowpreset.json` settings;
-9. save the complete image-specific working state with **Save project**;
-10. choose **Save preview** to export the current proxy-resolution PNG;
-11. configure final maximum dimension and PNG/JPEG format;
-12. choose **Export final** to rasterize the approved preview plan and brush against the original source.
+2. inspect the combined detail heat map, semantic overlays, important boundaries, background confidence or tangent directions;
+3. tune Scene boundaries settings and use **Reanalyze detail + subjects + boundaries** when required;
+4. configure **Boundary-aware painting** and **Background suppression**, or start with Balanced, Strong silhouette or Loose background;
+5. compare Background confidence, Background suppression, Background protection and Artistic detail overlays;
+6. click a detected semantic rectangle and correct it as primary subject, subject, background or ignored detection when required;
+7. promote a detected region to painterly focus/critical detail, or drag to create `IncreaseDetail` / `ReduceDetail` regions;
+8. click a manual region or semantic correction to select it, then edit it or press `Delete`;
+9. choose Draft, Standard or High and use **Rebuild preview** when required;
+10. choose **FlowPainting**, **GeometricPrimitives** or **Hybrid** as the generative engine;
+11. for flow painting, choose SolidRound, SoftRound, Flat or Bristle and edit deterministic material parameters;
+12. for primitives, choose any allowed-form combination, search budget, size range, opacity and detail influences;
+13. for hybrid mode, configure layer budgets, primitive flow influence and refinement scale;
+14. edit analysis/painting parameters and explicitly reanalyze or render;
+15. save/load reusable `*.flowpreset.json` flow settings;
+16. save the complete image-specific working state with **Save project**;
+17. choose **Save preview** to export the current proxy-resolution PNG;
+18. configure final maximum dimension and PNG/JPEG format;
+19. choose **Export final** to rasterize the approved stroke, primitive or hybrid plan;
+20. in primitive mode, choose **Export SVG** for resolution-independent vector output.
 
-Manual regions belong to projects, not presets. Project schema 4 stores normalized geometry, composition order, semantic-analysis settings, final-output settings and brush material; schema-1 through schema-3 files remain readable.
+Manual detail regions and semantic corrections belong to projects, not presets. Project schema 11 stores normalized detail/correction geometry, soft-region transition width, composition order, the current legacy semantic analysis settings, scene-boundary analysis, boundary-painting and background-suppression policies, final-output settings, brush material, selected engine, primitive settings and hybrid composition settings; schema-1 through schema-10 files remain readable. SLIC settings and region-role migration will enter only with the future M14 persistence milestone.
 
 ## Documentation
 
@@ -123,3 +176,13 @@ Milestone-specific documents:
 - [`docs/M6_1_SYNCHRONIZED_VIEWPORT.md`](docs/M6_1_SYNCHRONIZED_VIEWPORT.md)
 - [`docs/M7_BRUSH_ENGINE.md`](docs/M7_BRUSH_ENGINE.md)
 - [`docs/M8_SEMANTIC_IMPORTANCE.md`](docs/M8_SEMANTIC_IMPORTANCE.md)
+- [`docs/M9_GEOMETRIC_PRIMITIVES.md`](docs/M9_GEOMETRIC_PRIMITIVES.md)
+- [`docs/M10_HYBRID_PRIMITIVE_FLOW.md`](docs/M10_HYBRID_PRIMITIVE_FLOW.md)
+- [`docs/M11_SCENE_BOUNDARIES.md`](docs/M11_SCENE_BOUNDARIES.md)
+- [`docs/M12_BOUNDARY_AWARE_PAINTING.md`](docs/M12_BOUNDARY_AWARE_PAINTING.md)
+- [`docs/M13_BACKGROUND_SUPPRESSION.md`](docs/M13_BACKGROUND_SUPPRESSION.md)
+- [`docs/M13_2_SOFT_DETAIL_REGIONS.md`](docs/M13_2_SOFT_DETAIL_REGIONS.md)
+- [`docs/M13_3_REGION_SELECTION_AND_SEMANTIC_CORRECTIONS.md`](docs/M13_3_REGION_SELECTION_AND_SEMANTIC_CORRECTIONS.md)
+- [`docs/M13_4_1_DIRTY_STATE_AND_DATA_LOSS_PROTECTION.md`](docs/M13_4_1_DIRTY_STATE_AND_DATA_LOSS_PROTECTION.md)
+- [`docs/M13_4_2_MEMORY_AND_WORK_BUDGETS.md`](docs/M13_4_2_MEMORY_AND_WORK_BUDGETS.md)
+- [`docs/M14_SLIC_REGIONAL_SEGMENTATION.md`](docs/M14_SLIC_REGIONAL_SEGMENTATION.md) — approved implementation plan

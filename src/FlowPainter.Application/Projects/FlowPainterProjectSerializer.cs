@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using FlowPainter.Application.FlowPainting.Planning;
 
 namespace FlowPainter.Application.Projects;
 
@@ -71,9 +73,36 @@ public static class FlowPainterProjectSerializer
             throw new InvalidDataException("The project payload is missing.");
         }
 
-        FlowPainterProject? project = projectElement.Deserialize<FlowPainterProject>(SerializerOptions);
+        JsonNode projectNode = JsonNode.Parse(projectElement.GetRawText())
+            ?? throw new InvalidDataException("The project payload is empty or invalid.");
+        ApplyCompatibilityDefaults(projectNode, schemaVersion);
+        FlowPainterProject? project = JsonSerializer.Deserialize<FlowPainterProject>(
+            projectNode.ToJsonString(),
+            SerializerOptions);
         return project
             ?? throw new InvalidDataException("The project document is empty or invalid.");
+    }
+
+    private static void ApplyCompatibilityDefaults(JsonNode projectNode, int schemaVersion)
+    {
+        if (projectNode is not JsonObject project)
+        {
+            return;
+        }
+
+        if (schemaVersion < 10
+            && project["settings"] is JsonObject settings
+            && settings["detailInfluence"] is JsonObject detailInfluence
+            && !detailInfluence.ContainsKey("regionTransitionWidth"))
+        {
+            detailInfluence["regionTransitionWidth"] =
+                DetailInfluenceSettings.DefaultRegionTransitionWidth;
+        }
+
+        if (schemaVersion < 11 && !project.ContainsKey("semanticCorrections"))
+        {
+            project["semanticCorrections"] = new JsonArray();
+        }
     }
 
     private static JsonSerializerOptions CreateOptions()

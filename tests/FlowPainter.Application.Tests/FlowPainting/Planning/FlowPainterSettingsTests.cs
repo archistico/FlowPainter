@@ -1,3 +1,4 @@
+using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
@@ -23,6 +24,11 @@ public sealed class FlowPainterSettingsTests
         Assert.NotNull(settings.DetailAnalysis);
         Assert.NotNull(settings.DetailInfluence);
         Assert.NotNull(settings.SemanticAnalysis);
+        Assert.NotNull(settings.BoundaryAnalysis);
+        Assert.NotNull(settings.BoundaryPainting);
+        Assert.NotNull(settings.BackgroundSuppression);
+        Assert.False(settings.BoundaryPainting.Enabled);
+        Assert.False(settings.BackgroundSuppression.Enabled);
         Assert.Equal(BrushKind.SolidRound, settings.Brush.Kind);
     }
 
@@ -113,6 +119,39 @@ public sealed class FlowPainterSettingsTests
         FlowPainterSettings settings = new(semanticAnalysis: semantic);
 
         Assert.Same(semantic, settings.SemanticAnalysis);
+    }
+
+    [Fact]
+    public void ConstructorRetainsProvidedBoundarySettings()
+    {
+        SceneBoundaryAnalysisSettings boundary = new(continuityWeight: 1.4d);
+
+        FlowPainterSettings settings = new(boundaryAnalysis: boundary);
+
+        Assert.Same(boundary, settings.BoundaryAnalysis);
+    }
+
+    [Fact]
+    public void ConstructorRetainsProvidedBoundaryPaintingSettings()
+    {
+        BoundaryPaintingSettings boundaryPainting = new(enabled: true, tangentAlignment: 0.9d);
+
+        FlowPainterSettings settings = new(boundaryPainting: boundaryPainting);
+
+        Assert.Same(boundaryPainting, settings.BoundaryPainting);
+    }
+
+
+    [Fact]
+    public void ConstructorRetainsProvidedBackgroundSuppressionSettings()
+    {
+        FlowPainter.Application.Background.BackgroundSuppressionSettings suppression = new(
+            enabled: true,
+            overallStrength: 0.9d);
+
+        FlowPainterSettings settings = new(backgroundSuppression: suppression);
+
+        Assert.Same(suppression, settings.BackgroundSuppression);
     }
 
     [Fact]

@@ -44,12 +44,26 @@ Each region stores:
 
 `UniformImageViewport` handles letterboxing/pillarboxing and maps between Avalonia viewport coordinates and normalized source coordinates. Consequently, regions remain aligned when the window is resized.
 
-The existing deterministic composition rules remain:
+The original deterministic composition formulas are:
 
 ```text
 Increase: value + strength × (1 - value)
 Reduce:   value × (1 - strength)
 ```
+
+### M13.2 evolution: soft region influence
+
+M13.2 keeps these formulas but replaces the hard inside/outside mask with a smooth distance-based influence. Region strength is multiplied by a `SmoothStep` feather that extends both inside and outside the rectangle. The core reaches full influence, the geometric border carries 50% influence and the field reaches zero beyond the configured radius.
+
+The radius is stored as `DetailInfluenceSettings.RegionTransitionWidth`, expressed as a fraction of the shorter analysis-map dimension. Same-intent overlaps use maximum influence rather than cumulative application, preventing rectangular hotspots. A zero radius retains the historical hard-mask behaviour.
+
+See [`M13_2_SOFT_DETAIL_REGIONS.md`](M13_2_SOFT_DETAIL_REGIONS.md) and ADR-0015 for the current composition contract.
+
+### M13.3 evolution: direct overlay selection
+
+M13.3 distinguishes a display-space click from a drag. Movement below six pixels selects an existing detail/correction/automatic overlay; a larger drag creates a new detail rectangle. Manual detail regions are hit-tested latest-first and repeated clicks cycle overlapping regions. The selected region can be edited through the existing controls or removed with `Delete`.
+
+Semantic corrections introduced in M13.3 remain a separate collection and do not change the `DetailRegion` contract.
 
 ## Detail-aware stroke planning
 
