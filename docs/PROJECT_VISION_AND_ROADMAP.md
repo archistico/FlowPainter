@@ -2,8 +2,8 @@
 
 **Document status:** living specification  
 **Last updated:** 2026-07-16  
-**Current validated baseline:** M13.4.1 — Dirty state and data-loss protection (765 tests)  
-**Next milestone:** M13.4.2 — Memory and work budgets  
+**Current validated baseline:** M13.4.4 — Analysis orchestration extraction (804 tests)  
+**Next milestone:** M14.1 — Regional segmentation contracts  
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -734,33 +734,47 @@ Detailed validation plan: [`M13_4_1_DIRTY_STATE_AND_DATA_LOSS_PROTECTION.md`](M1
 
 #### M13.4.2 — Memory and work budgets
 
-**Status: READY FOR VALIDATION**
+**Status: DONE — validated with 782 tests**
 
 Detailed validation plan: [`M13_4_2_MEMORY_AND_WORK_BUDGETS.md`](M13_4_2_MEMORY_AND_WORK_BUDGETS.md). Architecture decision: [`ADR-0018`](decisions/ADR-0018-RESOURCE-ADMISSION-BUDGETS.md).
 
 - one shared 2 GiB working-set admission policy for analysis and final rendering;
-- current-analysis estimate plus an explicit 24-byte-per-proxy-pixel future SLIC reserve;
+- current-analysis estimate plus the provisional 24-byte-per-proxy-pixel SLIC reserve, replaced by the exact M14.1 estimator;
 - mode-aware Flow, Primitive and Hybrid final-render estimates using three or four output-sized buffers;
 - bounded 256 MiB encoded input with direct seekable reads and cancellation-aware streaming;
 - Application-level Flow segment, primitive score-attempt and primitive pixel-evaluation budgets;
 - pre-allocation rejection inside planners and desktop analysis/export entry points;
-- seventeen new test cases, bringing the expected suite to 782;
+- seventeen new test cases, bringing the validated suite to 782;
 - representative measured 4K/8K profiling and opt-in 10K certification remain follow-up validation/M17 work.
 
 #### M13.4.3 — Atomic durable writes
 
-- temporary sibling files for local project, preset, preview, SVG and final-image writes;
-- flush, close and atomic replace/move semantics;
-- preservation of the previous valid destination on cancellation or failure;
-- documented fallback for storage providers without atomic replacement.
+**Status: DONE — validated with 790 tests**
+
+Detailed validation plan: [`M13_4_3_ATOMIC_DURABLE_WRITES.md`](M13_4_3_ATOMIC_DURABLE_WRITES.md). Architecture decision: [`ADR-0019`](decisions/ADR-0019-ATOMIC-LOCAL-FILE-COMMITS.md).
+
+- one Application-level `AtomicFileWriter` for every current local destination;
+- unique temporary sibling files opened with exclusive `CreateNew` semantics;
+- asynchronous flush, durable-storage flush, close and same-directory replace/move;
+- preservation of the previous valid destination on cancellation, serialization, encoding or commit failure;
+- no destination publication for failed new writes;
+- no silent direct-stream fallback for non-local storage providers;
+- eight new Application test cases, bringing the validated suite to 790.
 
 #### M13.4.4 — Analysis orchestration extraction
 
-- extract an `AnalysisCoordinator` from `MainWindow`;
-- immutable analysis cache keys and revision tracking;
-- cancellation, failure and stale-result tests without Avalonia;
-- adopt derived resources only after successful completion;
-- retain a thin UI composition root rather than performing a framework-wide rewrite.
+**Status: DONE — validated with 804 tests**
+
+Detailed validation plan: [`M13_4_4_ANALYSIS_ORCHESTRATION.md`](M13_4_4_ANALYSIS_ORCHESTRATION.md). Architecture decision: [`ADR-0020`](decisions/ADR-0020-DETACHED-ANALYSIS-ADOPTION.md).
+
+- Application-level `AnalysisCoordinator` extracted from `MainWindow`;
+- immutable value-based cache keys containing source identity, proxy size, analysis settings and workspace revisions;
+- detached full-analysis and manual-region recomposition results;
+- monotonic generations with cancellation/failure preservation and stale-result rejection;
+- overlay creation and current-key verification before transactional UI adoption;
+- candidate source results retagged only after image/project workspace adoption;
+- fourteen new Application test cases, bringing the validated suite to 804;
+- thin Avalonia composition root retained without a framework-wide rewrite.
 
 Exit criteria:
 
@@ -772,16 +786,22 @@ Exit criteria:
 
 ### M14 — SLIC regional segmentation
 
-**Status: PLANNED — approved direction**
+**Status: IN PROGRESS — M14.1 ready for validation**
 
 Detailed plan: [`M14_SLIC_REGIONAL_SEGMENTATION.md`](M14_SLIC_REGIONAL_SEGMENTATION.md). Architectural decision: [`ADR-0017`](decisions/ADR-0017-SLIC-REGIONAL-SEGMENTATION.md).
 
 #### M14.1 — Regional segmentation contracts
 
+**Status: READY FOR VALIDATION**
+
+Detailed validation plan: [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md).
+
 - `IRegionSegmentationAnalyzer` and immutable request/settings/result contracts;
 - compact `RegionLabelMap` with `UInt16`/`UInt32` storage policy;
 - `ImageRegion`, bounds, diagnostics and progress contracts;
-- invariants for complete coverage, unique ownership, connectedness, compact labels and determinism.
+- invariants for complete coverage, unique ownership, compact labels, graph consistency, monotonic hierarchy and deterministic ownership;
+- exact `RegionSegmentationEstimator` integrated into analysis/final-render admission;
+- 59 new Domain/Application cases, bringing the expected suite to 863.
 
 #### M14.2 — Deterministic SLIC implementation
 

@@ -30,7 +30,7 @@ Contains stable concepts and invariants:
 - supported image dimensions;
 - normalized geometry;
 - detail regions, schema-11 semantic-correction compatibility values and maps;
-- planned M14 regional labels, region descriptors, adjacency and hierarchy values;
+- M14.1 regional labels, region descriptors, adjacency and hierarchy values;
 - generation modes;
 - deterministic randomness;
 - managed RGBA image values used by pure planning tests;
@@ -48,7 +48,9 @@ Contains orchestration and policies that operate on domain objects:
 - current M8–M13.3 `ISemanticImportanceAnalyzer` compatibility pipeline, semantic maps and normalized semantic regions;
 - current composition of structural, subject, silhouette and focal importance;
 - current non-destructive semantic-correction composition before scene-boundary analysis;
-- planned M14 `IRegionSegmentationAnalyzer`, SLIC segmentation, regional descriptors, adjacency graph and hierarchy policies;
+- M13.4.4 `AnalysisCoordinator`, detached analysis results, immutable cache identities and transactional adoption;
+- M14.1 `IRegionSegmentationAnalyzer`, immutable segmentation request/result/progress contracts and exact resource estimator;
+- planned M14.2+ SLIC clustering, descriptor calculation, adjacency accumulation and hierarchy policies;
 - deterministic overlay hit testing and semantic-correction editing;
 - composition of automatic/manual detail information;
 - normalized viewport coordinate mapping;
@@ -101,11 +103,13 @@ Stroke rendering delegates material deposition to the validated SolidRound, Soft
 Avalonia desktop composition root and presentation layer. The current workflow is:
 
 ```text
-Current validated M13.3 workflow:
+Current M13.4.4 compatibility workflow:
 
 Open image or project
     ↓
 Resolve source and create selected-quality proxy
+    ↓
+Create immutable analysis request and cache key
     ↓
 Analyze structural and legacy semantic importance
     ↓
@@ -113,7 +117,11 @@ Apply persistent schema-11 semantic corrections
     ↓
 Analyze corrected scene boundaries and background confidence
     ↓
-Compose manual detail regions and generate Flow / Primitive / Hybrid plans
+Compose manual detail regions and background suppression
+    ↓
+Adopt the complete detached result transactionally
+    ↓
+Generate Flow / Primitive / Hybrid plans
     ↓
 Render, persist and export
 
@@ -157,6 +165,43 @@ Project = source + seed + parameters + preview quality + final output + image-sp
 
 Recent project/preset paths are persisted separately as non-critical UI state. Failure to restore or write recent items must never prevent image or project operations.
 
+## Analysis lifecycle and transactional adoption
+
+M13.4.4 and ADR-0020 move the complete derived-map lifecycle into `FlowPainter.Application.Analysis`. `AnalysisCoordinator` owns execution order, progress translation, cache identity, generation ordering, reduced recomposition and publication eligibility. It depends only on Application/domain analyzer and composer contracts. It does not own Avalonia controls, Skia images, file paths or workspace mutation.
+
+```text
+AnalysisRequest
+├── IRgbaPixelSource proxy
+├── structural / semantic / boundary / background settings
+├── copied manual regions and semantic corrections
+└── AnalysisCacheKey
+        ↓
+AnalysisCoordinator.AnalyzeAsync / RecomposeAsync
+        ↓
+PendingAnalysis
+├── monotonic generation
+├── immutable cache key
+└── detached AnalysisResult
+        ↓
+caller builds temporary native overlay and rechecks active key
+        ↓
+AnalysisCoordinator.TryAdopt
+        ↓
+UI replacement callback succeeds
+        ↓
+CurrentKey + CurrentResult are published
+```
+
+`AnalysisCacheKey` is value-based and includes a non-empty per-source session identity, proxy dimensions, detail-region revision, semantic-correction revision and an invariant fingerprint of every setting that affects derived analysis output. Renderer-only settings are excluded. Candidate image/project loads use a temporary source identity and revision pair; after the workspace is committed, `TryRetagCurrent` moves the accepted result to the committed revisions without recomputation.
+
+Every full analysis or recomposition increments a coordinator generation. `TryAdopt` rejects a pending result unless it belongs to the latest requested generation and matches the caller's freshly rebuilt expected key. Starting, cancelling or failing a newer run does not erase the last successfully adopted result. `Invalidate` deliberately clears it and makes all outstanding generations stale.
+
+The adoption callback is synchronous and intentionally limited to short native/UI ownership swaps. The coordinator publishes its cache only after that callback returns successfully. Overlay creation, source/proxy replacement and Avalonia bitmap construction therefore cannot leave a cache entry claiming that a failed UI adoption succeeded.
+
+Manual detail-region edits use `RecomposeAsync` when structural, semantic and boundary inputs are unchanged. That path reuses the accepted structural, corrected-semantic, boundary and automatic-detail maps, then rebuilds only manual composition and background suppression. Semantic-correction or analyzer-setting changes still require the full pipeline.
+
+`MainWindow` remains the desktop composition root: it reads controls, owns disposable native resources, renders temporary overlays and supplies the final adoption callback. It no longer invokes the three analyzers or the map composers directly. This is the lifecycle boundary that M14 will extend with SLIC labels, descriptors and hierarchy results.
+
 ## Analysis fields
 
 FlowPainter separates four control structures in the approved target architecture:
@@ -183,9 +228,9 @@ Reduce:   value × (1 - strength)
 
 This keeps values in `[0, 1]` and makes repeated adjustments deterministic.
 
-### Planned SLIC regional segmentation
+### SLIC regional segmentation contracts and planned implementation
 
-M14 introduces a local, deterministic and model-free regional representation in Application:
+M14 introduces a local, deterministic and model-free regional representation across Domain and Application:
 
 ```text
 IRgbaPixelSource proxy
@@ -203,7 +248,7 @@ RegionSegmentationResult
 
 The first implementation is SLIC in CIELAB + image-coordinate space. It must provide complete pixel ownership, connected regions, compact identifiers, deterministic output, cancellation and progress. The initial SLIC labels are intentionally fine-grained building blocks, not semantic objects. Later M14 steps calculate descriptors, shared-boundary evidence and deterministic hierarchical merges.
 
-The implementation belongs in Application because it consumes `IRgbaPixelSource`, produces pure Domain/Application values and must remain independent of SkiaSharp and Avalonia. Imaging.Skia continues to own decode and proxy generation only. No SAM, ONNX, Python, model checkpoint or GPU dependency is permitted by the approved segmentation decision.
+M14.1 places compact `RegionLabelMap`, `ImageRegion`, `RegionAdjacencyGraph` and `RegionHierarchy` values in Domain. Request, settings, result, diagnostics, progress and estimation policies belong in Application because they consume `IRgbaPixelSource` and coordinate use cases. The future algorithm remains independent of SkiaSharp and Avalonia. Imaging.Skia continues to own decode and proxy generation only. No SAM, ONNX, Python, model checkpoint or GPU dependency is permitted by the approved segmentation decision.
 
 For large sources, the global partition is computed on an aspect-ratio-preserving proxy. Labels are projected to source coordinates and M17 may refine only border bands or selected complex regions. A full-resolution floating-point segmentation field is not allowed.
 
@@ -268,7 +313,7 @@ The 10,000 × 10,000 decoded-size limit is enforced by `ImageSize` and metadata 
 
 M13.4.2 and ADR-0018 introduce `WorkloadBudgetPolicy` as the shared Application-level admission boundary. The supported estimated peak working set is 2 GiB. The policy is invoked before proxy analysis, before final export and inside each generative planner, so future callers cannot bypass the desktop checks.
 
-`AnalysisMemoryEstimator` includes decoded source RGBA, proxy RGBA, a conservative 160-byte-per-proxy-pixel reserve for current analysis fields and a 24-byte-per-proxy-pixel reserve for the future SLIC label map, cluster state, descriptors and adjacency data. The SLIC reserve is planning capacity only until M14.
+`AnalysisMemoryEstimator` includes decoded source RGBA, proxy RGBA, a conservative 160-byte-per-proxy-pixel reserve for current analysis fields and the exact M14.1 `RegionSegmentationEstimator` peak. The segmentation estimate selects two- or four-byte labels from the projected region count and includes Lab, distance, assignment, optional smoothing and cluster-state buffers plus deterministic assignment-work estimates.
 
 `FinalRenderMemoryEstimator` is mode-aware. Flow and Primitive conservatively represent three output-sized buffers: render surface, copied bitmap and encoding reserve. Hybrid represents four output-sized buffers at its layered render peak: retained primitive and flow layers, refinement surface and copied result. The estimate also includes source, proxy, preview, optional overlay and analysis/SLIC reserves. The desktop reports estimated MiB, output-buffer count, risk and whether policy allows the export. An approved preview plan takes precedence over the currently selected combo-box mode, matching final-render behaviour.
 
@@ -281,6 +326,14 @@ M13.4.2 and ADR-0018 introduce `WorkloadBudgetPolicy` as the shared Application-
 The current policy allows at most 25,000,000 flow-segment steps, 5,000,000 primitive score attempts and 3,000,000,000 primitive pixel evaluations. Requests over a limit fail before large loops or plan collections are created. These values are support-policy limits, not persistent artistic settings, and therefore do not alter project or preset schemas.
 
 Native Skia allocation, codec scratch space and exact operating-system working-set behaviour cannot be inferred perfectly. Estimates are intentionally conservative admission controls; measured profiling and Hybrid layer-lifetime reduction remain M17 work.
+
+## Atomic local persistence
+
+M13.4.3 and ADR-0019 introduce `AtomicFileWriter` in `FlowPainter.Application.Persistence` as the only production path for local destination commits. Project, preset, preview PNG, final raster, SVG and recent-item writes serialize or encode into a unique temporary sibling file. The temporary stream is flushed, closed and then moved over the destination in the same directory.
+
+The previous destination is never opened or truncated before commit. A failed serializer, encoder, cancellation, flush or move therefore leaves an existing file unchanged; failed creation of a new file leaves no published destination. Temporary deletion is best-effort and never replaces the primary exception.
+
+Serializers and encoders retain generic `Stream` contracts and remain independent of filesystem policy. Avalonia selects the local destination path, while the Application layer owns the transactional write boundary. Non-local storage requires an explicit future provider-specific transaction rather than a silent direct-stream fallback.
 
 ## Engine boundaries
 

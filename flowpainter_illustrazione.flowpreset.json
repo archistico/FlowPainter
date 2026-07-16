@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 8,
+  "preset": {
+    "name": "Balanced",
+    "settings": {
+      "field": {
+        "kind": "CoherentNoise",
+        "scale": 15,
+        "octaves": 4,
+        "persistence": 0.75,
+        "lacunarity": 4,
+        "angleOffsetRadians": 0
+      },
+      "strokeCount": 70000,
+      "segmentCount": 10,
+      "referenceMaximumDimension": 512,
+      "uniformDensity": 18,
+      "lengthScale": 0.001,
+      "maximumCurveRadians": 0.5000000007584998,
+      "minimumStrokeWidthPixels": 2,
+      "maximumStrokeWidthPixels": 4,
+      "strokeOpacity": 0.85,
+      "backgroundMode": "SourceImage",
+      "detailAnalysis": {
+        "baseDetail": 0.12,
+        "edgeWeight": 0.75,
+        "contrastWeight": 0.45,
+        "smoothingRadius": 1
+      },
+      "detailInfluence": {
+        "placementBias": 4,
+        "detailedLengthMultiplier": 0.55,
+        "backgroundLengthMultiplier": 1.35,
+        "detailedWidthMultiplier": 0.65,
+        "backgroundWidthMultiplier": 1.45,
+        "regionTransitionWidth": 0.05
+      },
+      "brush": {
+        "kind": "Bristle",
+        "hardness": 0.78,
+        "sizeJitter": 0.03,
+        "opacityJitter": 0.03,
+        "bristleCount": 7,
+        "bristleSpread": 0.75
+      },
+      "semanticAnalysis": {
+        "enabled": true,
+        "overallInfluence": 0.7,
+        "saliencyWeight": 0.35,
+        "subjectWeight": 0.8,
+        "silhouetteWeight": 0.9,
+        "focalWeight": 1,
+        "subjectThreshold": 0.52,
+        "minimumSubjectAreaRatio": 0.004,
+        "maximumSubjects": 6,
+        "centerBias": 0.25,
+        "smoothingRadius": 2,
+        "boundaryRadius": 2
+      },
+      "boundaryAnalysis": {
+        "enabled": true,
+        "luminanceWeight": 0.45,
+        "colorWeight": 0.75,
+        "multiscaleWeight": 0.7,
+        "continuityWeight": 0.85,
+        "semanticBoundaryWeight": 1.2,
+        "textureSuppression": 0.65,
+        "edgeThreshold": 0.1,
+        "importantEdgeThreshold": 0.32,
+        "coarseRadius": 3,
+        "smoothingRadius": 1,
+        "boundaryProtectionRadius": 4
+      },
+      "boundaryPainting": {
+        "enabled": true,
+        "tangentAlignment": 0.78,
+        "alignmentRadius": 5,
+        "crossingPenalty": 0.82,
+        "hardBoundaryThreshold": 0.62,
+        "terminationStrength": 0.78,
+        "internalEdgeInfluence": 0.42,
+        "textureEdgeInfluence": 0.08,
+        "contourReinforcement": 0.55,
+        "cornerPreservation": 0.68
+      },
+      "backgroundSuppression": {
+        "enabled": true,
+        "overallStrength": 0.78,
+        "detailFloor": 0.16,
+        "uncertaintyProtection": 0.88,
+        "silhouetteProtection": 0.96,
+        "transitionSoftness": 0.72,
+        "backgroundPlacementWeight": 0.32,
+        "strokeLengthMultiplier": 1.7,
+        "strokeWidthMultiplier": 1.55,
+        "segmentMultiplier": 0.62,
+        "curveFreedomMultiplier": 1.45,
+        "colorSimplification": 0.28
+      }
+    }
+  }
+}

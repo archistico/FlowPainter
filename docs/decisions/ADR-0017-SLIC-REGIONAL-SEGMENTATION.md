@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the M13.4–M17 roadmap. Implementation begins after M13.4 stabilization.
+Accepted and in progress. M13.4 stabilization is validated; M14.1 contracts are implemented and awaiting validation.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # M13.4.2 — Memory and work budgets
 
-**Status: READY FOR VALIDATION**
+**Status: DONE — validated with 782 tests**
 
 ## Purpose
 
@@ -54,7 +54,9 @@ The current constants are:
 
 ```text
 Current analysis reserve:      160 bytes per proxy pixel
-Future SLIC reserve:            24 bytes per proxy pixel
+Future SLIC reserve (provisional at M13.4.2): 24 bytes per proxy pixel
+
+M14.1 replaces this provisional fixed reserve with the exact `RegionSegmentationEstimator`.
 ```
 
 The SLIC reserve does not implement segmentation and is not allocated by M13.4.2. It makes the budget policy ready for the label map, cluster state, descriptors and adjacency data planned for M14.
@@ -177,7 +179,7 @@ The milestone adds or expands coverage for:
 - bounded seekable and non-seekable image input;
 - cancellation during non-seekable streaming.
 
-The validated M13.4.1 baseline contains **765** cases. M13.4.2 adds **17** cases, for an expected total of **782**.
+The validated M13.4.1 baseline contains **765** cases. M13.4.2 adds **17** cases, bringing the validated total to **782**.
 
 ## Manual validation checklist
 
@@ -216,3 +218,5 @@ M13.4.2 is complete when:
 - supported workloads retain deterministic output;
 - over-budget workloads fail before expensive allocation or iteration;
 - build and all **782** tests pass locally.
+
+The user validated the milestone on Windows on 2026-07-16: Release compilation succeeded and all 782 tests passed.

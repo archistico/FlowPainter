@@ -1,3 +1,4 @@
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Domain.Images;
 
 namespace FlowPainter.Application.Images;
@@ -5,7 +6,6 @@ namespace FlowPainter.Application.Images;
 public static class AnalysisMemoryEstimator
 {
     public const int CurrentAnalysisBytesPerPixel = 160;
-    public const int SegmentationReserveBytesPerPixel = 24;
 
     public static AnalysisMemoryEstimate Estimate(
         ImageSize sourceSize,
@@ -15,13 +15,14 @@ public static class AnalysisMemoryEstimator
         long proxyRgbaBytes = proxySize.GetRequiredBytes(ImageSize.RgbaBytesPerPixel);
         long currentAnalysisBytes = checked(
             proxySize.PixelCount * CurrentAnalysisBytesPerPixel);
-        long segmentationReserveBytes = checked(
-            proxySize.PixelCount * SegmentationReserveBytesPerPixel);
+        RegionSegmentationEstimate segmentationEstimate = RegionSegmentationEstimator.Estimate(
+            proxySize,
+            new RegionSegmentationSettings());
 
         return new AnalysisMemoryEstimate(
             sourceBytes,
             proxyRgbaBytes,
             currentAnalysisBytes,
-            segmentationReserveBytes);
+            segmentationEstimate.EstimatedPeakBytes);
     }
 }

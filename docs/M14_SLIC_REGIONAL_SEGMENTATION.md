@@ -1,6 +1,6 @@
 # M14 — SLIC regional segmentation
 
-**Status:** PLANNED — approved direction  
+**Status:** IN PROGRESS — M14.1 ready for validation  
 **Approved:** 2026-07-16  
 **Depends on:** M13.4 pre-SLIC stabilization  
 **Decision:** [`ADR-0017-SLIC-REGIONAL-SEGMENTATION.md`](decisions/ADR-0017-SLIC-REGIONAL-SEGMENTATION.md)
@@ -25,14 +25,14 @@ M14 does not include:
 
 ## Preconditions from M13.4
 
-Implementation starts only after:
+Implementation starts only after M13.4 is locally validated. The required stabilization capabilities are:
 
 - dirty-state and destructive-navigation guards are complete;
 - project/session adoption is transactional;
 - analysis, segmentation, planning and rendering have explicit memory/work budgets;
 - encoded input is bounded;
 - durable local writes are atomic;
-- analysis lifecycle orchestration is testable outside Avalonia.
+- analysis lifecycle orchestration is testable outside Avalonia through the M13.4.4 `AnalysisCoordinator`.
 
 ## Planned data model
 
@@ -106,14 +106,18 @@ The precise number of levels may be configurable, but parentage must be determin
 
 ## M14.1 — Contracts and invariants
 
+**Status:** READY FOR VALIDATION
+
+Detailed specification: [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md).
+
 Deliverables:
 
 - segmentation request/settings/result contracts;
 - compact label-map storage abstraction;
 - region, adjacency, hierarchy and diagnostic values;
 - progress-stage contract;
-- memory/work estimator integration;
-- validation and immutability tests.
+- exact memory/work estimator integration replacing the provisional M13.4.2 reserve;
+- validation and immutability tests across Domain and Application.
 
 Core invariants:
 
@@ -132,7 +136,8 @@ Exit criteria:
 
 - invalid dimensions, region sizes, compactness and iteration values are rejected;
 - storage selection and byte estimates are tested at boundary values;
-- Domain/Application contracts have no Avalonia or SkiaSharp references.
+- Domain/Application contracts have no Avalonia or SkiaSharp references;
+- all 863 tests pass after adding 59 focused M14.1 cases.
 
 ## M14.2 — Deterministic SLIC implementation
 

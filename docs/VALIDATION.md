@@ -1,10 +1,10 @@
 # Validation checklist
 
-## M13.4.2 memory and work budgets
+## M14.1 regional segmentation contracts
 
 **Status: READY FOR VALIDATION**
 
-Expected automated suite: **782 cases** (765 validated baseline + 17 new/expanded budget cases).
+Expected automated suite: **863 cases** (804 validated baseline + 59 new Domain/Application segmentation-contract cases).
 
 Required commands:
 
@@ -14,7 +14,7 @@ dotnet build FlowPainter.sln -c Release --no-restore
 dotnet test FlowPainter.sln -c Release --no-build
 ```
 
-Manual acceptance is defined in [`M13_4_2_MEMORY_AND_WORK_BUDGETS.md`](M13_4_2_MEMORY_AND_WORK_BUDGETS.md). Validation must cover ordinary image loading, preview-quality rebuilds, mode-aware final estimates, over-budget export rejection and planner rejection of excessive work settings.
+Manual acceptance is defined in [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md). Validation must cover compact-label storage boundaries, ownership, row/index access, region-area consistency, symmetric adjacency, monotonic hierarchy, range validation and deterministic memory/work estimates. Existing image, project and render behaviour must remain unchanged.
 
 Run from the repository root with the .NET 10 SDK installed.
 
@@ -26,31 +26,69 @@ dotnet test FlowPainter.sln -c Release --no-build --logger "console;verbosity=no
 dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 ```
 
-## Current validated baseline — M13.4.1
+## Current validated baseline — M13.4.4
 
 - restore succeeds;
 - all nine projects build with zero warnings and zero errors;
-- all **765** test cases pass with zero failures and zero skips;
+- all **804** test cases pass with zero failures and zero skips;
 - project schema remains 11 and preset schema remains 8;
-- dirty state covers persisted controls and committed region/correction edits;
-- Open image, Open project, recent-project open and window close are guarded by Save / Discard / Cancel;
-- cancelled, invalid or failed Save attempts retain the active session;
+- dirty state and Save / Discard / Cancel navigation remain validated;
+- analysis and final export are admitted through the shared 2 GiB memory policy;
+- Flow, Primitive and Hybrid planning enforce bounded work before large loops or collections;
+- encoded image input is bounded to 256 MiB with cancellation-aware streaming;
+- M14.1 SLIC proxy memory/work uses an exact deterministic admission estimate;
+- all current local writes use atomic sibling-file commit and preserve previous valid destinations on failure;
 - Domain and Application remain free of Avalonia, SkiaSharp, LibNoiseCore, machine-learning runtimes and model files.
 
-M13.3 plus the audit corrections established 755 cases. M13.4.1 added ten Application workflow cases, establishing the current validated baseline of 765.
+M13.3 plus audit corrections established 755 cases. M13.4.1 added ten Application cases, reaching 765. M13.4.2 added fourteen Application and three Imaging.Skia cases, reaching 782. M13.4.3 added eight Application persistence cases, reaching 790. M13.4.4 added fourteen Application analysis-lifecycle cases, establishing the current validated baseline of 804.
 
-## Next validation target — M13.4 pre-SLIC stabilization
+## Next validation target — M14.1 regional segmentation contracts
 
-M13.4 must be validated before any SLIC label-map implementation is adopted. Its exit checks are:
+M13.4 is fully validated. M14.1 must pass before deterministic SLIC clustering begins. Its exit checks are:
 
-- complete dirty-state guards and no silent data loss;
-- detached, transactional project/session adoption;
-- conservative analysis/segmentation/planning/rendering work and memory budgets;
-- bounded encoded input;
-- atomic local writes preserving previous valid files;
-- extracted, non-UI `AnalysisCoordinator` tests for success, cancellation, failure and stale results.
+- compact immutable labels with tested `UInt16`/`UInt32` selection;
+- consistent region, graph, hierarchy and diagnostic identities;
+- exact deterministic segmentation memory/work estimates integrated into admission;
+- no Avalonia or SkiaSharp dependency in Domain/Application contracts;
+- no UI, project-schema or active semantic-pipeline change.
 
 ## Validation history
+
+### 2026-07-16 — M14.1 regional segmentation contracts prepared
+
+M14.1 adds pure Domain/Application contracts for compact regional labels, immutable region descriptors, symmetric adjacency, monotonic hierarchy, detached results, diagnostics, progress and deterministic SLIC memory/work estimates. The exact estimator replaces the provisional fixed per-pixel SLIC reserve introduced by M13.4.2. Fifty-nine focused cases raise the expected suite from 804 to 863. No SLIC clustering, UI integration, schema migration or semantic-path replacement occurs in this milestone.
+
+### 2026-07-16 — M13.4.4 validated on Windows
+
+The user confirmed that the complete solution builds and all **804** tests pass after the analyzer and test-fixture follow-ups. Detached analysis orchestration and transactional result adoption are accepted as the baseline for M14.1.
+
+### 2026-07-16 — M13.4.4 Windows test follow-up
+
+The first executable test pass built all production projects but exposed two defects in the new coordinator tests. The defensive-copy test constructed a zero-width `NormalizedRect`, and completed-stage progress mapping could exceed its nominal boundary by a floating-point epsilon before the next exact stage boundary was reported. The fixture now uses a valid correction rectangle, while `AnalysisCoordinator` maps phase endpoints exactly through `MapStageFraction`. The monotonic-progress assertion remains strict and meaningful. No schema, runtime pipeline order or expected 804-case count changed.
+
+### 2026-07-16 — M13.4.4 Windows build follow-up
+
+The first Windows build exposed analyzer-only issues: four private progress factories returned the interface type instead of the concrete forwarding implementation, fourteen new test names used underscores forbidden by CA1707, `CreateAnalysisRequest` was eligible for `static`, and the recomposition branch passed a nullable basis through a conditional expression. The follow-up package uses concrete private return types, analyzer-compliant PascalCase test names, a static request factory and a directly null-guarded recomposition branch. No runtime behaviour, schema or expected test count changed.
+
+### 2026-07-16 — M13.4.4 analysis orchestration prepared
+
+M13.4.4 adds the non-UI `AnalysisCoordinator`, detached `AnalysisResult`/`PendingAnalysis` contracts, immutable source/settings/revision cache keys, monotonic generations, manual-region recomposition and transactional UI adoption after overlay creation. Cancellation, failure, callback failure, key mismatch and older-generation results preserve the active session. Fourteen focused Application cases raise the expected suite from 790 to 804.
+
+Project schema remains 11 and preset schema remains 8. Executable validation could not be run in the packaging environment because the .NET SDK is unavailable; source, delimiter, documentation, test-count and ZIP-integrity checks are performed before delivery.
+
+### 2026-07-16 — M13.4.3 validated on Windows
+
+The user confirmed that the Release build succeeds and all **790** tests pass. Atomic sibling-file commits for project, preset, preview, raster, SVG and recent-item destinations are accepted as the baseline for M13.4.4.
+
+### 2026-07-16 — M13.4.3 atomic durable writes prepared
+
+M13.4.3 adds the Application-level `AtomicFileWriter` and routes project, preset, rendered preview, final Flow/Primitive/Hybrid raster, primitive SVG and recent-item writes through temporary sibling files. The temporary output is flushed and closed before a same-directory replace/move publishes it. Existing destinations are preserved on cancellation or failure, and failed new writes publish no destination. Eight focused Application cases raise the expected suite from 782 to 790.
+
+No project or preset schema changes. Executable validation could not be run in the packaging environment because the .NET SDK is unavailable; source, documentation, test-count and ZIP-integrity checks are performed before delivery.
+
+### 2026-07-16 — M13.4.2 validated on Windows
+
+The user confirmed that the Release build succeeds and all **782** tests pass. Shared memory/work admission, Hybrid buffer accounting, future SLIC reserve, bounded encoded input and planner-level workload rejection are accepted as the baseline for M13.4.3.
 
 ### 2026-07-16 — M13.4.1 validated on Windows
 

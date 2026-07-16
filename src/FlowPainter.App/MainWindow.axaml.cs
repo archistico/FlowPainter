@@ -13,6 +13,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using FlowPainter.Application.Analysis;
 using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
@@ -23,6 +24,7 @@ using FlowPainter.Application.Interaction;
 using FlowPainter.Application.Images;
 using FlowPainter.Application.Hybrid;
 using FlowPainter.Application.PrimitiveGeneration;
+using FlowPainter.Application.Persistence;
 using FlowPainter.Application.Projects;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Application.Workflow;
@@ -63,9 +65,10 @@ public partial class MainWindow : Window
     private readonly SkiaHybridPlanRenderer _hybridRenderer = new();
     private readonly SkiaPngEncoder _pngEncoder = new();
     private readonly SkiaImageEncoder _imageEncoder = new();
-    private readonly ImageDetailAnalyzer _detailAnalyzer = new();
-    private readonly HeuristicSemanticImportanceAnalyzer _semanticAnalyzer = new();
-    private readonly HeuristicSceneBoundaryAnalyzer _boundaryAnalyzer = new();
+    private readonly AnalysisCoordinator _analysisCoordinator = new(
+        new ImageDetailAnalyzer(),
+        new HeuristicSemanticImportanceAnalyzer(),
+        new HeuristicSceneBoundaryAnalyzer());
     private readonly DetailMapOverlayRenderer _detailOverlayRenderer = new();
     private readonly BoundaryDirectionOverlayRenderer _boundaryDirectionOverlayRenderer = new();
     private readonly FlowPainterPlanner _planner = new(new DefaultFlowFieldFactory());
@@ -255,6 +258,7 @@ public partial class MainWindow : Window
     private Point _panLastPosition;
     private CancellationTokenSource? _operationCancellation;
     private string? _currentSourcePath;
+    private Guid _analysisSourceIdentity = Guid.Empty;
     private string? _currentProjectPath;
     private bool _suppressRegionSelectionChange;
     private bool _suppressSemanticRegionSelectionChange;
@@ -571,51 +575,72 @@ public partial class MainWindow : Window
                 previewMaximumDimension,
                 progress,
                 cancellationToken).ConfigureAwait(true);
-            AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
+            Guid sourceIdentity = Guid.NewGuid();
+            AnalysisRequest analysisRequest = CreateAnalysisRequest(
                 proxy,
+                sourceIdentity,
                 project.Settings.DetailAnalysis,
                 project.Settings.DetailInfluence,
                 project.Settings.SemanticAnalysis,
                 project.Settings.BoundaryAnalysis,
-                project.SemanticCorrections,
-                cancellationToken).ConfigureAwait(true);
-            DetailMap manuallyComposedMap = DetailMapComposer.ApplyRegions(
-                maps.Automatic,
-                project.DetailRegions,
-                project.Settings.DetailInfluence.RegionTransitionWidth,
-                cancellationToken);
-            BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
-                maps,
-                manuallyComposedMap,
                 project.Settings.BackgroundSuppression,
-                cancellationToken);
-            overlay = await _detailOverlayRenderer.RenderAsync(
+                project.DetailRegions,
+                project.SemanticCorrections,
+                0L,
+                0L);
+            PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
+                analysisRequest,
+                CreateAnalysisPipelineProgress(),
+                cancellationToken).ConfigureAwait(true);
+            overlay = await RenderAnalysisOverlayAsync(
                 proxy,
-                backgroundSuppression.EffectiveDetailMap,
-                cancellationToken: cancellationToken).ConfigureAwait(true);
+                pending.Result,
+                cancellationToken).ConfigureAwait(true);
 
             cancellationToken.ThrowIfCancellationRequested();
-            ReplaceSource(
-                loaded,
-                proxy,
-                maps.Automatic,
-                backgroundSuppression.EffectiveDetailMap,
-                maps.Semantic,
-                maps.Boundary,
-                backgroundSuppression,
-                project.Settings.DetailAnalysis,
-                project.Settings.DetailInfluence,
-                project.Settings.SemanticAnalysis,
-                project.Settings.BoundaryAnalysis,
-                project.Settings.BackgroundSuppression,
-                overlay);
-            adopted = true;
+            bool resultAdopted = _analysisCoordinator.TryAdopt(
+                pending,
+                analysisRequest.CacheKey,
+                result => ReplaceSource(
+                    loaded,
+                    proxy,
+                    result.AutomaticDetailMap,
+                    result.BackgroundSuppression.EffectiveDetailMap,
+                    result.SemanticAnalysis,
+                    result.BoundaryAnalysis,
+                    result.BackgroundSuppression,
+                    project.Settings.DetailAnalysis,
+                    project.Settings.DetailInfluence,
+                    project.Settings.SemanticAnalysis,
+                    project.Settings.BoundaryAnalysis,
+                    project.Settings.BackgroundSuppression,
+                    overlay));
+            if (!resultAdopted)
+            {
+                ThrowStaleAnalysisResult(cancellationToken);
+            }
 
+            adopted = true;
+            _analysisSourceIdentity = sourceIdentity;
             _currentSourcePath = sourcePath;
             _currentProjectPath = projectPath;
             _workspace.LoadProject(workspaceCandidate);
             RefreshDirtyIndicator();
             CaptureActiveWorkspaceRevisions();
+            AnalysisCacheKey activeKey = AnalysisCacheKey.Create(
+                _analysisSourceIdentity,
+                proxy.Size,
+                project.Settings.DetailAnalysis,
+                project.Settings.DetailInfluence,
+                project.Settings.SemanticAnalysis,
+                project.Settings.BoundaryAnalysis,
+                project.Settings.BackgroundSuppression,
+                _workspace.DetailRegionRevision,
+                _workspace.SemanticCorrectionRevision);
+            if (!_analysisCoordinator.TryRetagCurrent(analysisRequest.CacheKey, activeKey))
+            {
+                _analysisCoordinator.Invalidate();
+            }
             ApplyProjectControls(project);
             _recentProjects.Add(projectPath);
             await PersistRecentItemsBestEffortAsync(cancellationToken).ConfigureAwait(true);
@@ -723,10 +748,12 @@ public partial class MainWindow : Window
                 project.PrimitiveGeneration,
                 project.HybridGeneration,
                 project.SemanticCorrections);
-            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
-            await FlowPainterProjectSerializer.SerializeAsync(
-                persistedProject,
-                output,
+            await AtomicFileWriter.WriteAsync(
+                projectPath,
+                (output, writeCancellationToken) => FlowPainterProjectSerializer.SerializeAsync(
+                    persistedProject,
+                    output,
+                    writeCancellationToken),
                 cancellationToken).ConfigureAwait(true);
             _currentProjectPath = projectPath;
             _workspace.MarkSaved(projectPath, project.Name);
@@ -787,41 +814,54 @@ public partial class MainWindow : Window
                 SemanticAnalysisSettings semanticSettings = ReadSemanticAnalysisSettings();
                 SceneBoundaryAnalysisSettings boundarySettings = ReadBoundaryAnalysisSettings();
                 BackgroundSuppressionSettings backgroundSettings = ReadBackgroundSuppressionSettings();
-                AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
+                AnalysisRequest analysisRequest = CreateCurrentAnalysisRequest(
                     proxy,
                     detailSettings,
                     detailInfluenceSettings,
                     semanticSettings,
                     boundarySettings,
-                    _workspace.SemanticCorrections.Regions,
+                    backgroundSettings);
+                PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
+                    analysisRequest,
+                    CreateAnalysisPipelineProgress(),
                     cancellationToken).ConfigureAwait(true);
-                DetailMap manuallyComposedMap = DetailMapComposer.ApplyRegions(
-                    maps.Automatic,
-                    _workspace.Regions.Regions,
-                    detailInfluenceSettings.RegionTransitionWidth,
-                    cancellationToken);
-                BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
-                    maps,
-                    manuallyComposedMap,
-                    backgroundSettings,
-                    cancellationToken);
-                overlay = await _detailOverlayRenderer.RenderAsync(
+                overlay = await RenderAnalysisOverlayAsync(
                     proxy,
-                    backgroundSuppression.EffectiveDetailMap,
-                    cancellationToken: cancellationToken).ConfigureAwait(true);
-                ReplaceProxy(
+                    pending.Result,
+                    cancellationToken).ConfigureAwait(true);
+                AnalysisCacheKey currentKey = CreateCurrentAnalysisRequest(
                     proxy,
-                    maps.Automatic,
-                    backgroundSuppression.EffectiveDetailMap,
-                    maps.Semantic,
-                    maps.Boundary,
-                    backgroundSuppression,
                     detailSettings,
                     detailInfluenceSettings,
                     semanticSettings,
                     boundarySettings,
-                    backgroundSettings,
-                    overlay);
+                    backgroundSettings).CacheKey;
+                if (currentKey != analysisRequest.CacheKey)
+                {
+                    ThrowStaleAnalysisResult(cancellationToken);
+                }
+
+                bool resultAdopted = _analysisCoordinator.TryAdopt(
+                    pending,
+                    currentKey,
+                    result => ReplaceProxy(
+                        proxy,
+                        result.AutomaticDetailMap,
+                        result.BackgroundSuppression.EffectiveDetailMap,
+                        result.SemanticAnalysis,
+                        result.BoundaryAnalysis,
+                        result.BackgroundSuppression,
+                        detailSettings,
+                        detailInfluenceSettings,
+                        semanticSettings,
+                        boundarySettings,
+                        backgroundSettings,
+                        overlay));
+                if (!resultAdopted)
+                {
+                    ThrowStaleAnalysisResult(cancellationToken);
+                }
+
                 adopted = true;
                 _statusText.Text = $"Preview rebuilt at {previewSettings.MaximumDimension:N0}px maximum dimension.";
             }
@@ -914,40 +954,52 @@ public partial class MainWindow : Window
                     previewSettings.MaximumDimension,
                     progress,
                     cancellationToken).ConfigureAwait(true);
-                AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
+                Guid sourceIdentity = Guid.NewGuid();
+                AnalysisRequest analysisRequest = CreateAnalysisRequest(
                     proxy,
+                    sourceIdentity,
                     detailSettings,
                     settings.DetailInfluence,
                     settings.SemanticAnalysis,
                     settings.BoundaryAnalysis,
+                    settings.BackgroundSuppression,
+                    Array.Empty<DetailRegion>(),
                     Array.Empty<SemanticCorrectionRegion>(),
+                    0L,
+                    0L);
+                PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
+                    analysisRequest,
+                    CreateAnalysisPipelineProgress(),
                     cancellationToken).ConfigureAwait(true);
-                BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
-                    maps,
-                    maps.Automatic,
-                    settings.BackgroundSuppression,
-                    cancellationToken);
-                overlay = await _detailOverlayRenderer.RenderAsync(
+                overlay = await RenderAnalysisOverlayAsync(
                     proxy,
-                    backgroundSuppression.EffectiveDetailMap,
-                    cancellationToken: cancellationToken).ConfigureAwait(true);
+                    pending.Result,
+                    cancellationToken).ConfigureAwait(true);
 
-                ReplaceSource(
-                    loaded,
-                    proxy,
-                    maps.Automatic,
-                    backgroundSuppression.EffectiveDetailMap,
-                    maps.Semantic,
-                    maps.Boundary,
-                    backgroundSuppression,
-                    detailSettings,
-                    settings.DetailInfluence,
-                    settings.SemanticAnalysis,
-                    settings.BoundaryAnalysis,
-                    settings.BackgroundSuppression,
-                    overlay);
+                bool resultAdopted = _analysisCoordinator.TryAdopt(
+                    pending,
+                    analysisRequest.CacheKey,
+                    result => ReplaceSource(
+                        loaded,
+                        proxy,
+                        result.AutomaticDetailMap,
+                        result.BackgroundSuppression.EffectiveDetailMap,
+                        result.SemanticAnalysis,
+                        result.BoundaryAnalysis,
+                        result.BackgroundSuppression,
+                        detailSettings,
+                        settings.DetailInfluence,
+                        settings.SemanticAnalysis,
+                        settings.BoundaryAnalysis,
+                        settings.BackgroundSuppression,
+                        overlay));
+                if (!resultAdopted)
+                {
+                    ThrowStaleAnalysisResult(cancellationToken);
+                }
+
                 adopted = true;
-
+                _analysisSourceIdentity = sourceIdentity;
                 string sourcePath = files[0].Path.LocalPath;
                 _currentSourcePath = sourcePath;
                 _currentProjectPath = null;
@@ -958,6 +1010,21 @@ public partial class MainWindow : Window
                 _workspace.SetFinalRender(finalRenderSettings);
                 RefreshDirtyIndicator();
                 CaptureActiveWorkspaceRevisions();
+                RefreshRegionVisuals();
+                AnalysisCacheKey activeKey = AnalysisCacheKey.Create(
+                    _analysisSourceIdentity,
+                    proxy.Size,
+                    detailSettings,
+                    settings.DetailInfluence,
+                    settings.SemanticAnalysis,
+                    settings.BoundaryAnalysis,
+                    settings.BackgroundSuppression,
+                    _workspace.DetailRegionRevision,
+                    _workspace.SemanticCorrectionRevision);
+                if (!_analysisCoordinator.TryRetagCurrent(analysisRequest.CacheKey, activeKey))
+                {
+                    _analysisCoordinator.Invalidate();
+                }
                 _projectNameTextBox.Text = IoPath.GetFileNameWithoutExtension(files[0].Name);
                 _saveProjectButton.IsEnabled = true;
                 _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
@@ -1430,13 +1497,15 @@ public partial class MainWindow : Window
                 ReportOperationProgress(
                     0.88d + (value.Fraction * 0.12d),
                     value.Message));
-            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
-            await _imageEncoder.EncodeAsync(
-                finalImage,
-                output,
-                finalSettings.Format,
-                finalSettings.JpegQuality,
-                encodeProgress,
+            await AtomicFileWriter.WriteAsync(
+                file.Path.LocalPath,
+                (output, writeCancellationToken) => _imageEncoder.EncodeAsync(
+                    finalImage,
+                    output,
+                    finalSettings.Format,
+                    finalSettings.JpegQuality,
+                    encodeProgress,
+                    writeCancellationToken),
                 cancellationToken).ConfigureAwait(true);
             _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0} with the {brush.Kind} brush.";
         }).ConfigureAwait(true);
@@ -1506,13 +1575,15 @@ public partial class MainWindow : Window
                 cancellationToken).ConfigureAwait(true);
             Progress<ImageOperationProgress> encodeProgress = new(value =>
                 ReportOperationProgress(0.88d + (value.Fraction * 0.12d), value.Message));
-            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
-            await _imageEncoder.EncodeAsync(
-                finalImage,
-                output,
-                finalSettings.Format,
-                finalSettings.JpegQuality,
-                encodeProgress,
+            await AtomicFileWriter.WriteAsync(
+                file.Path.LocalPath,
+                (output, writeCancellationToken) => _imageEncoder.EncodeAsync(
+                    finalImage,
+                    output,
+                    finalSettings.Format,
+                    finalSettings.JpegQuality,
+                    encodeProgress,
+                    writeCancellationToken),
                 cancellationToken).ConfigureAwait(true);
             _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0} "
                 + $"from {plan.PrimitivePlan.Primitives.Count:N0} primitives and "
@@ -1585,13 +1656,15 @@ public partial class MainWindow : Window
                 cancellationToken).ConfigureAwait(true);
             Progress<ImageOperationProgress> encodeProgress = new(value =>
                 ReportOperationProgress(0.88d + (value.Fraction * 0.12d), value.Message));
-            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
-            await _imageEncoder.EncodeAsync(
-                finalImage,
-                output,
-                finalSettings.Format,
-                finalSettings.JpegQuality,
-                encodeProgress,
+            await AtomicFileWriter.WriteAsync(
+                file.Path.LocalPath,
+                (output, writeCancellationToken) => _imageEncoder.EncodeAsync(
+                    finalImage,
+                    output,
+                    finalSettings.Format,
+                    finalSettings.JpegQuality,
+                    encodeProgress,
+                    writeCancellationToken),
                 cancellationToken).ConfigureAwait(true);
             _statusText.Text = $"Exported {file.Name} at {outputSize.Width:N0} × {outputSize.Height:N0} from {plan.Primitives.Count:N0} primitives.";
         }).ConfigureAwait(true);
@@ -1646,11 +1719,13 @@ public partial class MainWindow : Window
         await RunExportingImageAsync(async cancellationToken =>
         {
             ReportOperationProgress(0.1d, "Writing SVG primitives");
-            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
-            await SvgPrimitivePlanExporter.ExportAsync(
-                plan,
-                outputSize,
-                output,
+            await AtomicFileWriter.WriteAsync(
+                file.Path.LocalPath,
+                (output, writeCancellationToken) => SvgPrimitivePlanExporter.ExportAsync(
+                    plan,
+                    outputSize,
+                    output,
+                    writeCancellationToken),
                 cancellationToken).ConfigureAwait(true);
             ReportOperationProgress(1d, "SVG export completed");
             _statusText.Text = $"Exported {file.Name} with {plan.Primitives.Count:N0} vector primitives.";
@@ -1731,16 +1806,20 @@ public partial class MainWindow : Window
 
         await RunAnalyzingDetailAsync(async cancellationToken =>
         {
-            AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
+            AnalysisRequest analysisRequest = CreateCurrentAnalysisRequest(
                 proxy,
                 detailSettings,
                 detailInfluenceSettings,
                 semanticSettings,
                 boundarySettings,
-                _workspace.SemanticCorrections.Regions,
+                backgroundSettings);
+            PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
+                analysisRequest,
+                CreateAnalysisPipelineProgress(),
                 cancellationToken).ConfigureAwait(true);
             await ReplaceAnalyzedDetailMapsAsync(
-                maps,
+                pending,
+                analysisRequest,
                 detailSettings,
                 detailInfluenceSettings,
                 semanticSettings,
@@ -1748,7 +1827,7 @@ public partial class MainWindow : Window
                 backgroundSettings,
                 cancellationToken).ConfigureAwait(true);
             _statusText.Text = semanticSettings.Enabled
-                ? $"Structural, semantic and boundary maps updated. {maps.Semantic.Regions.Count:N0} semantic regions found."
+                ? $"Structural, semantic and boundary maps updated. {pending.Result.SemanticAnalysis.Regions.Count:N0} semantic regions found."
                 : "Structural and boundary maps updated; semantic analysis is disabled.";
         }).ConfigureAwait(true);
     }
@@ -2004,16 +2083,20 @@ public partial class MainWindow : Window
 
         return await RunAnalyzingDetailAsync(async cancellationToken =>
         {
-            AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
+            AnalysisRequest analysisRequest = CreateCurrentAnalysisRequest(
                 proxy,
                 detailSettings,
                 detailInfluenceSettings,
                 semanticSettings,
                 boundarySettings,
-                _workspace.SemanticCorrections.Regions,
+                backgroundSettings);
+            PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
+                analysisRequest,
+                CreateAnalysisPipelineProgress(),
                 cancellationToken).ConfigureAwait(true);
             await ReplaceAnalyzedDetailMapsAsync(
-                maps,
+                pending,
+                analysisRequest,
                 detailSettings,
                 detailInfluenceSettings,
                 semanticSettings,
@@ -2653,12 +2736,14 @@ public partial class MainWindow : Window
 
         await RunSavingPresetAsync(async cancellationToken =>
         {
-            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
-            await FlowPainterPresetSerializer.SerializeAsync(
-                preset,
-                output,
-                cancellationToken).ConfigureAwait(true);
             string presetPath = file.Path.LocalPath;
+            await AtomicFileWriter.WriteAsync(
+                presetPath,
+                (output, writeCancellationToken) => FlowPainterPresetSerializer.SerializeAsync(
+                    preset,
+                    output,
+                    writeCancellationToken),
+                cancellationToken).ConfigureAwait(true);
             _recentPresets.Add(presetPath);
             await PersistRecentItemsBestEffortAsync(cancellationToken).ConfigureAwait(true);
             RefreshRecentItemControls();
@@ -2696,11 +2781,13 @@ public partial class MainWindow : Window
 
         await RunExportingImageAsync(async cancellationToken =>
         {
-            await using Stream output = await file.OpenWriteAsync().ConfigureAwait(true);
-            await _pngEncoder.EncodeAsync(
-                renderedImage,
-                output,
-                CreateImageProgress(),
+            await AtomicFileWriter.WriteAsync(
+                file.Path.LocalPath,
+                (output, writeCancellationToken) => _pngEncoder.EncodeAsync(
+                    renderedImage,
+                    output,
+                    CreateImageProgress(),
+                    writeCancellationToken),
                 cancellationToken).ConfigureAwait(true);
             _statusText.Text = $"Saved {file.Name}";
         }).ConfigureAwait(true);
@@ -2776,16 +2863,12 @@ public partial class MainWindow : Window
             RecentItemsDocument.CurrentSchemaVersion,
             _recentProjects.Paths.ToArray(),
             _recentPresets.Paths.ToArray());
-        await using FileStream output = new(
+        await AtomicFileWriter.WriteAsync(
             recentItemsPath,
-            FileMode.Create,
-            FileAccess.Write,
-            FileShare.None,
-            bufferSize: 4096,
-            useAsync: true);
-        await RecentItemsSerializer.SerializeAsync(
-            document,
-            output,
+            (output, writeCancellationToken) => RecentItemsSerializer.SerializeAsync(
+                document,
+                output,
+                writeCancellationToken),
             cancellationToken).ConfigureAwait(true);
     }
 
@@ -3359,152 +3442,81 @@ public partial class MainWindow : Window
             : throw new InvalidOperationException("Select a manual detail-region intent.");
     }
 
-    private async Task<DetailMap> AnalyzeDetailMapAsync(
+    private static AnalysisRequest CreateAnalysisRequest(
         SkiaImage proxy,
-        DetailAnalysisSettings settings,
-        CancellationToken cancellationToken)
+        Guid sourceIdentity,
+        DetailAnalysisSettings detailSettings,
+        DetailInfluenceSettings detailInfluenceSettings,
+        SemanticAnalysisSettings semanticSettings,
+        SceneBoundaryAnalysisSettings boundarySettings,
+        BackgroundSuppressionSettings backgroundSettings,
+        IReadOnlyList<DetailRegion> detailRegions,
+        IReadOnlyList<SemanticCorrectionRegion> semanticCorrections,
+        long detailRegionRevision,
+        long semanticCorrectionRevision)
     {
-        Progress<DetailAnalysisProgress> progress = new(value =>
-        {
-            string message = value.Stage switch
-            {
-                DetailAnalysisStage.Preparing => "Preparing structural analysis...",
-                DetailAnalysisStage.AnalyzingStructure => $"Analyzing image structure {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                DetailAnalysisStage.Smoothing => $"Smoothing structural map {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                DetailAnalysisStage.Completed => "Structural analysis completed.",
-                _ => "Analyzing structure..."
-            };
-            ReportOperationProgress(value.Fraction * 0.32d, message);
-        });
-
-        return await _detailAnalyzer.AnalyzeAsync(
+        return new AnalysisRequest(
             proxy,
-            settings,
-            progress,
-            cancellationToken).ConfigureAwait(true);
+            sourceIdentity,
+            detailSettings,
+            detailInfluenceSettings,
+            semanticSettings,
+            boundarySettings,
+            backgroundSettings,
+            detailRegions,
+            semanticCorrections,
+            detailRegionRevision,
+            semanticCorrectionRevision);
     }
 
-    private async Task<SemanticAnalysisResult> AnalyzeSemanticImportanceAsync(
-        SkiaImage proxy,
-        SemanticAnalysisSettings settings,
-        CancellationToken cancellationToken)
-    {
-        Progress<SemanticAnalysisProgress> progress = new(value =>
-        {
-            string message = value.Stage switch
-            {
-                SemanticAnalysisStage.Preparing => "Preparing semantic importance analysis...",
-                SemanticAnalysisStage.ComputingSaliency => $"Computing saliency {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                SemanticAnalysisStage.SegmentingSubjects => "Segmenting generic subjects...",
-                SemanticAnalysisStage.BuildingSilhouettes => $"Building subject silhouettes {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                SemanticAnalysisStage.CombiningMaps => "Combining semantic maps...",
-                SemanticAnalysisStage.Completed => "Semantic importance analysis completed.",
-                _ => "Analyzing semantic importance..."
-            };
-            ReportOperationProgress(0.34d + (value.Fraction * 0.30d), message);
-        });
-
-        return await _semanticAnalyzer.AnalyzeAsync(
-            proxy,
-            settings,
-            progress,
-            cancellationToken).ConfigureAwait(true);
-    }
-
-    private async Task<SceneBoundaryAnalysisResult> AnalyzeSceneBoundariesAsync(
-        SkiaImage proxy,
-        SemanticAnalysisResult semanticAnalysis,
-        SceneBoundaryAnalysisSettings settings,
-        CancellationToken cancellationToken)
-    {
-        Progress<SceneBoundaryAnalysisProgress> progress = new(value =>
-        {
-            string message = value.Stage switch
-            {
-                SceneBoundaryAnalysisStage.Preparing => "Preparing scene-boundary analysis...",
-                SceneBoundaryAnalysisStage.ComputingMultiscaleEdges => $"Computing multiscale edges {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                SceneBoundaryAnalysisStage.LinkingContours => $"Linking continuous contours {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                SceneBoundaryAnalysisStage.ClassifyingBoundaries => $"Classifying important boundaries {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                SceneBoundaryAnalysisStage.EstimatingBackground => $"Estimating background confidence {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                SceneBoundaryAnalysisStage.SmoothingMaps => "Smoothing boundary maps...",
-                SceneBoundaryAnalysisStage.Completed => "Scene-boundary analysis completed.",
-                _ => "Analyzing scene boundaries..."
-            };
-            ReportOperationProgress(0.64d + (value.Fraction * 0.32d), message);
-        });
-
-        return await _boundaryAnalyzer.AnalyzeAsync(
-            proxy,
-            semanticAnalysis,
-            settings,
-            progress,
-            cancellationToken).ConfigureAwait(true);
-    }
-
-    private async Task<AutomaticAnalysisMaps> AnalyzeAutomaticMapsAsync(
+    private AnalysisRequest CreateCurrentAnalysisRequest(
         SkiaImage proxy,
         DetailAnalysisSettings detailSettings,
         DetailInfluenceSettings detailInfluenceSettings,
         SemanticAnalysisSettings semanticSettings,
         SceneBoundaryAnalysisSettings boundarySettings,
-        IReadOnlyList<SemanticCorrectionRegion> semanticCorrections,
-        CancellationToken cancellationToken)
+        BackgroundSuppressionSettings backgroundSettings)
     {
-        DetailMap structural = await AnalyzeDetailMapAsync(
+        if (_analysisSourceIdentity == Guid.Empty)
+        {
+            throw new InvalidOperationException("The active analysis source identity is not available.");
+        }
+
+        return CreateAnalysisRequest(
             proxy,
+            _analysisSourceIdentity,
             detailSettings,
-            cancellationToken).ConfigureAwait(true);
-        SemanticAnalysisResult automaticSemantic = await AnalyzeSemanticImportanceAsync(
-            proxy,
+            detailInfluenceSettings,
             semanticSettings,
-            cancellationToken).ConfigureAwait(true);
-        SemanticAnalysisResult semantic = SemanticCorrectionComposer.Apply(
-            automaticSemantic,
-            semanticCorrections,
-            detailInfluenceSettings.RegionTransitionWidth,
-            cancellationToken);
-        SceneBoundaryAnalysisResult boundary = await AnalyzeSceneBoundariesAsync(
-            proxy,
-            semantic,
             boundarySettings,
-            cancellationToken).ConfigureAwait(true);
-        DetailMap automatic = SemanticDetailMapComposer.Combine(
-            structural,
-            semantic,
-            semanticSettings,
-            cancellationToken);
-        ReportOperationProgress(0.97d, "Automatic structural, semantic and boundary maps completed.");
-        return new AutomaticAnalysisMaps(structural, semantic, boundary, automatic);
+            backgroundSettings,
+            _workspace.Regions.Regions,
+            _workspace.SemanticCorrections.Regions,
+            _workspace.DetailRegionRevision,
+            _workspace.SemanticCorrectionRevision);
     }
 
-    private BackgroundSuppressionResult ComposeBackgroundSuppression(
-        AutomaticAnalysisMaps maps,
-        DetailMap manuallyComposedMap,
-        BackgroundSuppressionSettings settings,
+    private Progress<AnalysisPipelineProgress> CreateAnalysisPipelineProgress()
+    {
+        return new Progress<AnalysisPipelineProgress>(value =>
+            ReportOperationProgress(value.Fraction, value.Message));
+    }
+
+    private async Task<SkiaImage> RenderAnalysisOverlayAsync(
+        SkiaImage proxy,
+        AnalysisResult result,
         CancellationToken cancellationToken)
     {
-        Progress<BackgroundSuppressionProgress> progress = new(value =>
-        {
-            string message = value.Stage switch
-            {
-                BackgroundSuppressionStage.Preparing => "Preparing background suppression...",
-                BackgroundSuppressionStage.BuildingProtection => "Protecting subjects, silhouettes and uncertain areas...",
-                BackgroundSuppressionStage.EstimatingSuppression => "Estimating low-importance background...",
-                BackgroundSuppressionStage.SmoothingTransitions => "Smoothing subject-background transitions...",
-                BackgroundSuppressionStage.CombiningDetail => "Building the artistic detail field...",
-                BackgroundSuppressionStage.Completed => "Background suppression completed.",
-                _ => "Composing background suppression..."
-            };
-            ReportOperationProgress(0.97d + (value.Fraction * 0.025d), message);
-        });
+        return await _detailOverlayRenderer.RenderAsync(
+            proxy,
+            result.BackgroundSuppression.EffectiveDetailMap,
+            cancellationToken: cancellationToken).ConfigureAwait(true);
+    }
 
-        return BackgroundSuppressionComposer.Compose(
-            maps.Automatic,
-            manuallyComposedMap,
-            maps.Semantic,
-            maps.Boundary,
-            settings,
-            progress,
+    private static void ThrowStaleAnalysisResult(CancellationToken cancellationToken)
+    {
+        throw new OperationCanceledException(
+            "The completed analysis no longer matches the active source or revisions.",
             cancellationToken);
     }
 
@@ -3517,29 +3529,26 @@ public partial class MainWindow : Window
         BackgroundSuppressionSettings backgroundSettings,
         CancellationToken cancellationToken)
     {
-        if (_automaticDetailMap is not null
-            && _composedDetailMap is not null
-            && DetailAnalysisSettingsEqual(_activeDetailAnalysisSettings, detailSettings)
-            && _activeDetailRegionTransitionWidth == detailInfluenceSettings.RegionTransitionWidth
-            && _activeDetailRegionRevision == _workspace.DetailRegionRevision
-            && _activeSemanticCorrectionRevision == _workspace.SemanticCorrectionRevision
-            && SemanticAnalysisSettingsEqual(_activeSemanticAnalysisSettings, semanticSettings)
-            && BoundaryAnalysisSettingsEqual(_activeBoundaryAnalysisSettings, boundarySettings)
-            && BackgroundSuppressionSettingsEqual(_activeBackgroundSuppressionSettings, backgroundSettings))
-        {
-            return _composedDetailMap;
-        }
-
-        AutomaticAnalysisMaps maps = await AnalyzeAutomaticMapsAsync(
+        AnalysisRequest request = CreateCurrentAnalysisRequest(
             proxy,
             detailSettings,
             detailInfluenceSettings,
             semanticSettings,
             boundarySettings,
-            _workspace.SemanticCorrections.Regions,
+            backgroundSettings);
+        AnalysisResult? cached = _analysisCoordinator.GetCurrent(request.CacheKey);
+        if (cached is not null)
+        {
+            return cached.BackgroundSuppression.EffectiveDetailMap;
+        }
+
+        PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
+            request,
+            CreateAnalysisPipelineProgress(),
             cancellationToken).ConfigureAwait(true);
         await ReplaceAnalyzedDetailMapsAsync(
-            maps,
+            pending,
+            request,
             detailSettings,
             detailInfluenceSettings,
             semanticSettings,
@@ -3551,7 +3560,8 @@ public partial class MainWindow : Window
     }
 
     private async Task ReplaceAnalyzedDetailMapsAsync(
-        AutomaticAnalysisMaps maps,
+        PendingAnalysis pending,
+        AnalysisRequest expectedRequest,
         DetailAnalysisSettings detailSettings,
         DetailInfluenceSettings detailInfluenceSettings,
         SemanticAnalysisSettings semanticSettings,
@@ -3559,97 +3569,96 @@ public partial class MainWindow : Window
         BackgroundSuppressionSettings backgroundSettings,
         CancellationToken cancellationToken)
     {
-        DetailMap manuallyComposed = DetailMapComposer.ApplyRegions(
-            maps.Automatic,
-            _workspace.Regions.Regions,
-            detailInfluenceSettings.RegionTransitionWidth,
-            cancellationToken);
-        BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
-            maps,
-            manuallyComposed,
-            backgroundSettings,
-            cancellationToken);
         SkiaImage proxy = _proxyImage
             ?? throw new InvalidOperationException("The analysis proxy is not available.");
-        using SkiaImage overlay = await _detailOverlayRenderer.RenderAsync(
+        using SkiaImage overlay = await RenderAnalysisOverlayAsync(
             proxy,
-            backgroundSuppression.EffectiveDetailMap,
-            cancellationToken: cancellationToken).ConfigureAwait(true);
-        ReplaceDetailVisualization(backgroundSuppression.EffectiveDetailMap, overlay);
-        _automaticDetailMap = maps.Automatic;
-        _semanticAnalysisResult = maps.Semantic;
-        _sceneBoundaryAnalysisResult = maps.Boundary;
-        _backgroundSuppressionResult = backgroundSuppression;
-        _activeDetailAnalysisSettings = detailSettings;
-        _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
-        CaptureActiveWorkspaceRevisions();
-        _activeSemanticAnalysisSettings = semanticSettings;
-        _activeBoundaryAnalysisSettings = boundarySettings;
-        _activeBackgroundSuppressionSettings = backgroundSettings;
-        ClearSemanticOverlayPreview();
-        RefreshSemanticRegions();
+            pending.Result,
+            cancellationToken).ConfigureAwait(true);
+        AnalysisCacheKey currentKey = CreateCurrentAnalysisRequest(
+            proxy,
+            detailSettings,
+            detailInfluenceSettings,
+            semanticSettings,
+            boundarySettings,
+            backgroundSettings).CacheKey;
+        if (currentKey != expectedRequest.CacheKey)
+        {
+            ThrowStaleAnalysisResult(cancellationToken);
+        }
+
+        bool adopted = _analysisCoordinator.TryAdopt(
+            pending,
+            currentKey,
+            result =>
+            {
+                ReplaceDetailVisualization(result.BackgroundSuppression.EffectiveDetailMap, overlay);
+                _automaticDetailMap = result.AutomaticDetailMap;
+                _semanticAnalysisResult = result.SemanticAnalysis;
+                _sceneBoundaryAnalysisResult = result.BoundaryAnalysis;
+                _backgroundSuppressionResult = result.BackgroundSuppression;
+                _activeDetailAnalysisSettings = detailSettings;
+                _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
+                CaptureActiveWorkspaceRevisions();
+                _activeSemanticAnalysisSettings = semanticSettings;
+                _activeBoundaryAnalysisSettings = boundarySettings;
+                _activeBackgroundSuppressionSettings = backgroundSettings;
+                ClearSemanticOverlayPreview();
+                RefreshSemanticRegions();
+            });
+        if (!adopted)
+        {
+            ThrowStaleAnalysisResult(cancellationToken);
+        }
     }
 
     private async Task RecomposeDetailMapAsync(CancellationToken cancellationToken)
     {
-        DetailMap automatic = _automaticDetailMap
-            ?? throw new InvalidOperationException("The automatic detail map is not available.");
-        DetailInfluenceSettings detailInfluenceSettings = ReadDetailInfluenceSettings();
-        if (_workspace.SemanticCorrections.Count > 0
-            && _activeDetailRegionTransitionWidth != detailInfluenceSettings.RegionTransitionWidth)
-        {
-            DetailAnalysisSettings detailSettings = ReadDetailAnalysisSettings();
-            SemanticAnalysisSettings semanticSettings = ReadSemanticAnalysisSettings();
-            SceneBoundaryAnalysisSettings boundarySettings = ReadBoundaryAnalysisSettings();
-            BackgroundSuppressionSettings backgroundSettings = ReadBackgroundSuppressionSettings();
-            SkiaImage currentProxy = _proxyImage
-                ?? throw new InvalidOperationException("The analysis proxy is not available.");
-            AutomaticAnalysisMaps reanalyzedMaps = await AnalyzeAutomaticMapsAsync(
-                currentProxy,
-                detailSettings,
-                detailInfluenceSettings,
-                semanticSettings,
-                boundarySettings,
-                _workspace.SemanticCorrections.Regions,
-                cancellationToken).ConfigureAwait(true);
-            await ReplaceAnalyzedDetailMapsAsync(
-                reanalyzedMaps,
-                detailSettings,
-                detailInfluenceSettings,
-                semanticSettings,
-                boundarySettings,
-                backgroundSettings,
-                cancellationToken).ConfigureAwait(true);
-            return;
-        }
-
-        DetailMap manuallyComposed = DetailMapComposer.ApplyRegions(
-            automatic,
-            _workspace.Regions.Regions,
-            detailInfluenceSettings.RegionTransitionWidth,
-            cancellationToken);
-        SemanticAnalysisResult semantic = _semanticAnalysisResult
-            ?? throw new InvalidOperationException("The semantic analysis is not available.");
-        SceneBoundaryAnalysisResult boundary = _sceneBoundaryAnalysisResult
-            ?? throw new InvalidOperationException("The boundary analysis is not available.");
-        BackgroundSuppressionSettings settings = ReadBackgroundSuppressionSettings();
-        AutomaticAnalysisMaps maps = new(automatic, semantic, boundary, automatic);
-        BackgroundSuppressionResult backgroundSuppression = ComposeBackgroundSuppression(
-            maps,
-            manuallyComposed,
-            settings,
-            cancellationToken);
         SkiaImage proxy = _proxyImage
             ?? throw new InvalidOperationException("The analysis proxy is not available.");
-        using SkiaImage overlay = await _detailOverlayRenderer.RenderAsync(
+        DetailAnalysisSettings detailSettings = ReadDetailAnalysisSettings();
+        DetailInfluenceSettings detailInfluenceSettings = ReadDetailInfluenceSettings();
+        SemanticAnalysisSettings semanticSettings = ReadSemanticAnalysisSettings();
+        SceneBoundaryAnalysisSettings boundarySettings = ReadBoundaryAnalysisSettings();
+        BackgroundSuppressionSettings backgroundSettings = ReadBackgroundSuppressionSettings();
+        AnalysisRequest request = CreateCurrentAnalysisRequest(
             proxy,
-            backgroundSuppression.EffectiveDetailMap,
-            cancellationToken: cancellationToken).ConfigureAwait(true);
-        _backgroundSuppressionResult = backgroundSuppression;
-        _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
-        _activeBackgroundSuppressionSettings = settings;
-        CaptureActiveWorkspaceRevisions();
-        ReplaceDetailVisualization(backgroundSuppression.EffectiveDetailMap, overlay);
+            detailSettings,
+            detailInfluenceSettings,
+            semanticSettings,
+            boundarySettings,
+            backgroundSettings);
+        AnalysisResult? basis = _analysisCoordinator.CurrentResult;
+        PendingAnalysis pending;
+        if (basis is null
+            || !DetailAnalysisSettingsEqual(_activeDetailAnalysisSettings, detailSettings)
+            || !SemanticAnalysisSettingsEqual(_activeSemanticAnalysisSettings, semanticSettings)
+            || !BoundaryAnalysisSettingsEqual(_activeBoundaryAnalysisSettings, boundarySettings)
+            || (_workspace.SemanticCorrections.Count > 0
+                && _activeDetailRegionTransitionWidth != detailInfluenceSettings.RegionTransitionWidth))
+        {
+            pending = await _analysisCoordinator.AnalyzeAsync(
+                request,
+                CreateAnalysisPipelineProgress(),
+                cancellationToken).ConfigureAwait(true);
+        }
+        else
+        {
+            pending = await _analysisCoordinator.RecomposeAsync(
+                request,
+                basis,
+                CreateAnalysisPipelineProgress(),
+                cancellationToken).ConfigureAwait(true);
+        }
+        await ReplaceAnalyzedDetailMapsAsync(
+            pending,
+            request,
+            detailSettings,
+            detailInfluenceSettings,
+            semanticSettings,
+            boundarySettings,
+            backgroundSettings,
+            cancellationToken).ConfigureAwait(true);
     }
 
     private Task<bool> RunLoadingImageAsync(Func<CancellationToken, Task> operation)
@@ -3853,8 +3862,6 @@ public partial class MainWindow : Window
             _activeSemanticAnalysisSettings = semanticSettings;
             _activeBoundaryAnalysisSettings = boundarySettings;
             _activeBackgroundSuppressionSettings = backgroundSettings;
-            _workspace.ClearRegions();
-            _workspace.ClearSemanticCorrections();
             _imageViewportState.Reset();
 
             UpdateSourcePreviewSelection();
@@ -4698,6 +4705,37 @@ public partial class MainWindow : Window
         _activeSemanticCorrectionRevision = _workspace.SemanticCorrectionRevision;
     }
 
+    private void RetagCurrentAnalysisForWorkspace()
+    {
+        AnalysisCacheKey? currentKey = _analysisCoordinator.CurrentKey;
+        SkiaImage? proxy = _proxyImage;
+        if (currentKey is null
+            || proxy is null
+            || _analysisSourceIdentity == Guid.Empty
+            || _activeDetailAnalysisSettings is null
+            || _activeSemanticAnalysisSettings is null
+            || _activeBoundaryAnalysisSettings is null
+            || _activeBackgroundSuppressionSettings is null
+            || !double.IsFinite(_activeDetailRegionTransitionWidth))
+        {
+            return;
+        }
+
+        DetailInfluenceSettings detailInfluenceSettings = new(
+            regionTransitionWidth: _activeDetailRegionTransitionWidth);
+        AnalysisCacheKey replacementKey = AnalysisCacheKey.Create(
+            _analysisSourceIdentity,
+            proxy.Size,
+            _activeDetailAnalysisSettings,
+            detailInfluenceSettings,
+            _activeSemanticAnalysisSettings,
+            _activeBoundaryAnalysisSettings,
+            _activeBackgroundSuppressionSettings,
+            _workspace.DetailRegionRevision,
+            _workspace.SemanticCorrectionRevision);
+        _analysisCoordinator.TryRetagCurrent(currentKey, replacementKey);
+    }
+
     private void RestoreWorkspaceEdit(
         WorkspaceEditSnapshot snapshot,
         string? selectedRegionId = null,
@@ -4706,6 +4744,7 @@ public partial class MainWindow : Window
     {
         _workspace.RestoreEditState(snapshot);
         CaptureActiveWorkspaceRevisions();
+        RetagCurrentAnalysisForWorkspace();
         RefreshSemanticRegions(selectedSemanticRegionId);
         RefreshSemanticCorrections(selectedCorrectionId);
         RefreshRegionVisuals(selectedRegionId);
@@ -5070,12 +5109,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private sealed record AutomaticAnalysisMaps(
-        DetailMap Structural,
-        SemanticAnalysisResult Semantic,
-        SceneBoundaryAnalysisResult Boundary,
-        DetailMap Automatic);
-
     private T FindRequiredControl<T>(string name)
         where T : Control
     {
@@ -5126,6 +5159,8 @@ public partial class MainWindow : Window
         _activeSemanticAnalysisSettings = null;
         _activeBoundaryAnalysisSettings = null;
         _activeBackgroundSuppressionSettings = null;
+        _analysisCoordinator.Invalidate();
+        _analysisSourceIdentity = Guid.Empty;
         _selectionStart = null;
         _selectionCurrent = null;
         _selectionPointerStartPosition = null;

@@ -1,0 +1,92 @@
+using System.Collections.ObjectModel;
+using FlowPainter.Domain.Segmentation;
+
+namespace FlowPainter.Application.Segmentation;
+
+public sealed class RegionSegmentationResult
+{
+    public RegionSegmentationResult(
+        RegionLabelMap labels,
+        IEnumerable<ImageRegion> regions,
+        RegionAdjacencyGraph adjacency,
+        RegionHierarchy hierarchy,
+        SegmentationDiagnostics diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+        ArgumentNullException.ThrowIfNull(regions);
+        ArgumentNullException.ThrowIfNull(adjacency);
+        ArgumentNullException.ThrowIfNull(hierarchy);
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        ImageRegion[] regionArray = regions.OrderBy(region => region.Id).ToArray();
+        if (regionArray.Length != labels.RegionCount)
+        {
+            throw new ArgumentException("The region list must contain one entry for every compact label.", nameof(regions));
+        }
+
+        int[] labelCounts = labels.CountPixelsByRegion();
+        long totalArea = 0L;
+        for (int regionId = 0; regionId < regionArray.Length; regionId++)
+        {
+            ImageRegion region = regionArray[regionId];
+            if (region.Id != regionId)
+            {
+                throw new ArgumentException("Region identifiers must be compact and ordered from zero.", nameof(regions));
+            }
+
+            if (region.PixelCount != labelCounts[regionId])
+            {
+                throw new ArgumentException("Region pixel counts must match the label map.", nameof(regions));
+            }
+
+            double expectedArea = region.PixelCount / (double)labels.Size.PixelCount;
+            if (Math.Abs(region.NormalizedArea - expectedArea) > 1e-12d)
+            {
+                throw new ArgumentException("Region normalized areas must match the label map.", nameof(regions));
+            }
+
+            if (region.Bounds.Right > labels.Size.Width || region.Bounds.Bottom > labels.Size.Height)
+            {
+                throw new ArgumentException("Region bounds must lie inside the label map.", nameof(regions));
+            }
+
+            totalArea = checked(totalArea + region.PixelCount);
+        }
+
+        if (totalArea != labels.Size.PixelCount)
+        {
+            throw new ArgumentException("The sum of region areas must cover the complete label map.", nameof(regions));
+        }
+
+        if (adjacency.RegionCount != labels.RegionCount)
+        {
+            throw new ArgumentException("The adjacency graph must use the label-map region count.", nameof(adjacency));
+        }
+
+        if (hierarchy.FineRegionCount != labels.RegionCount)
+        {
+            throw new ArgumentException("The hierarchy must map every fine label.", nameof(hierarchy));
+        }
+
+        if (diagnostics.FinalRegionCount != labels.RegionCount)
+        {
+            throw new ArgumentException("Diagnostics must report the final label-map region count.", nameof(diagnostics));
+        }
+
+        Labels = labels;
+        Regions = Array.AsReadOnly(regionArray);
+        Adjacency = adjacency;
+        Hierarchy = hierarchy;
+        Diagnostics = diagnostics;
+    }
+
+    public RegionLabelMap Labels { get; }
+
+    public ReadOnlyCollection<ImageRegion> Regions { get; }
+
+    public RegionAdjacencyGraph Adjacency { get; }
+
+    public RegionHierarchy Hierarchy { get; }
+
+    public SegmentationDiagnostics Diagnostics { get; }
+}

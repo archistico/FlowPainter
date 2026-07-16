@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted and implemented by M13.4.2, pending local build/test validation.
+Accepted, implemented and validated by M13.4.2 on 2026-07-16.
 
 ## Context
 

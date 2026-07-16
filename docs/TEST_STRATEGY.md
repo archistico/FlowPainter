@@ -193,14 +193,14 @@ dotnet test FlowPainter.sln -c Release --collect:"XPlat Code Coverage"
 
 ## Current suite
 
-The current validated repository contains **765** cases:
+The current validated repository contains **782** cases:
 
 - 115 Domain;
-- 576 Application;
-- 24 Imaging.Skia;
+- 590 Application;
+- 27 Imaging.Skia;
 - 50 Rendering.Skia.
 
-M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases added on 2026-07-16 establish the 765-case validated baseline. M13.4.2 adds 14 Application and 3 Imaging.Skia cases, for an expected total of **782** pending local validation.
+M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases established 765. M13.4.2 added 14 Application and 3 Imaging.Skia cases and was validated at **782**. M13.4.3 added 8 Application persistence cases, reaching 790. M13.4.4 added 14 Application analysis-lifecycle cases and was validated at **804**. M14.1 adds 30 Domain and 29 Application contract cases, for an expected total of **863** pending local validation.
 
 
 ## M11 scene-boundary tests
@@ -329,17 +329,38 @@ M13.4.2 validates:
 - bounded seekable and non-seekable encoded input;
 - cancellation during non-seekable streaming.
 
-The remaining M13.4 increments will add:
+M13.4.3 validates:
 
-- detached project candidates and atomic session adoption;
-- atomic local writes preserving an existing destination;
-- analysis cache keys, revision invalidation and stale-result rejection.
+- successful creation and replacement through a temporary sibling;
+- preservation of an existing destination after failure or cancellation;
+- no published destination after a failed new write;
+- missing-directory creation and path validation;
+- temporary-file cleanup on committed and non-committed paths;
+- all production project, preset, preview, raster, SVG and recent-item writes using the shared commit boundary.
+
+M13.4.4 validates:
+
+- value-based cache keys for equivalent source, dimensions, analysis settings and workspace revisions;
+- cache invalidation when source identity, settings or revisions change;
+- defensive copying of mutable detail-region and semantic-correction collections;
+- complete detached structural, semantic, boundary, automatic, manual and background-suppression output;
+- monotonic stage progress through pipeline completion;
+- cancellation and analyzer failure preserving the previously adopted result;
+- transactional publication only after the caller adoption callback succeeds;
+- rejection of older generations and mismatched expected keys;
+- callback failure leaving the coordinator cache unpublished;
+- manual-region/background recomposition reusing valid automatic maps without analyzer reruns;
+- cache-key retagging after candidate project/image adoption;
+- explicit invalidation clearing current state and rejecting pending results.
+
+These fourteen focused Application cases established the validated **804**-case M13.4.4 baseline.
 
 ## M14 SLIC regional-segmentation tests
 
-M14 is validated incrementally:
+M14 is validated incrementally. M14.1 contributes **59** focused tests (30 Domain and 29 Application), raising the expected suite from 804 to **863**:
 
-- **M14.1:** contract ranges, storage selection, dimensions, ownership and immutability;
+
+- **M14.1:** contract ranges, `UInt16`/`UInt32` storage boundaries, row/index access, defensive ownership, region-area consistency, graph symmetry, monotonic hierarchy, progress and exact memory/work estimates;
 - **M14.2:** deterministic SLIC results, local assignment bounds, convergence, cancellation and progress;
 - **M14.3:** connected labels, minimum-region repair, compact relabelling and complete coverage;
 - **M14.4:** analytically verifiable colour, luminance, area, centroid, bounds, perimeter and orientation descriptors;

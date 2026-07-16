@@ -21,12 +21,12 @@ public sealed class FinalRenderMemoryEstimatorTests
         Assert.Equal(500_000L, estimate.PreviewBytes);
         Assert.Equal(500_000L, estimate.DetailOverlayBytes);
         Assert.Equal(20_000_000L, estimate.AnalysisWorkingBytes);
-        Assert.Equal(3_000_000L, estimate.SegmentationReserveBytes);
+        Assert.Equal(3_253_072L, estimate.SegmentationReserveBytes);
         Assert.Equal(32_000_000L, estimate.OutputSurfaceBytes);
         Assert.Equal(32_000_000L, estimate.OutputCopyBytes);
         Assert.Equal(32_000_000L, estimate.EncodingReserveBytes);
         Assert.Equal(96_000_000L, estimate.OutputWorkingBytes);
-        Assert.Equal(122_500_000L, estimate.KnownPeakBytes);
+        Assert.Equal(122_753_072L, estimate.KnownPeakBytes);
         Assert.Equal(3, estimate.OutputBufferCount);
     }
 
@@ -121,7 +121,7 @@ public sealed class FinalRenderMemoryEstimatorTests
             new ImageSize(10_000, 10_000),
             GenerativeMode.FlowPainting);
 
-        Assert.Equal(1_805_520_896L, estimate.KnownPeakBytes);
+        Assert.Equal(1_807_642_624L, estimate.KnownPeakBytes);
         Assert.Equal(FinalRenderMemoryRisk.High, estimate.Risk);
         Assert.True(WorkloadBudgetPolicy.IsMemoryWithinBudget(estimate.KnownPeakBytes));
     }
@@ -136,7 +136,7 @@ public sealed class FinalRenderMemoryEstimatorTests
             new ImageSize(10_000, 10_000),
             GenerativeMode.Hybrid);
 
-        Assert.Equal(2_205_520_896L, estimate.KnownPeakBytes);
+        Assert.Equal(2_207_642_624L, estimate.KnownPeakBytes);
         Assert.Equal(FinalRenderMemoryRisk.High, estimate.Risk);
         Assert.False(WorkloadBudgetPolicy.IsMemoryWithinBudget(estimate.KnownPeakBytes));
     }
