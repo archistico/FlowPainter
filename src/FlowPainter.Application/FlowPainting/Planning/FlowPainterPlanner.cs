@@ -16,11 +16,11 @@ namespace FlowPainter.Application.FlowPainting.Planning;
 public sealed class FlowPainterPlanner
 {
     public const string PlannerVersion = "flow-field-v1";
-    public const string DetailPlannerVersion = "flow-field-detail-v1";
-    public const string BoundaryPlannerVersion = "flow-field-boundary-v1";
-    public const string RegionalBoundaryPlannerVersion = "flow-field-regional-boundary-v1";
-    public const string BackgroundPlannerVersion = "flow-field-background-v1";
-    public const string RegionalBackgroundPlannerVersion = "flow-field-background-regional-boundary-v1";
+    public const string DetailPlannerVersion = "flow-field-detail-v2";
+    public const string BoundaryPlannerVersion = "flow-field-boundary-v2";
+    public const string RegionalBoundaryPlannerVersion = "flow-field-regional-boundary-v2";
+    public const string BackgroundPlannerVersion = "flow-field-background-v2";
+    public const string RegionalBackgroundPlannerVersion = "flow-field-background-regional-boundary-v2";
     private const int ProgressBatchSize = 256;
     private const int CrossingSampleCount = 4;
     private readonly IFlowFieldFactory _fieldFactory;
@@ -522,20 +522,24 @@ public sealed class FlowPainterPlanner
             double artisticDetail = artisticDetailField?.SampleNearest(start) ?? 0d;
             double localSuppression = Math.Max(0d, -artisticDetail);
             double density = densityMap.SampleNearest(start);
-            double lengthMultiplier = detailMap is null
-                ? 1d
-                : settings.DetailInfluence.GetLengthMultiplier(localDetail);
-            lengthMultiplier *= settings.BackgroundSuppression.GetStrokeLengthMultiplier(localSuppression);
+            LocalStrokeGeometry localGeometry = detailMap is null
+                ? LocalStrokeGeometry.Neutral
+                : HighDetailStrokePolicy.EvaluateGeometry(localDetail, settings.DetailInfluence);
+            double lengthMultiplier = localGeometry.LengthMultiplier
+                * settings.BackgroundSuppression.GetStrokeLengthMultiplier(localSuppression);
             double maximumLength = settings.LengthScale * density * lengthMultiplier;
-            int localSegmentCount = Math.Max(
-                2,
+            double segmentMultiplier = localGeometry.SegmentMultiplier
+                * settings.BackgroundSuppression.GetSegmentMultiplier(localSuppression);
+            int localSegmentCount = Math.Clamp(
                 checked((int)Math.Round(
-                    settings.SegmentCount
-                    * settings.BackgroundSuppression.GetSegmentMultiplier(localSuppression),
-                    MidpointRounding.AwayFromZero)));
+                    settings.SegmentCount * segmentMultiplier,
+                    MidpointRounding.AwayFromZero)),
+                2,
+                FlowPainterSettings.MaximumSegmentCount);
             double localMaximumCurve = Math.Min(
                 AngleMath.Tau,
                 settings.MaximumCurveRadians
+                * localGeometry.CurveMultiplier
                 * settings.BackgroundSuppression.GetCurveFreedomMultiplier(localSuppression));
             List<RelativePoint> points = guidanceField is null
                 ? CreateUnconstrainedPath(
@@ -550,6 +554,7 @@ public sealed class FlowPainterPlanner
                     localSegmentCount,
                     localMaximumCurve,
                     settings,
+                    localDetail,
                     field,
                     guidanceField);
             Rgba32 sampledColor = source.SampleNearest(start);
@@ -562,11 +567,7 @@ public sealed class FlowPainterPlanner
                     * (settings.MaximumStrokeWidthPixels
                         - settings.MinimumStrokeWidthPixels));
 
-            if (detailMap is not null)
-            {
-                widthPixels *= settings.DetailInfluence.GetWidthMultiplier(localDetail);
-            }
-
+            widthPixels *= localGeometry.WidthMultiplier;
             widthPixels *= settings.BackgroundSuppression.GetStrokeWidthMultiplier(localSuppression);
 
             double widthRelativeToReference = widthPixels / settings.ReferenceMaximumDimension;
@@ -649,6 +650,7 @@ public sealed class FlowPainterPlanner
         int segmentCount,
         double maximumCurveRadians,
         FlowPainterSettings settings,
+        double localDetail,
         IFlowField field,
         BoundaryGuidanceField guidanceField)
     {
@@ -677,7 +679,11 @@ public sealed class FlowPainterPlanner
             double angle = AlignToBoundary(
                 baseAngle,
                 currentGuidance,
-                boundarySettings.TangentAlignment * currentGuidance.Influence);
+                HighDetailStrokePolicy.GetTangentAlignmentAmount(
+                    localDetail,
+                    currentGuidance,
+                    settings.DetailInfluence,
+                    boundarySettings));
             double segmentLength = baseSegmentLength * Math.Clamp(
                 1d - (0.72d * boundarySettings.CornerPreservation * currentGuidance.CornerStrength),
                 0.2d,
@@ -702,10 +708,15 @@ public sealed class FlowPainterPlanner
 
             if (crossing.Risk > 0d && crossing.Guidance.HasDirection)
             {
+                double crossingResistance = HighDetailStrokePolicy.GetCrossingResistance(
+                    localDetail,
+                    crossing.Guidance,
+                    settings.DetailInfluence,
+                    boundarySettings);
                 angle = AlignToBoundary(
                     angle,
                     crossing.Guidance,
-                    boundarySettings.CrossingPenalty * crossing.Risk);
+                    crossingResistance * crossing.Risk);
                 candidate = CreateCandidate(x, y, angle, segmentLength);
                 crossing = EvaluateCrossing(
                     x,

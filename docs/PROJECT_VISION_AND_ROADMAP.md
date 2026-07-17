@@ -3,7 +3,7 @@
 **Document status:** living specification
 **Last updated:** 2026-07-17
 **Current validated baseline:** M14.6 — Hierarchical regional merge (964 tests)
-**Current milestone:** M15.1 — Regional boundary field — READY FOR VALIDATION
+**Current milestone:** M15.2 — High-detail local stroke policy — READY FOR VALIDATION
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -911,11 +911,11 @@ Exit criteria:
 
 ### M15 — Region-guided painterly rendering
 
-**Status: IN PROGRESS — M15.1 ready for validation**
+**Status: IN PROGRESS — M15.1 validated; M15.2 ready for validation**
 
 #### M15.1 — Regional boundary field
 
-**Status: READY FOR VALIDATION**
+**Status: DONE — validated with 1,049 tests**
 
 Detailed validation plan: [`M15_1_REGIONAL_BOUNDARY_FIELD.md`](M15_1_REGIONAL_BOUNDARY_FIELD.md).
 
@@ -925,14 +925,20 @@ Detailed validation plan: [`M15_1_REGIONAL_BOUNDARY_FIELD.md`](M15_1_REGIONAL_BO
 - blend regional evidence after the validated M11–M12 scene-guidance propagation;
 - reuse one regional guidance field across both Hybrid stroke layers;
 - retain compatibility overloads and introduce explicit regional planner versions;
-- 25 new Application cases raise the expected suite from 1,024 to 1,049.
+- 25 new Application cases were validated at 1,049 total tests.
 
 #### M15.2 — High-detail local stroke policy
+
+**Status: READY FOR VALIDATION**
+
+Detailed validation plan: [`M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md`](M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md).
 
 - shorter and thinner marks in detailed regions;
 - increased local segment count and controlled curvature;
 - stronger tangent alignment and crossing resistance near important boundaries;
-- continuous interpolation of density, length, width, segmentation and curvature.
+- continuous interpolation of density, length, width, segmentation and curvature;
+- project schema 13 and preset schema 10 persist the reusable policy;
+- 22 new Application cases raise the expected suite from 1,049 to 1,071.
 
 #### M15.3 — Staged Flow rendering
 

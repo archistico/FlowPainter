@@ -8,6 +8,12 @@ public sealed class DetailInfluenceSettings
     public const double DefaultDetailedWidthMultiplier = 0.65d;
     public const double DefaultBackgroundWidthMultiplier = 1.45d;
     public const double DefaultRegionTransitionWidth = 0.05d;
+    public const double DefaultDetailedSegmentMultiplier = 1.65d;
+    public const double DefaultBackgroundSegmentMultiplier = 0.85d;
+    public const double DefaultDetailedCurveMultiplier = 1.25d;
+    public const double DefaultBackgroundCurveMultiplier = 0.85d;
+    public const double DefaultDetailedTangentAlignmentBoost = 0.22d;
+    public const double DefaultDetailedCrossingResistanceBoost = 0.28d;
 
     public DetailInfluenceSettings(
         double placementBias = DefaultPlacementBias,
@@ -15,14 +21,26 @@ public sealed class DetailInfluenceSettings
         double backgroundLengthMultiplier = DefaultBackgroundLengthMultiplier,
         double detailedWidthMultiplier = DefaultDetailedWidthMultiplier,
         double backgroundWidthMultiplier = DefaultBackgroundWidthMultiplier,
-        double regionTransitionWidth = DefaultRegionTransitionWidth)
+        double regionTransitionWidth = DefaultRegionTransitionWidth,
+        double detailedSegmentMultiplier = DefaultDetailedSegmentMultiplier,
+        double backgroundSegmentMultiplier = DefaultBackgroundSegmentMultiplier,
+        double detailedCurveMultiplier = DefaultDetailedCurveMultiplier,
+        double backgroundCurveMultiplier = DefaultBackgroundCurveMultiplier,
+        double detailedTangentAlignmentBoost = DefaultDetailedTangentAlignmentBoost,
+        double detailedCrossingResistanceBoost = DefaultDetailedCrossingResistanceBoost)
     {
         ValidateRange(placementBias, 0d, 20d, nameof(placementBias));
-        ValidateRange(detailedLengthMultiplier, 0.05d, 4d, nameof(detailedLengthMultiplier));
-        ValidateRange(backgroundLengthMultiplier, 0.05d, 4d, nameof(backgroundLengthMultiplier));
-        ValidateRange(detailedWidthMultiplier, 0.05d, 4d, nameof(detailedWidthMultiplier));
-        ValidateRange(backgroundWidthMultiplier, 0.05d, 4d, nameof(backgroundWidthMultiplier));
+        ValidateMultiplier(detailedLengthMultiplier, nameof(detailedLengthMultiplier));
+        ValidateMultiplier(backgroundLengthMultiplier, nameof(backgroundLengthMultiplier));
+        ValidateMultiplier(detailedWidthMultiplier, nameof(detailedWidthMultiplier));
+        ValidateMultiplier(backgroundWidthMultiplier, nameof(backgroundWidthMultiplier));
         ValidateRange(regionTransitionWidth, 0d, 0.5d, nameof(regionTransitionWidth));
+        ValidateMultiplier(detailedSegmentMultiplier, nameof(detailedSegmentMultiplier));
+        ValidateMultiplier(backgroundSegmentMultiplier, nameof(backgroundSegmentMultiplier));
+        ValidateMultiplier(detailedCurveMultiplier, nameof(detailedCurveMultiplier));
+        ValidateMultiplier(backgroundCurveMultiplier, nameof(backgroundCurveMultiplier));
+        ValidateRange(detailedTangentAlignmentBoost, 0d, 1d, nameof(detailedTangentAlignmentBoost));
+        ValidateRange(detailedCrossingResistanceBoost, 0d, 1d, nameof(detailedCrossingResistanceBoost));
 
         PlacementBias = placementBias;
         DetailedLengthMultiplier = detailedLengthMultiplier;
@@ -30,6 +48,12 @@ public sealed class DetailInfluenceSettings
         DetailedWidthMultiplier = detailedWidthMultiplier;
         BackgroundWidthMultiplier = backgroundWidthMultiplier;
         RegionTransitionWidth = regionTransitionWidth;
+        DetailedSegmentMultiplier = detailedSegmentMultiplier;
+        BackgroundSegmentMultiplier = backgroundSegmentMultiplier;
+        DetailedCurveMultiplier = detailedCurveMultiplier;
+        BackgroundCurveMultiplier = backgroundCurveMultiplier;
+        DetailedTangentAlignmentBoost = detailedTangentAlignmentBoost;
+        DetailedCrossingResistanceBoost = detailedCrossingResistanceBoost;
     }
 
     public double PlacementBias { get; }
@@ -49,6 +73,18 @@ public sealed class DetailInfluenceSettings
     /// </summary>
     public double RegionTransitionWidth { get; }
 
+    public double DetailedSegmentMultiplier { get; }
+
+    public double BackgroundSegmentMultiplier { get; }
+
+    public double DetailedCurveMultiplier { get; }
+
+    public double BackgroundCurveMultiplier { get; }
+
+    public double DetailedTangentAlignmentBoost { get; }
+
+    public double DetailedCrossingResistanceBoost { get; }
+
     public double GetPlacementWeight(double detail)
     {
         ValidateDetail(detail);
@@ -67,8 +103,30 @@ public sealed class DetailInfluenceSettings
         return Interpolate(BackgroundWidthMultiplier, DetailedWidthMultiplier, detail);
     }
 
+    public double GetSegmentMultiplier(double detail)
+    {
+        ValidateDetail(detail);
+        return Interpolate(BackgroundSegmentMultiplier, DetailedSegmentMultiplier, detail);
+    }
+
+    public double GetCurveMultiplier(double detail)
+    {
+        ValidateDetail(detail);
+        return Interpolate(BackgroundCurveMultiplier, DetailedCurveMultiplier, detail);
+    }
+
     private static double Interpolate(double start, double end, double amount)
     {
+        if (amount == 0d)
+        {
+            return start;
+        }
+
+        if (amount == 1d)
+        {
+            return end;
+        }
+
         return start + ((end - start) * amount);
     }
 
@@ -81,6 +139,11 @@ public sealed class DetailInfluenceSettings
                 detail,
                 "Detail must be finite and between 0 and 1.");
         }
+    }
+
+    private static void ValidateMultiplier(double value, string parameterName)
+    {
+        ValidateRange(value, 0.05d, 4d, parameterName);
     }
 
     private static void ValidateRange(

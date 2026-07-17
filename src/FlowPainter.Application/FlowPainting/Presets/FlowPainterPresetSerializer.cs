@@ -95,6 +95,12 @@ public static class FlowPainterPresetSerializer
                 DetailInfluenceSettings.DefaultRegionTransitionWidth;
         }
 
+        if (schemaVersion < 10
+            && settings["detailInfluence"] is JsonObject strokePolicy)
+        {
+            ApplyHighDetailStrokePolicyDefaults(strokePolicy);
+        }
+
         if (schemaVersion < 9)
         {
             if (!settings.ContainsKey("regionalSegmentation"))
@@ -111,6 +117,23 @@ public static class FlowPainterPresetSerializer
                     SerializerOptions);
             }
         }
+    }
+
+
+    private static void ApplyHighDetailStrokePolicyDefaults(JsonObject detailInfluence)
+    {
+        detailInfluence["detailedSegmentMultiplier"] =
+            DetailInfluenceSettings.DefaultDetailedSegmentMultiplier;
+        detailInfluence["backgroundSegmentMultiplier"] =
+            DetailInfluenceSettings.DefaultBackgroundSegmentMultiplier;
+        detailInfluence["detailedCurveMultiplier"] =
+            DetailInfluenceSettings.DefaultDetailedCurveMultiplier;
+        detailInfluence["backgroundCurveMultiplier"] =
+            DetailInfluenceSettings.DefaultBackgroundCurveMultiplier;
+        detailInfluence["detailedTangentAlignmentBoost"] =
+            DetailInfluenceSettings.DefaultDetailedTangentAlignmentBoost;
+        detailInfluence["detailedCrossingResistanceBoost"] =
+            DetailInfluenceSettings.DefaultDetailedCrossingResistanceBoost;
     }
 
     private static JsonSerializerOptions CreateOptions()

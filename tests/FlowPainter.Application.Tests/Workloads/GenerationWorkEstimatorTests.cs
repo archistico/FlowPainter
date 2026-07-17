@@ -10,15 +10,44 @@ namespace FlowPainter.Application.Tests.Workloads;
 public sealed class GenerationWorkEstimatorTests
 {
     [Fact]
-    public void EstimateFlowMultipliesStrokesBySegments()
+    public void EstimateFlowIncludesMaximumLocalSegmentMultiplier()
     {
         FlowPainterSettings settings = new(strokeCount: 120, segmentCount: 24);
 
         GenerationWorkEstimate estimate = GenerationWorkEstimator.EstimateFlow(settings);
 
         Assert.Equal(GenerativeMode.FlowPainting, estimate.Mode);
-        Assert.Equal(2_880L, estimate.FlowSegmentSteps);
+        Assert.Equal(4_800L, estimate.FlowSegmentSteps);
         Assert.Equal(0L, estimate.PrimitiveScoreAttempts);
+    }
+
+
+    [Fact]
+    public void EstimateFlowCapsLocalSegmentsAtSupportedMaximum()
+    {
+        FlowPainterSettings settings = new(
+            strokeCount: 2,
+            segmentCount: FlowPainterSettings.MaximumSegmentCount,
+            detailInfluence: new DetailInfluenceSettings(detailedSegmentMultiplier: 4d));
+
+        GenerationWorkEstimate estimate = GenerationWorkEstimator.EstimateFlow(settings);
+
+        Assert.Equal(2L * FlowPainterSettings.MaximumSegmentCount, estimate.FlowSegmentSteps);
+    }
+
+    [Fact]
+    public void EstimateFlowUsesLargerBackgroundOrDetailedSegmentPolicy()
+    {
+        FlowPainterSettings settings = new(
+            strokeCount: 10,
+            segmentCount: 10,
+            detailInfluence: new DetailInfluenceSettings(
+                detailedSegmentMultiplier: 0.5d,
+                backgroundSegmentMultiplier: 1.8d));
+
+        GenerationWorkEstimate estimate = GenerationWorkEstimator.EstimateFlow(settings);
+
+        Assert.Equal(180L, estimate.FlowSegmentSteps);
     }
 
     [Fact]
@@ -62,7 +91,7 @@ public sealed class GenerationWorkEstimatorTests
             hybrid);
 
         Assert.Equal(GenerativeMode.Hybrid, estimate.Mode);
-        Assert.Equal(650L, estimate.FlowSegmentSteps);
+        Assert.Equal(1_105L, estimate.FlowSegmentSteps);
         Assert.Equal(70L, estimate.PrimitiveScoreAttempts);
         Assert.Equal(9_800L, estimate.PrimitivePixelEvaluations);
     }

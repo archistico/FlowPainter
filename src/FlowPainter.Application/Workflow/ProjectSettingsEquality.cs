@@ -107,7 +107,13 @@ internal static class ProjectSettingsEquality
             && first.BackgroundLengthMultiplier == second.BackgroundLengthMultiplier
             && first.DetailedWidthMultiplier == second.DetailedWidthMultiplier
             && first.BackgroundWidthMultiplier == second.BackgroundWidthMultiplier
-            && first.RegionTransitionWidth == second.RegionTransitionWidth;
+            && first.RegionTransitionWidth == second.RegionTransitionWidth
+            && first.DetailedSegmentMultiplier == second.DetailedSegmentMultiplier
+            && first.BackgroundSegmentMultiplier == second.BackgroundSegmentMultiplier
+            && first.DetailedCurveMultiplier == second.DetailedCurveMultiplier
+            && first.BackgroundCurveMultiplier == second.BackgroundCurveMultiplier
+            && first.DetailedTangentAlignmentBoost == second.DetailedTangentAlignmentBoost
+            && first.DetailedCrossingResistanceBoost == second.DetailedCrossingResistanceBoost;
     }
 
     private static bool SemanticAnalysisIsEquivalent(SemanticAnalysisSettings first, SemanticAnalysisSettings second)

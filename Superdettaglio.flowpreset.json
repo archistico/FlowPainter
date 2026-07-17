@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 10,
+  "preset": {
+    "name": "Fine detail",
+    "settings": {
+      "field": {
+        "kind": "LegacyTrigonometric",
+        "scale": 20,
+        "octaves": 5,
+        "persistence": 0.2,
+        "lacunarity": 2,
+        "angleOffsetRadians": 0
+      },
+      "strokeCount": 200000,
+      "segmentCount": 14,
+      "referenceMaximumDimension": 1024,
+      "uniformDensity": 20,
+      "lengthScale": 0.0012,
+      "maximumCurveRadians": 0.17453292519943295,
+      "minimumStrokeWidthPixels": 1,
+      "maximumStrokeWidthPixels": 12,
+      "strokeOpacity": 0.6,
+      "backgroundMode": "SourceImage",
+      "detailAnalysis": {
+        "baseDetail": 0.12,
+        "edgeWeight": 0.75,
+        "contrastWeight": 0.45,
+        "smoothingRadius": 1
+      },
+      "detailInfluence": {
+        "placementBias": 6,
+        "detailedLengthMultiplier": 0.45,
+        "backgroundLengthMultiplier": 1.25,
+        "detailedWidthMultiplier": 0.55,
+        "backgroundWidthMultiplier": 1.3,
+        "regionTransitionWidth": 0.05,
+        "detailedSegmentMultiplier": 1.65,
+        "backgroundSegmentMultiplier": 0.85,
+        "detailedCurveMultiplier": 1.25,
+        "backgroundCurveMultiplier": 0.85,
+        "detailedTangentAlignmentBoost": 0.22,
+        "detailedCrossingResistanceBoost": 0.28
+      },
+      "brush": {
+        "kind": "Bristle",
+        "hardness": 0.95,
+        "sizeJitter": 0.04,
+        "opacityJitter": 0.06,
+        "bristleCount": 7,
+        "bristleSpread": 0.75
+      },
+      "semanticAnalysis": {
+        "enabled": true,
+        "overallInfluence": 0.7,
+        "saliencyWeight": 0.35,
+        "subjectWeight": 0.8,
+        "silhouetteWeight": 0.9,
+        "focalWeight": 1,
+        "subjectThreshold": 0.52,
+        "minimumSubjectAreaRatio": 0.004,
+        "maximumSubjects": 6,
+        "centerBias": 0.25,
+        "smoothingRadius": 2,
+        "boundaryRadius": 2
+      },
+      "boundaryAnalysis": {
+        "enabled": true,
+        "luminanceWeight": 0.45,
+        "colorWeight": 0.75,
+        "multiscaleWeight": 0.7,
+        "continuityWeight": 0.85,
+        "semanticBoundaryWeight": 1.2,
+        "textureSuppression": 0.65,
+        "edgeThreshold": 0.1,
+        "importantEdgeThreshold": 0.32,
+        "coarseRadius": 3,
+        "smoothingRadius": 1,
+        "boundaryProtectionRadius": 4
+      },
+      "boundaryPainting": {
+        "enabled": true,
+        "tangentAlignment": 0.9,
+        "alignmentRadius": 5,
+        "crossingPenalty": 0.92,
+        "hardBoundaryThreshold": 0.62,
+        "terminationStrength": 0.88,
+        "internalEdgeInfluence": 0.42,
+        "textureEdgeInfluence": 0.08,
+        "contourReinforcement": 0.8,
+        "cornerPreservation": 0.82
+      },
+      "backgroundSuppression": {
+        "enabled": true,
+        "overallStrength": 0.78,
+        "detailFloor": 0.16,
+        "uncertaintyProtection": 0.88,
+        "silhouetteProtection": 0.96,
+        "transitionSoftness": 0.72,
+        "backgroundPlacementWeight": 0.32,
+        "strokeLengthMultiplier": 1.7,
+        "strokeWidthMultiplier": 1.55,
+        "segmentMultiplier": 0.62,
+        "curveFreedomMultiplier": 1.45,
+        "colorSimplification": 0.28
+      },
+      "regionalSegmentation": {
+        "enabled": true,
+        "targetRegionSize": 64,
+        "compactness": 10,
+        "preBlurSigma": 0.8,
+        "maximumIterations": 10,
+        "convergenceTolerance": 0.5
+      },
+      "regionMerge": {
+        "intermediateTargetRatio": 0.6,
+        "broadMassTargetRatio": 0.3,
+        "intermediateMaximumCost": 0.42,
+        "broadMassMaximumCost": 0.62,
+        "strongBoundaryThreshold": 0.72,
+        "maximumParentAreaFraction": 0.45
+      }
+    }
+  }
+}

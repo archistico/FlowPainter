@@ -347,7 +347,13 @@ public sealed class HybridPlanComposer
             flowSettings.DetailInfluence.BackgroundLengthMultiplier,
             flowSettings.DetailInfluence.DetailedWidthMultiplier,
             flowSettings.DetailInfluence.BackgroundWidthMultiplier,
-            flowSettings.DetailInfluence.RegionTransitionWidth);
+            flowSettings.DetailInfluence.RegionTransitionWidth,
+            flowSettings.DetailInfluence.DetailedSegmentMultiplier,
+            flowSettings.DetailInfluence.BackgroundSegmentMultiplier,
+            flowSettings.DetailInfluence.DetailedCurveMultiplier,
+            flowSettings.DetailInfluence.BackgroundCurveMultiplier,
+            flowSettings.DetailInfluence.DetailedTangentAlignmentBoost,
+            flowSettings.DetailInfluence.DetailedCrossingResistanceBoost);
         FlowPainterSettings refinementSettings = CopyFlowSettings(
             flowSettings,
             ScaleCount(flowSettings.StrokeCount, hybridSettings.RefinementBudgetFraction),

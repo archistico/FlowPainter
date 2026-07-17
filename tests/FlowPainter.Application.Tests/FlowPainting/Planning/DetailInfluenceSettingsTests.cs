@@ -15,6 +15,12 @@ public sealed class DetailInfluenceSettingsTests
         Assert.Equal(DetailInfluenceSettings.DefaultDetailedWidthMultiplier, settings.DetailedWidthMultiplier);
         Assert.Equal(DetailInfluenceSettings.DefaultBackgroundWidthMultiplier, settings.BackgroundWidthMultiplier);
         Assert.Equal(DetailInfluenceSettings.DefaultRegionTransitionWidth, settings.RegionTransitionWidth);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedSegmentMultiplier, settings.DetailedSegmentMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultBackgroundSegmentMultiplier, settings.BackgroundSegmentMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedCurveMultiplier, settings.DetailedCurveMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultBackgroundCurveMultiplier, settings.BackgroundCurveMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedTangentAlignmentBoost, settings.DetailedTangentAlignmentBoost);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedCrossingResistanceBoost, settings.DetailedCrossingResistanceBoost);
     }
 
     [Fact]
@@ -69,6 +75,43 @@ public sealed class DetailInfluenceSettingsTests
             () => new DetailInfluenceSettings(detailedLengthMultiplier: value));
     }
 
+
+
+    [Fact]
+    public void SegmentMultiplierInterpolatesContinuously()
+    {
+        DetailInfluenceSettings settings = new(
+            detailedSegmentMultiplier: 2d,
+            backgroundSegmentMultiplier: 0.5d);
+
+        Assert.Equal(0.5d, settings.GetSegmentMultiplier(0d));
+        Assert.Equal(1.25d, settings.GetSegmentMultiplier(0.5d));
+        Assert.Equal(2d, settings.GetSegmentMultiplier(1d));
+    }
+
+    [Fact]
+    public void CurveMultiplierInterpolatesContinuously()
+    {
+        DetailInfluenceSettings settings = new(
+            detailedCurveMultiplier: 1.5d,
+            backgroundCurveMultiplier: 0.75d);
+
+        Assert.Equal(0.75d, settings.GetCurveMultiplier(0d));
+        Assert.Equal(1.125d, settings.GetCurveMultiplier(0.5d));
+        Assert.Equal(1.5d, settings.GetCurveMultiplier(1d));
+    }
+
+    [Theory]
+    [InlineData(-0.01d)]
+    [InlineData(1.01d)]
+    [InlineData(double.NaN)]
+    public void ConstructorRejectsInvalidBoundaryBoosts(double value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new DetailInfluenceSettings(detailedTangentAlignmentBoost: value));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new DetailInfluenceSettings(detailedCrossingResistanceBoost: value));
+    }
 
     [Theory]
     [InlineData(-0.001d)]

@@ -207,7 +207,7 @@ M14.8 added 26 validated cases, producing the 1,024-case baseline:
 - 31 Imaging.Skia;
 - 50 Rendering.Skia.
 
-M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases established 765. M13.4.2 added 14 Application and 3 Imaging.Skia cases and was validated at **782**. M13.4.3 added 8 Application persistence cases, reaching 790. M13.4.4 added 14 Application analysis-lifecycle cases and was validated at **804**. M14.1 added 30 Domain and 29 Application contract cases and was validated at **863**. M14.2 added 17 Application algorithm cases and 2 Domain signed-label cases and was validated at **882**. M14.3 added 25 Application topology/diagnostic cases and was validated at **907**. M14.4 added 13 Application descriptor cases and was validated at **920**. M14.5 added 20 Domain/Application adjacency cases and was validated at **940**. M14.6 added 2 Domain and 22 Application hierarchy cases and was validated at **964**. M14.7 added 4 Domain and 30 Application migration cases and was validated at **998**. M14.8 added 22 Application and 4 Imaging.Skia cases and was validated at **1,024**. M15.1 adds 25 Application cases, for an expected total of **1,049** pending local validation.
+M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases established 765. M13.4.2 added 14 Application and 3 Imaging.Skia cases and was validated at **782**. M13.4.3 added 8 Application persistence cases, reaching 790. M13.4.4 added 14 Application analysis-lifecycle cases and was validated at **804**. M14.1 added 30 Domain and 29 Application contract cases and was validated at **863**. M14.2 added 17 Application algorithm cases and 2 Domain signed-label cases and was validated at **882**. M14.3 added 25 Application topology/diagnostic cases and was validated at **907**. M14.4 added 13 Application descriptor cases and was validated at **920**. M14.5 added 20 Domain/Application adjacency cases and was validated at **940**. M14.6 added 2 Domain and 22 Application hierarchy cases and was validated at **964**. M14.7 added 4 Domain and 30 Application migration cases and was validated at **998**. M14.8 added 22 Application and 4 Imaging.Skia cases and was validated at **1,024**. M15.1 added 25 Application cases and was validated at **1,049**. M15.2 adds 22 Application cases, for an expected total of **1,071** pending local validation.
 
 
 ## M11 scene-boundary tests
@@ -374,11 +374,13 @@ M14 is validated incrementally. M14.1 contributed **59** focused tests (30 Domai
 - **M14.6:** validated settings/cost contracts, adjacent-only merging, protected aggregate strong edges, recomputed costs, deterministic tie breaking, compact parent/child traceability, cancellation, hierarchy progress and revised memory estimates;
 - **M14.7:** generalized role contracts, all schema-11 correction mappings, regional structure/focus/background composition, RAG boundary rasterization, soft role precedence, fixed regional detail influence, compatibility-only legacy maps, region-aware boundary forwarding, SLIC/merge cache identity, semantic-setting retirement, detached active orchestration and recomposition reuse;
 - **M14.8:** segmentation enable/default behaviour, merge-intensity mapping, project/preset schema migration and round trips, hierarchy/strong-boundary diagnostic rendering, Skia diagnostic conversion, cancellation, ownership and cache invalidation;
-- **M15.1:** regional-field settings, distance propagation, RAG strength/tangent transfer, side-aware normals, strong/soft transitions, deterministic tie breaking, empty/cancelled fields, scene-guidance blending, contour reinforcement and Flow/Hybrid planner integration.
+- **M15.1:** regional-field settings, distance propagation, RAG strength/tangent transfer, side-aware normals, strong/soft transitions, deterministic tie breaking, empty/cancelled fields, scene-guidance blending, contour reinforcement and Flow/Hybrid planner integration;
+- **M15.2:** local length/width/segment/curve interpolation, detail-weighted tangent/crossing response, planner geometry, workload bounds, v2 plan identity and schema migration.
 
 ## M15–M17 validation
 
-- M15.1 verifies the continuous regional boundary field and raises the expected suite from 1,024 to 1,049;
+- M15.1 verified the continuous regional boundary field at 1,049 tests;
+- M15.2 raises the expected suite from 1,049 to 1,071;
 - later M15 steps compare stroke/primitive budgets across hierarchy levels and verify smooth transitions, boundary alignment and stage ordering;
 - M16 tests merge/split/role commands, undo/redo, local resegmentation and compatibility-preserving region overrides;
 - M17 owns controlled high-resolution, native-memory, incremental-cache, packaging and startup smoke suites.

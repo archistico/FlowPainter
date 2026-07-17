@@ -1,6 +1,6 @@
 # M15.1 — Regional boundary field
 
-**Status:** READY FOR VALIDATION  
+**Status:** DONE — validated with 1,049 tests  
 **Baseline:** M14.8 validated with 1,024 tests  
 **Expected suite:** 1,049 tests
 

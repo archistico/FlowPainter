@@ -409,7 +409,7 @@ SkiaHybridPlanRenderer → PNG/JPEG
 
 `PrimitiveInfluenceFlowField` decorates the selected base field. It combines the base vector with distance-weighted primitive directions using AxisAlignment, rotated-envelope BoundaryTangent, Vortex or Mixed strategies. The primitive plan remains immutable. M12 reuses the same `FlowPainterPlanner` with an optional precomputed `BoundaryGuidanceField`, so primitive-derived deformation and scene-boundary guidance compose in both hybrid stroke layers.
 
-`SkiaHybridPlanRenderer` owns the intermediate primitive and flow images. It returns only the final refinement image, transferring that ownership to the caller. Preview and high-resolution export reuse the same `HybridPlan` and brush settings. Hybrid settings introduced in project schema 6 remain persisted in current schema 12; generated plans are never persisted.
+`SkiaHybridPlanRenderer` owns the intermediate primitive and flow images. It returns only the final refinement image, transferring that ownership to the caller. Preview and high-resolution export reuse the same `HybridPlan` and brush settings. Hybrid settings introduced in project schema 6 remain persisted in current schema 13; generated plans are never persisted.
 
 ## Boundary-aware planner boundary
 
@@ -621,7 +621,7 @@ Manual region-role overrides ─────────────────
 Migration rules:
 
 - M8–M13.3 files remain historical documentation of implemented behaviour;
-- schema-1 through schema-11 projects remain readable and migrate into current schema 12 values;
+- schema-1 through schema-11 projects remain readable and migrate into current schema 13 values;
 - manual user decisions are preserved, even when their internal representation changes;
 - automatic semantic regions are derived legacy data and need not be persisted into the new pipeline;
 - renderers remain unaware of SLIC and consume only approved immutable plans;
@@ -633,7 +633,7 @@ Migration rules:
 M14.8 keeps derived segmentation data out of project files:
 
 ```text
-Project schema 12 / preset schema 9
+Project schema 13 / preset schema 10
         ├── RegionSegmentationSettings
         ├── RegionMergeSettings
         └── project-only RegionRoleOverride[]
@@ -647,7 +647,7 @@ diagnostic overlays / active generative plans
 
 Obsolete semantic tuning values are hidden but still populated from old documents so a load/save cycle does not discard historical data. Compatibility role lists and commands consume the active regional compatibility envelope; no semantic analyzer or model is reintroduced.
 
-Project schema 12 persists generalized role overrides directly and falls back to deterministic schema-11 correction conversion when they are absent. Preset schema 9 stores reusable SLIC and merge settings only. Labels, descriptors, adjacency and hierarchy are derived, potentially large values and are intentionally recomputed rather than serialized.
+Project schema 13 persists generalized role overrides and the high-detail stroke policy, while retaining deterministic compatibility with schema-11 corrections and schema-12 regional settings. Preset schema 10 stores reusable SLIC, merge and stroke-policy settings only. Labels, descriptors, adjacency and hierarchy are derived, potentially large values and are intentionally recomputed rather than serialized.
 
 
 ## M15.1 regional boundary field
@@ -658,4 +658,10 @@ M15.1 converts the discrete SLIC/RAG structure into a continuous field used duri
 
 `BoundaryGuidanceField` first builds and propagates the validated M11–M12 scene evidence, then blends regional strength, distance, normal, tangent, hardness and contour reinforcement. Regional tangents participate in corner detection. Existing scene-only overloads remain unchanged.
 
-Flow plans using the new field publish `flow-field-regional-boundary-v1`; regional background plans publish `flow-field-background-regional-boundary-v1`. Hybrid constructs one combined field and reuses it for both stroke layers. M15.2 will consume the same samples to vary local stroke geometry; M15.1 itself does not yet change the detail policy.
+M15.1 Flow plans publish the regional boundary planner identity and Hybrid reuses one combined field for both stroke layers. M15.2 advances all detail-aware planner identities to v2 and consumes the same samples to vary local stroke geometry.
+
+## M15.2 high-detail local stroke policy
+
+`HighDetailStrokePolicy` keeps geometry and boundary response separate. `LocalStrokeGeometry` continuously interpolates length, width, segment count and curve freedom from background to detailed settings. The planner combines those values with background suppression, clamps local segments to the supported maximum and retains the no-detail v1 path unchanged.
+
+At every boundary-aware step, continuous detail and scene/regional evidence add bounded tangent-alignment and crossing-resistance boosts. Zero detail reproduces the validated M12/M15.1 response; no binary region role is consulted. Project schema 13 and preset schema 10 persist the six new reusable controls, while older documents receive deterministic defaults. Workload estimation admits the maximum possible local segment count before allocation.

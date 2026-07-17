@@ -35,7 +35,9 @@ public sealed class RegionalSegmentationPersistenceTests
         stream.Position = 0L;
         JsonObject projectDocument = (await JsonNode.ParseAsync(stream))?.AsObject()
             ?? throw new InvalidOperationException("The serialized project document is empty.");
-        Assert.Equal(12, projectDocument["schemaVersion"]?.GetValue<int>());
+        Assert.Equal(
+            FlowPainterProjectDocument.CurrentSchemaVersion,
+            projectDocument["schemaVersion"]?.GetValue<int>());
         stream.Position = 0L;
         FlowPainterProject restored = await FlowPainterProjectSerializer.DeserializeAsync(stream);
 
@@ -99,7 +101,9 @@ public sealed class RegionalSegmentationPersistenceTests
         stream.Position = 0L;
         JsonObject presetDocument = (await JsonNode.ParseAsync(stream))?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset document is empty.");
-        Assert.Equal(9, presetDocument["schemaVersion"]?.GetValue<int>());
+        Assert.Equal(
+            FlowPainterPresetDocument.CurrentSchemaVersion,
+            presetDocument["schemaVersion"]?.GetValue<int>());
         stream.Position = 0L;
         FlowPainterPreset restored = await FlowPainterPresetSerializer.DeserializeAsync(stream);
 

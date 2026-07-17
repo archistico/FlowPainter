@@ -281,7 +281,13 @@ public sealed class FlowPainterPlannerTests
             detailedLengthMultiplier: 1d,
             backgroundLengthMultiplier: 1d,
             detailedWidthMultiplier: 1d,
-            backgroundWidthMultiplier: 1d);
+            backgroundWidthMultiplier: 1d,
+            detailedSegmentMultiplier: 1d,
+            backgroundSegmentMultiplier: 1d,
+            detailedCurveMultiplier: 1d,
+            backgroundCurveMultiplier: 1d,
+            detailedTangentAlignmentBoost: 0d,
+            detailedCrossingResistanceBoost: 0d);
         FlowPainterSettings settings = new(
             strokeCount: 50,
             segmentCount: 4,

@@ -35,7 +35,8 @@ public static class GenerationWorkEstimator
     public static GenerationWorkEstimate EstimateFlow(FlowPainterSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        long segmentSteps = checked((long)settings.StrokeCount * settings.SegmentCount);
+        int maximumSegmentCount = EstimateMaximumFlowSegmentCount(settings);
+        long segmentSteps = checked((long)settings.StrokeCount * maximumSegmentCount);
         return new GenerationWorkEstimate(
             GenerativeMode.FlowPainting,
             segmentSteps,
@@ -75,9 +76,10 @@ public static class GenerationWorkEstimator
         int refinementStrokeCount = ScaleCount(
             flowSettings.StrokeCount,
             hybridSettings.RefinementBudgetFraction);
+        int maximumSegmentCount = EstimateMaximumFlowSegmentCount(flowSettings);
         long flowSegmentSteps = checked(
             (long)(flowStrokeCount + refinementStrokeCount)
-            * flowSettings.SegmentCount);
+            * maximumSegmentCount);
         PrimitiveWork primitiveWork = CalculatePrimitiveWork(
             workingSize,
             primitiveSettings,
@@ -88,6 +90,18 @@ public static class GenerationWorkEstimator
             flowSegmentSteps,
             primitiveWork.ScoreAttempts,
             primitiveWork.PixelEvaluations);
+    }
+
+
+    private static int EstimateMaximumFlowSegmentCount(FlowPainterSettings settings)
+    {
+        double detailMultiplier = Math.Max(
+            settings.DetailInfluence.DetailedSegmentMultiplier,
+            settings.DetailInfluence.BackgroundSegmentMultiplier);
+        return Math.Clamp(
+            checked((int)Math.Ceiling(settings.SegmentCount * detailMultiplier)),
+            2,
+            FlowPainterSettings.MaximumSegmentCount);
     }
 
     private static PrimitiveWork CalculatePrimitiveWork(

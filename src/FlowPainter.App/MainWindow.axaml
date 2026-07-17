@@ -583,12 +583,36 @@
                                 <TextBox x:Name="BackgroundWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
                             </Grid>
                             <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detailed segments (%)" />
+                                <TextBox x:Name="DetailedSegmentsTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Background segments (%)" />
+                                <TextBox x:Name="BackgroundSegmentsTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detailed curve freedom (%)" />
+                                <TextBox x:Name="DetailedCurveTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Background curve freedom (%)" />
+                                <TextBox x:Name="BackgroundCurveTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detail tangent boost (%)" />
+                                <TextBox x:Name="DetailTangentBoostTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Detail crossing resistance (%)" />
+                                <TextBox x:Name="DetailCrossingBoostTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
                                 <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Region transition (%)" />
                                 <TextBox x:Name="RegionTransitionWidthTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
                             </Grid>
                             <TextBlock TextWrapping="Wrap"
                                        Foreground="#7F8794"
-                                       Text="Manual regions keep full influence in their core and blend gradually across the border. The percentage is measured against the shorter analysis dimension." />
+                                       Text="Detailed areas use shorter, thinner marks with more local segments and controlled curvature. Near strong boundaries, detail progressively reinforces tangent alignment and crossing resistance without creating a binary seam." />
 
                             <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Manual detail regions" />
                             <TextBlock TextWrapping="Wrap" Foreground="#7F8794" Text="Click a region to select it; drag to add a rectangular focus or background region. Press Delete to remove the selected manual region or semantic correction." />

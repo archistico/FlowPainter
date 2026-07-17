@@ -35,7 +35,19 @@ public sealed class FlowPainterProjectSerializerTests
             strokeOpacity: 0.63d,
             backgroundMode: StrokePlanBackgroundMode.Transparent,
             detailAnalysis: new DetailAnalysisSettings(0.2d, 0.9d, 0.6d, 3),
-            detailInfluence: new DetailInfluenceSettings(5.5d, 0.4d, 1.6d, 0.55d, 1.7d, 0.08d),
+            detailInfluence: new DetailInfluenceSettings(
+                5.5d,
+                0.4d,
+                1.6d,
+                0.55d,
+                1.7d,
+                0.08d,
+                1.9d,
+                0.65d,
+                1.35d,
+                0.75d,
+                0.29d,
+                0.33d),
             brush: new BrushSettings(BrushKind.Flat, 0.7d, 0.12d, 0.2d, 5, 0.65d),
             semanticAnalysis: new SemanticAnalysisSettings(
                 enabled: true,
@@ -376,6 +388,48 @@ public sealed class FlowPainterProjectSerializerTests
         Assert.Empty(loaded.SemanticCorrections);
     }
 
+
+    [Fact]
+    public async Task DeserializeSchemaVersionTwelveUsesHighDetailPolicyDefaults()
+    {
+        FlowPainterProject project = new(
+            "Legacy stroke policy",
+            "images/source.png",
+            42UL,
+            new FlowPainterSettings(
+                detailInfluence: new DetailInfluenceSettings(
+                    detailedSegmentMultiplier: 2d,
+                    backgroundSegmentMultiplier: 0.5d,
+                    detailedCurveMultiplier: 1.5d,
+                    backgroundCurveMultiplier: 0.7d,
+                    detailedTangentAlignmentBoost: 0.6d,
+                    detailedCrossingResistanceBoost: 0.7d)));
+        await using MemoryStream current = new();
+        await FlowPainterProjectSerializer.SerializeAsync(project, current);
+        current.Position = 0L;
+        JsonObject root = (await JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project JSON is empty.");
+        root["schemaVersion"] = 12;
+        JsonObject detailInfluence = root["project"]?["settings"]?["detailInfluence"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized project has no detail-influence settings.");
+        detailInfluence.Remove("detailedSegmentMultiplier");
+        detailInfluence.Remove("backgroundSegmentMultiplier");
+        detailInfluence.Remove("detailedCurveMultiplier");
+        detailInfluence.Remove("backgroundCurveMultiplier");
+        detailInfluence.Remove("detailedTangentAlignmentBoost");
+        detailInfluence.Remove("detailedCrossingResistanceBoost");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterProject loaded = await FlowPainterProjectSerializer.DeserializeAsync(legacy);
+
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedSegmentMultiplier, loaded.Settings.DetailInfluence.DetailedSegmentMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultBackgroundSegmentMultiplier, loaded.Settings.DetailInfluence.BackgroundSegmentMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedCurveMultiplier, loaded.Settings.DetailInfluence.DetailedCurveMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultBackgroundCurveMultiplier, loaded.Settings.DetailInfluence.BackgroundCurveMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedTangentAlignmentBoost, loaded.Settings.DetailInfluence.DetailedTangentAlignmentBoost);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedCrossingResistanceBoost, loaded.Settings.DetailInfluence.DetailedCrossingResistanceBoost);
+    }
+
     [Fact]
     public async Task DeserializeRejectsUnsupportedSchemaVersion()
     {
@@ -439,6 +493,12 @@ public sealed class FlowPainterProjectSerializerTests
         Assert.Equal(expected.DetailInfluence.DetailedWidthMultiplier, actual.DetailInfluence.DetailedWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.BackgroundWidthMultiplier, actual.DetailInfluence.BackgroundWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.RegionTransitionWidth, actual.DetailInfluence.RegionTransitionWidth);
+        Assert.Equal(expected.DetailInfluence.DetailedSegmentMultiplier, actual.DetailInfluence.DetailedSegmentMultiplier);
+        Assert.Equal(expected.DetailInfluence.BackgroundSegmentMultiplier, actual.DetailInfluence.BackgroundSegmentMultiplier);
+        Assert.Equal(expected.DetailInfluence.DetailedCurveMultiplier, actual.DetailInfluence.DetailedCurveMultiplier);
+        Assert.Equal(expected.DetailInfluence.BackgroundCurveMultiplier, actual.DetailInfluence.BackgroundCurveMultiplier);
+        Assert.Equal(expected.DetailInfluence.DetailedTangentAlignmentBoost, actual.DetailInfluence.DetailedTangentAlignmentBoost);
+        Assert.Equal(expected.DetailInfluence.DetailedCrossingResistanceBoost, actual.DetailInfluence.DetailedCrossingResistanceBoost);
         Assert.Equal(expected.Brush.Kind, actual.Brush.Kind);
         Assert.Equal(expected.Brush.Hardness, actual.Brush.Hardness);
         Assert.Equal(expected.Brush.SizeJitter, actual.Brush.SizeJitter);

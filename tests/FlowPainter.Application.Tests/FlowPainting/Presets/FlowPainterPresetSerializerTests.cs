@@ -37,7 +37,19 @@ public sealed class FlowPainterPresetSerializerTests
                 0.6d,
                 StrokePlanBackgroundMode.Transparent,
                 new DetailAnalysisSettings(0.2d, 0.8d, 0.3d, 2),
-                new DetailInfluenceSettings(6d, 0.4d, 1.6d, 0.5d, 1.7d, 0.09d),
+                new DetailInfluenceSettings(
+                    6d,
+                    0.4d,
+                    1.6d,
+                    0.5d,
+                    1.7d,
+                    0.09d,
+                    1.8d,
+                    0.7d,
+                    1.4d,
+                    0.8d,
+                    0.31d,
+                    0.37d),
                 new BrushSettings(BrushKind.Bristle, 0.45d, 0.2d, 0.3d, 11, 0.85d),
                 new SemanticAnalysisSettings(false, 0.4d, 0d, 0d, 0d, 0d, 0.6d, 0.01d, 3, 0.5d, 1, 4),
                 new SceneBoundaryAnalysisSettings(
@@ -101,6 +113,48 @@ public sealed class FlowPainterPresetSerializerTests
             loaded.Settings.DetailInfluence.RegionTransitionWidth);
     }
 
+
+    [Fact]
+    public async Task DeserializeMigratesSchemaVersionNineWithHighDetailPolicyDefaults()
+    {
+        FlowPainterPreset preset = new(
+            "Legacy stroke policy",
+            new FlowPainterSettings(
+                detailInfluence: new DetailInfluenceSettings(
+                    detailedSegmentMultiplier: 2d,
+                    backgroundSegmentMultiplier: 0.5d,
+                    detailedCurveMultiplier: 1.5d,
+                    backgroundCurveMultiplier: 0.7d,
+                    detailedTangentAlignmentBoost: 0.6d,
+                    detailedCrossingResistanceBoost: 0.7d)));
+        await using MemoryStream current = new();
+        await FlowPainterPresetSerializer.SerializeAsync(preset, current);
+        current.Position = 0L;
+        System.Text.Json.Nodes.JsonObject root =
+            (await System.Text.Json.Nodes.JsonNode.ParseAsync(current))?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
+        root["schemaVersion"] = 9;
+        System.Text.Json.Nodes.JsonObject detailInfluence =
+            root["preset"]?["settings"]?["detailInfluence"]?.AsObject()
+            ?? throw new InvalidOperationException("The serialized preset has no detail-influence settings.");
+        detailInfluence.Remove("detailedSegmentMultiplier");
+        detailInfluence.Remove("backgroundSegmentMultiplier");
+        detailInfluence.Remove("detailedCurveMultiplier");
+        detailInfluence.Remove("backgroundCurveMultiplier");
+        detailInfluence.Remove("detailedTangentAlignmentBoost");
+        detailInfluence.Remove("detailedCrossingResistanceBoost");
+        await using MemoryStream legacy = new(Encoding.UTF8.GetBytes(root.ToJsonString()));
+
+        FlowPainterPreset loaded = await FlowPainterPresetSerializer.DeserializeAsync(legacy);
+
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedSegmentMultiplier, loaded.Settings.DetailInfluence.DetailedSegmentMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultBackgroundSegmentMultiplier, loaded.Settings.DetailInfluence.BackgroundSegmentMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedCurveMultiplier, loaded.Settings.DetailInfluence.DetailedCurveMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultBackgroundCurveMultiplier, loaded.Settings.DetailInfluence.BackgroundCurveMultiplier);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedTangentAlignmentBoost, loaded.Settings.DetailInfluence.DetailedTangentAlignmentBoost);
+        Assert.Equal(DetailInfluenceSettings.DefaultDetailedCrossingResistanceBoost, loaded.Settings.DetailInfluence.DetailedCrossingResistanceBoost);
+    }
+
     [Fact]
     public async Task DeserializeRejectsUnsupportedSchemaVersion()
     {
@@ -109,7 +163,7 @@ public sealed class FlowPainterPresetSerializerTests
             new FlowPainterPreset("Invalid version", new FlowPainterSettings(strokeCount: 1)),
             valid);
         string json = Encoding.UTF8.GetString(valid.ToArray())
-            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 99", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 10", "\"schemaVersion\": 99", StringComparison.Ordinal);
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes(json), writable: false);
 
         await Assert.ThrowsAsync<NotSupportedException>(
@@ -166,7 +220,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 2", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 10", "\"schemaVersion\": 2", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -187,7 +241,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 3", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 10", "\"schemaVersion\": 3", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -210,7 +264,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 4", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 10", "\"schemaVersion\": 4", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -265,6 +319,12 @@ public sealed class FlowPainterPresetSerializerTests
         Assert.Equal(expected.DetailInfluence.DetailedWidthMultiplier, actual.DetailInfluence.DetailedWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.BackgroundWidthMultiplier, actual.DetailInfluence.BackgroundWidthMultiplier);
         Assert.Equal(expected.DetailInfluence.RegionTransitionWidth, actual.DetailInfluence.RegionTransitionWidth);
+        Assert.Equal(expected.DetailInfluence.DetailedSegmentMultiplier, actual.DetailInfluence.DetailedSegmentMultiplier);
+        Assert.Equal(expected.DetailInfluence.BackgroundSegmentMultiplier, actual.DetailInfluence.BackgroundSegmentMultiplier);
+        Assert.Equal(expected.DetailInfluence.DetailedCurveMultiplier, actual.DetailInfluence.DetailedCurveMultiplier);
+        Assert.Equal(expected.DetailInfluence.BackgroundCurveMultiplier, actual.DetailInfluence.BackgroundCurveMultiplier);
+        Assert.Equal(expected.DetailInfluence.DetailedTangentAlignmentBoost, actual.DetailInfluence.DetailedTangentAlignmentBoost);
+        Assert.Equal(expected.DetailInfluence.DetailedCrossingResistanceBoost, actual.DetailInfluence.DetailedCrossingResistanceBoost);
         Assert.Equal(expected.Brush.Kind, actual.Brush.Kind);
         Assert.Equal(expected.Brush.Hardness, actual.Brush.Hardness);
         Assert.Equal(expected.Brush.SizeJitter, actual.Brush.SizeJitter);

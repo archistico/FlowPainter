@@ -1,58 +1,47 @@
 # Validation checklist
 
-## M15.1 Regional boundary field
+## M15.2 High-detail local stroke policy
 
-**Status: READY FOR VALIDATION**
+Status: **READY FOR VALIDATION**  
+Validated baseline: **M15.1 — 1,049 tests**  
+Expected automated suite: **1,071 cases** (1,049 validated baseline + 22 new Application cases).
 
-Expected automated suite: **1,049 cases** (1,024 validated baseline + 25 new Application cases).
-
-Required commands:
-
-```bash
-dotnet restore FlowPainter.sln
-dotnet build FlowPainter.sln -c Release --no-restore
-dotnet test FlowPainter.sln -c Release --no-build
-```
-
-Manual acceptance is defined in [`M15_1_REGIONAL_BOUNDARY_FIELD.md`](M15_1_REGIONAL_BOUNDARY_FIELD.md). Validation covers regional distance/strength transfer, normals/tangents, hard and soft transitions, scene-guidance composition and Flow/Hybrid adoption.
-
-Run from the repository root with the .NET 10 SDK installed.
+Run:
 
 ```bash
-dotnet --info
-dotnet restore FlowPainter.sln
-dotnet build FlowPainter.sln -c Release --no-restore
-dotnet test FlowPainter.sln -c Release --no-build --logger "console;verbosity=normal"
-dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
+dotnet build -c Release
+dotnet test -c Release --no-build
 ```
 
-## Current validated baseline — M14.8
+Manual acceptance is defined in [`M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md`](M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md).
+
+## Current validated baseline — M15.1
 
 - restore succeeds;
 - all nine projects build with zero warnings and zero errors;
-- all **1,024** test cases pass with zero failures and zero skips;
-- project schema 12 and preset schema 9 are the validated persistence baseline;
+- all **1,049** test cases pass with zero failures and zero skips;
+- project schema 12 and preset schema 9 remain the M15.1 validated persistence baseline;
 - M13.4 state, memory, persistence and analysis-orchestration safeguards remain validated;
 - M14.1–M14.6 contracts, deterministic SLIC, connectivity, descriptors, RAG and hierarchy remain accepted;
 - M14.7 active SLIC orchestration and generalized roles remain accepted;
 - M14.8 regional controls, diagnostics, inspection and backward-compatible persistence are accepted;
 - Domain and Application remain free of Avalonia, SkiaSharp, LibNoiseCore, machine-learning runtimes, external SLIC packages and model files.
 
-M13.3 plus audit corrections established 755 cases. M13.4.1 reached 765, M13.4.2 reached 782, M13.4.3 reached 790 and M13.4.4 reached 804. M14.1 reached 863, M14.2 reached 882, M14.3 reached 907, M14.4 reached 920, M14.5 reached 940, M14.6 reached 964, M14.7 reached 998 and M14.8 was validated at **1,024**.
+M13.3 plus audit corrections established 755 cases. M13.4.1 reached 765, M13.4.2 reached 782, M13.4.3 reached 790 and M13.4.4 reached 804. M14.1 reached 863, M14.2 reached 882, M14.3 reached 907, M14.4 reached 920, M14.5 reached 940, M14.6 reached 964, M14.7 reached 998 and M14.8 was validated at **1,024** and M15.1 at **1,049**.
 
-## Next validation target — M15.1 Regional boundary field
+## Next validation target — M15.2 High-detail local stroke policy
 
-M14.8 is fully validated. M15.1 exit checks are:
+M15.1 is fully validated. M15.2 exit checks are:
 
-- nearest-boundary distance is bounded, deterministic and symmetric on simple fixtures;
-- RAG strength and prevailing tangent reach the correct pixels;
-- normals point toward the opposite side of the nearest boundary;
-- weak boundaries blend through broad continuous transitions;
-- strong boundaries are classified and protected in narrower bands;
-- scene-only M11–M12 guidance remains compatible;
-- Flow and both Hybrid stroke layers use regional planner versions;
-- disabled boundary painting preserves the existing detail-only path;
-- build has zero warnings/errors and all 1,049 tests pass.
+- detailed areas use shorter and thinner marks through continuous multipliers;
+- local segment count increases deterministically and remains capped by the supported maximum;
+- curve freedom interpolates continuously and remains bounded;
+- zero detail preserves the validated M12/M15.1 boundary response;
+- detailed areas progressively strengthen tangent alignment and crossing resistance;
+- no-detail plans retain the original v1 identity and sequence;
+- project schema 13 and preset schema 10 round-trip the new controls and migrate older documents;
+- work estimation reserves the worst-case local segment count;
+- build has zero warnings/errors and all 1,071 tests pass.
 
 The first Windows build of M5.1 identified nine compile/analyzer findings unrelated to the scrollbar layout change:
 

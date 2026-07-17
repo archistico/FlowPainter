@@ -154,6 +154,12 @@ public partial class MainWindow : Window
     private readonly TextBox _backgroundLengthTextBox;
     private readonly TextBox _detailedWidthTextBox;
     private readonly TextBox _backgroundWidthTextBox;
+    private readonly TextBox _detailedSegmentsTextBox;
+    private readonly TextBox _backgroundSegmentsTextBox;
+    private readonly TextBox _detailedCurveTextBox;
+    private readonly TextBox _backgroundCurveTextBox;
+    private readonly TextBox _detailTangentBoostTextBox;
+    private readonly TextBox _detailCrossingBoostTextBox;
     private readonly TextBox _regionTransitionWidthTextBox;
     private readonly TextBox _regionStrengthTextBox;
     private readonly TextBox _regionalTargetSizeTextBox;
@@ -365,6 +371,12 @@ public partial class MainWindow : Window
         _backgroundLengthTextBox = FindRequiredControl<TextBox>("BackgroundLengthTextBox");
         _detailedWidthTextBox = FindRequiredControl<TextBox>("DetailedWidthTextBox");
         _backgroundWidthTextBox = FindRequiredControl<TextBox>("BackgroundWidthTextBox");
+        _detailedSegmentsTextBox = FindRequiredControl<TextBox>("DetailedSegmentsTextBox");
+        _backgroundSegmentsTextBox = FindRequiredControl<TextBox>("BackgroundSegmentsTextBox");
+        _detailedCurveTextBox = FindRequiredControl<TextBox>("DetailedCurveTextBox");
+        _backgroundCurveTextBox = FindRequiredControl<TextBox>("BackgroundCurveTextBox");
+        _detailTangentBoostTextBox = FindRequiredControl<TextBox>("DetailTangentBoostTextBox");
+        _detailCrossingBoostTextBox = FindRequiredControl<TextBox>("DetailCrossingBoostTextBox");
         _regionTransitionWidthTextBox = FindRequiredControl<TextBox>("RegionTransitionWidthTextBox");
         _regionStrengthTextBox = FindRequiredControl<TextBox>("RegionStrengthTextBox");
         _regionalTargetSizeTextBox = FindRequiredControl<TextBox>("RegionalTargetSizeTextBox");
@@ -3204,6 +3216,12 @@ public partial class MainWindow : Window
         _backgroundLengthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundLengthMultiplier * 100d);
         _detailedWidthTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedWidthMultiplier * 100d);
         _backgroundWidthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundWidthMultiplier * 100d);
+        _detailedSegmentsTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedSegmentMultiplier * 100d);
+        _backgroundSegmentsTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundSegmentMultiplier * 100d);
+        _detailedCurveTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedCurveMultiplier * 100d);
+        _backgroundCurveTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundCurveMultiplier * 100d);
+        _detailTangentBoostTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedTangentAlignmentBoost * 100d);
+        _detailCrossingBoostTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedCrossingResistanceBoost * 100d);
         _regionTransitionWidthTextBox.Text = FormatDouble(settings.DetailInfluence.RegionTransitionWidth * 100d);
         ApplyRegionalSegmentationSettings(settings.RegionalSegmentation);
         ApplyRegionMergeSettings(settings.RegionMerge);
@@ -3631,7 +3649,13 @@ public partial class MainWindow : Window
             ParseDouble(_backgroundLengthTextBox, "Background length") / 100d,
             ParseDouble(_detailedWidthTextBox, "Detailed width") / 100d,
             ParseDouble(_backgroundWidthTextBox, "Background width") / 100d,
-            ParseDouble(_regionTransitionWidthTextBox, "Region transition width") / 100d);
+            ParseDouble(_regionTransitionWidthTextBox, "Region transition width") / 100d,
+            ParseDouble(_detailedSegmentsTextBox, "Detailed segments") / 100d,
+            ParseDouble(_backgroundSegmentsTextBox, "Background segments") / 100d,
+            ParseDouble(_detailedCurveTextBox, "Detailed curve freedom") / 100d,
+            ParseDouble(_backgroundCurveTextBox, "Background curve freedom") / 100d,
+            ParseDouble(_detailTangentBoostTextBox, "Detail tangent boost") / 100d,
+            ParseDouble(_detailCrossingBoostTextBox, "Detail crossing resistance") / 100d);
     }
 
     private RegionSegmentationSettings ReadRegionalSegmentationSettings()
@@ -5335,6 +5359,12 @@ public partial class MainWindow : Window
             _backgroundLengthTextBox,
             _detailedWidthTextBox,
             _backgroundWidthTextBox,
+            _detailedSegmentsTextBox,
+            _backgroundSegmentsTextBox,
+            _detailedCurveTextBox,
+            _backgroundCurveTextBox,
+            _detailTangentBoostTextBox,
+            _detailCrossingBoostTextBox,
             _regionTransitionWidthTextBox,
             _regionalTargetSizeTextBox,
             _regionalCompactnessTextBox,
