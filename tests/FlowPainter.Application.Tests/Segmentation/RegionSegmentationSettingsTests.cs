@@ -9,11 +9,21 @@ public sealed class RegionSegmentationSettingsTests
     {
         RegionSegmentationSettings settings = new();
 
+        Assert.True(settings.Enabled);
         Assert.Equal(64, settings.TargetRegionSize);
         Assert.Equal(10d, settings.Compactness);
         Assert.Equal(0.8d, settings.PreBlurSigma);
         Assert.Equal(10, settings.MaximumIterations);
         Assert.Equal(0.5d, settings.ConvergenceTolerance);
+    }
+
+    [Fact]
+    public void ConstructorCanDisableSegmentationWithoutChangingParameters()
+    {
+        RegionSegmentationSettings settings = new(enabled: false);
+
+        Assert.False(settings.Enabled);
+        Assert.Equal(RegionSegmentationSettings.DefaultTargetRegionSize, settings.TargetRegionSize);
     }
 
     [Fact]

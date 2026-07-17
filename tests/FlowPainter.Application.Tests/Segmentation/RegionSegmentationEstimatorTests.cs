@@ -16,8 +16,29 @@ public sealed class RegionSegmentationEstimatorTests
         Assert.Equal(2, estimate.EstimatedRegionCount);
         Assert.Equal(RegionLabelStorageKind.Compact, estimate.LabelStorageKind);
         Assert.Equal(16_384L, estimate.LabelBytes);
-        Assert.Equal(213_184L, estimate.EstimatedPeakBytes);
+        Assert.Equal(32_768L, estimate.DescriptorBufferBytes);
+        Assert.Equal(640L, estimate.DescriptorRegionBytes);
+        Assert.Equal(2_048L, estimate.AdjacencyRegionBytes);
+        Assert.Equal(4_096L, estimate.HierarchyRegionBytes);
+        Assert.Equal(318_592L, estimate.EstimatedPeakBytes);
         Assert.Equal(737_280L, estimate.EstimatedAssignmentEvaluations);
+    }
+
+    [Fact]
+    public void EstimateDisabledSegmentationUsesSingleRegionWithoutClusteringWork()
+    {
+        RegionSegmentationEstimate estimate = RegionSegmentationEstimator.Estimate(
+            new ImageSize(128, 64),
+            new RegionSegmentationSettings(enabled: false));
+
+        Assert.Equal(1, estimate.EstimatedRegionCount);
+        Assert.Equal(RegionLabelStorageKind.Compact, estimate.LabelStorageKind);
+        Assert.Equal(0L, estimate.ColorBufferBytes);
+        Assert.Equal(0L, estimate.DistanceBufferBytes);
+        Assert.Equal(0L, estimate.AssignmentBufferBytes);
+        Assert.Equal(0L, estimate.SmoothingBufferBytes);
+        Assert.Equal(0L, estimate.ConnectivityBufferBytes);
+        Assert.Equal(0L, estimate.EstimatedAssignmentEvaluations);
     }
 
     [Fact]
@@ -28,7 +49,7 @@ public sealed class RegionSegmentationEstimatorTests
             new RegionSegmentationSettings(preBlurSigma: 0d));
 
         Assert.Equal(0L, estimate.SmoothingBufferBytes);
-        Assert.Equal(180_416L, estimate.EstimatedPeakBytes);
+        Assert.Equal(285_824L, estimate.EstimatedPeakBytes);
     }
 
     [Fact]

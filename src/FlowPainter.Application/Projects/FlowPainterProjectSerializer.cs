@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Segmentation;
 
 namespace FlowPainter.Application.Projects;
 
@@ -102,6 +103,24 @@ public static class FlowPainterProjectSerializer
         if (schemaVersion < 11 && !project.ContainsKey("semanticCorrections"))
         {
             project["semanticCorrections"] = new JsonArray();
+        }
+
+        if (schemaVersion < 12
+            && project["settings"] is JsonObject regionalSettings)
+        {
+            if (!regionalSettings.ContainsKey("regionalSegmentation"))
+            {
+                regionalSettings["regionalSegmentation"] = JsonSerializer.SerializeToNode(
+                    new RegionSegmentationSettings(),
+                    SerializerOptions);
+            }
+
+            if (!regionalSettings.ContainsKey("regionMerge"))
+            {
+                regionalSettings["regionMerge"] = JsonSerializer.SerializeToNode(
+                    new RegionMergeSettings(),
+                    SerializerOptions);
+            }
         }
     }
 

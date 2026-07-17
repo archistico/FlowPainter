@@ -1,8 +1,10 @@
 using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Detail;
+using FlowPainter.Domain.Segmentation;
 
 namespace FlowPainter.Application.Analysis;
 
@@ -10,23 +12,23 @@ public sealed class AnalysisCoordinator
 {
     private readonly object _gate = new();
     private readonly IDetailMapAnalyzer _detailAnalyzer;
-    private readonly ISemanticImportanceAnalyzer _semanticAnalyzer;
-    private readonly ISceneBoundaryAnalyzer _boundaryAnalyzer;
+    private readonly IRegionSegmentationAnalyzer _segmentationAnalyzer;
+    private readonly IRegionalSceneBoundaryAnalyzer _boundaryAnalyzer;
     private long _latestGeneration;
     private AnalysisCacheKey? _currentKey;
     private AnalysisResult? _currentResult;
 
     public AnalysisCoordinator(
         IDetailMapAnalyzer detailAnalyzer,
-        ISemanticImportanceAnalyzer semanticAnalyzer,
-        ISceneBoundaryAnalyzer boundaryAnalyzer)
+        IRegionSegmentationAnalyzer segmentationAnalyzer,
+        IRegionalSceneBoundaryAnalyzer boundaryAnalyzer)
     {
         ArgumentNullException.ThrowIfNull(detailAnalyzer);
-        ArgumentNullException.ThrowIfNull(semanticAnalyzer);
+        ArgumentNullException.ThrowIfNull(segmentationAnalyzer);
         ArgumentNullException.ThrowIfNull(boundaryAnalyzer);
 
         _detailAnalyzer = detailAnalyzer;
-        _semanticAnalyzer = semanticAnalyzer;
+        _segmentationAnalyzer = segmentationAnalyzer;
         _boundaryAnalyzer = boundaryAnalyzer;
     }
 
@@ -78,32 +80,41 @@ public sealed class AnalysisCoordinator
         progress?.Report(new AnalysisPipelineProgress(
             AnalysisPipelineStage.Preparing,
             0d,
-            "Preparing image analysis..."));
+            "Preparing regional image analysis..."));
 
         DetailMap structural = await _detailAnalyzer.AnalyzeAsync(
             request.Source,
             request.DetailSettings,
             CreateDetailProgress(progress),
             cancellationToken).ConfigureAwait(false);
-        SemanticAnalysisResult automaticSemantic = await _semanticAnalyzer.AnalyzeAsync(
+
+        RegionSegmentationRequest segmentationRequest = new(
             request.Source,
-            request.SemanticSettings,
-            CreateSemanticProgress(progress),
+            request.SegmentationSettings,
+            mergeSettings: request.MergeSettings);
+        RegionSegmentationResult segmentation = await _segmentationAnalyzer.AnalyzeAsync(
+            segmentationRequest,
+            CreateSegmentationProgress(progress),
             cancellationToken).ConfigureAwait(false);
 
         progress?.Report(new AnalysisPipelineProgress(
-            AnalysisPipelineStage.SemanticCorrections,
-            0.58d,
-            "Applying persistent semantic corrections..."));
-        SemanticAnalysisResult semantic = SemanticCorrectionComposer.Apply(
-            automaticSemantic,
-            request.SemanticCorrections,
+            AnalysisPipelineStage.RegionRoles,
+            0.62d,
+            "Applying persistent region-role overrides..."));
+        IReadOnlyList<RegionRoleOverride> roleOverrides = request.RegionRoleOverrides.Count > 0
+            ? request.RegionRoleOverrides
+            : LegacySemanticCorrectionAdapter.Convert(request.SemanticCorrections);
+        RegionalStructureAnalysisResult regional = RegionalStructureAnalysisComposer.Compose(
+            segmentation,
+            structural,
+            roleOverrides,
             request.DetailInfluenceSettings.RegionTransitionWidth,
             cancellationToken);
+        SemanticAnalysisResult semanticCompatibility = RegionalSemanticCompatibilityAdapter.Create(regional);
 
         SceneBoundaryAnalysisResult boundary = await _boundaryAnalyzer.AnalyzeAsync(
             request.Source,
-            semantic,
+            regional,
             request.BoundarySettings,
             CreateBoundaryProgress(progress),
             cancellationToken).ConfigureAwait(false);
@@ -111,11 +122,10 @@ public sealed class AnalysisCoordinator
         progress?.Report(new AnalysisPipelineProgress(
             AnalysisPipelineStage.AutomaticDetail,
             0.86d,
-            "Combining structural and semantic detail maps..."));
-        DetailMap automatic = SemanticDetailMapComposer.Combine(
+            "Combining structural and regional detail evidence..."));
+        DetailMap automatic = RegionalDetailMapComposer.Combine(
             structural,
-            semantic,
-            request.SemanticSettings,
+            regional,
             cancellationToken);
 
         progress?.Report(new AnalysisPipelineProgress(
@@ -131,7 +141,7 @@ public sealed class AnalysisCoordinator
         BackgroundSuppressionResult backgroundSuppression = BackgroundSuppressionComposer.Compose(
             automatic,
             manuallyComposed,
-            semantic,
+            regional,
             boundary,
             request.BackgroundSettings,
             CreateBackgroundProgress(progress),
@@ -140,7 +150,9 @@ public sealed class AnalysisCoordinator
         cancellationToken.ThrowIfCancellationRequested();
         AnalysisResult result = new(
             structural,
-            semantic,
+            segmentation,
+            regional,
+            semanticCompatibility,
             boundary,
             automatic,
             manuallyComposed,
@@ -148,7 +160,7 @@ public sealed class AnalysisCoordinator
         progress?.Report(new AnalysisPipelineProgress(
             AnalysisPipelineStage.Completed,
             1d,
-            "Image analysis completed."));
+            "Regional image analysis completed."));
         return new PendingAnalysis(generation, request.CacheKey, result);
     }
 
@@ -187,7 +199,7 @@ public sealed class AnalysisCoordinator
         BackgroundSuppressionResult backgroundSuppression = BackgroundSuppressionComposer.Compose(
             basis.AutomaticDetailMap,
             manuallyComposed,
-            basis.SemanticAnalysis,
+            basis.RegionalAnalysis,
             basis.BoundaryAnalysis,
             request.BackgroundSettings,
             CreateBackgroundProgress(progress),
@@ -196,6 +208,8 @@ public sealed class AnalysisCoordinator
 
         AnalysisResult result = new(
             basis.StructuralDetailMap,
+            basis.RegionalSegmentation,
+            basis.RegionalAnalysis,
             basis.SemanticAnalysis,
             basis.BoundaryAnalysis,
             basis.AutomaticDetailMap,
@@ -204,7 +218,7 @@ public sealed class AnalysisCoordinator
         progress?.Report(new AnalysisPipelineProgress(
             AnalysisPipelineStage.Completed,
             1d,
-            "Image analysis recomposed."));
+            "Regional image analysis recomposed."));
         return Task.FromResult(new PendingAnalysis(generation, request.CacheKey, result));
     }
 
@@ -268,7 +282,7 @@ public sealed class AnalysisCoordinator
             : new ForwardingProgress<DetailAnalysisProgress>(value => progress.Report(
                 new AnalysisPipelineProgress(
                     AnalysisPipelineStage.StructuralDetail,
-                    MapStageFraction(0d, 0.30d, value.Fraction),
+                    MapStageFraction(0d, 0.25d, value.Fraction),
                     value.Stage switch
                     {
                         DetailAnalysisStage.Preparing => "Preparing structural analysis...",
@@ -279,24 +293,29 @@ public sealed class AnalysisCoordinator
                     })));
     }
 
-    private static ForwardingProgress<SemanticAnalysisProgress>? CreateSemanticProgress(
+    private static ForwardingProgress<RegionSegmentationProgress>? CreateSegmentationProgress(
         IProgress<AnalysisPipelineProgress>? progress)
     {
         return progress is null
             ? null
-            : new ForwardingProgress<SemanticAnalysisProgress>(value => progress.Report(
+            : new ForwardingProgress<RegionSegmentationProgress>(value => progress.Report(
                 new AnalysisPipelineProgress(
-                    AnalysisPipelineStage.SemanticImportance,
-                    MapStageFraction(0.30d, 0.58d, value.Fraction),
+                    AnalysisPipelineStage.RegionalSegmentation,
+                    MapStageFraction(0.25d, 0.62d, value.OverallFraction),
                     value.Stage switch
                     {
-                        SemanticAnalysisStage.Preparing => "Preparing semantic importance analysis...",
-                        SemanticAnalysisStage.ComputingSaliency => $"Computing saliency {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                        SemanticAnalysisStage.SegmentingSubjects => "Segmenting generic subjects...",
-                        SemanticAnalysisStage.BuildingSilhouettes => $"Building subject silhouettes {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                        SemanticAnalysisStage.CombiningMaps => "Combining semantic maps...",
-                        SemanticAnalysisStage.Completed => "Semantic importance analysis completed.",
-                        _ => "Analyzing semantic importance..."
+                        RegionSegmentationStage.Preparing => "Preparing SLIC regional segmentation...",
+                        RegionSegmentationStage.Smoothing => "Pre-smoothing the segmentation proxy...",
+                        RegionSegmentationStage.ConvertingColor => "Converting the segmentation proxy to CIELAB...",
+                        RegionSegmentationStage.InitializingClusters => "Initializing deterministic SLIC clusters...",
+                        RegionSegmentationStage.AssigningPixels => $"Assigning SLIC pixels, iteration {value.CompletedIterations:N0} / {value.TotalIterations:N0}",
+                        RegionSegmentationStage.UpdatingClusters => "Updating SLIC cluster centroids...",
+                        RegionSegmentationStage.RepairingConnectivity => "Repairing regional connectivity...",
+                        RegionSegmentationStage.BuildingResult => "Calculating regional descriptors...",
+                        RegionSegmentationStage.BuildingAdjacency => "Building the region adjacency graph...",
+                        RegionSegmentationStage.BuildingHierarchy => "Building the regional hierarchy...",
+                        RegionSegmentationStage.Completed => "Regional segmentation completed.",
+                        _ => "Segmenting image regions..."
                     })));
     }
 
@@ -308,17 +327,17 @@ public sealed class AnalysisCoordinator
             : new ForwardingProgress<SceneBoundaryAnalysisProgress>(value => progress.Report(
                 new AnalysisPipelineProgress(
                     AnalysisPipelineStage.SceneBoundaries,
-                    MapStageFraction(0.58d, 0.86d, value.Fraction),
+                    MapStageFraction(0.64d, 0.86d, value.Fraction),
                     value.Stage switch
                     {
-                        SceneBoundaryAnalysisStage.Preparing => "Preparing scene-boundary analysis...",
+                        SceneBoundaryAnalysisStage.Preparing => "Preparing region-aware boundary analysis...",
                         SceneBoundaryAnalysisStage.ComputingMultiscaleEdges => $"Computing multiscale edges {value.CompletedRows:N0} / {value.TotalRows:N0}",
                         SceneBoundaryAnalysisStage.LinkingContours => $"Linking continuous contours {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                        SceneBoundaryAnalysisStage.ClassifyingBoundaries => $"Classifying important boundaries {value.CompletedRows:N0} / {value.TotalRows:N0}",
-                        SceneBoundaryAnalysisStage.EstimatingBackground => $"Estimating background confidence {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                        SceneBoundaryAnalysisStage.ClassifyingBoundaries => $"Combining regional and image boundaries {value.CompletedRows:N0} / {value.TotalRows:N0}",
+                        SceneBoundaryAnalysisStage.EstimatingBackground => $"Estimating regional background confidence {value.CompletedRows:N0} / {value.TotalRows:N0}",
                         SceneBoundaryAnalysisStage.SmoothingMaps => "Smoothing boundary maps...",
-                        SceneBoundaryAnalysisStage.Completed => "Scene-boundary analysis completed.",
-                        _ => "Analyzing scene boundaries..."
+                        SceneBoundaryAnalysisStage.Completed => "Region-aware boundary analysis completed.",
+                        _ => "Analyzing regional boundaries..."
                     })));
     }
 
@@ -334,9 +353,9 @@ public sealed class AnalysisCoordinator
                     value.Stage switch
                     {
                         BackgroundSuppressionStage.Preparing => "Preparing background suppression...",
-                        BackgroundSuppressionStage.BuildingProtection => "Protecting subjects, silhouettes and uncertain areas...",
-                        BackgroundSuppressionStage.EstimatingSuppression => "Estimating low-importance background...",
-                        BackgroundSuppressionStage.SmoothingTransitions => "Smoothing subject-background transitions...",
+                        BackgroundSuppressionStage.BuildingProtection => "Protecting regional focus, strong boundaries and uncertain areas...",
+                        BackgroundSuppressionStage.EstimatingSuppression => "Estimating low-importance regional background...",
+                        BackgroundSuppressionStage.SmoothingTransitions => "Smoothing regional transitions...",
                         BackgroundSuppressionStage.CombiningDetail => "Building the artistic detail field...",
                         BackgroundSuppressionStage.Completed => "Background suppression completed.",
                         _ => "Composing background suppression..."

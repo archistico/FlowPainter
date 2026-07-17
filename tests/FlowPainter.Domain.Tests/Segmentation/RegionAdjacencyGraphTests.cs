@@ -23,6 +23,25 @@ public sealed class RegionAdjacencyGraphTests
             edge => Assert.True(edge.Connects(1, 2)));
     }
 
+
+    [Fact]
+    public void GetEdgesReturnsSymmetricDeterministicNeighborhoods()
+    {
+        RegionAdjacency zeroTwo = new(0, 2, 1);
+        RegionAdjacency zeroOne = new(0, 1, 2);
+        RegionAdjacency oneTwo = new(1, 2, 3);
+        RegionAdjacency[] unorderedEdges = [oneTwo, zeroTwo, zeroOne];
+        RegionAdjacency[] zeroEdges = [zeroOne, zeroTwo];
+        RegionAdjacency[] oneEdges = [zeroOne, oneTwo];
+        RegionAdjacency[] twoEdges = [zeroTwo, oneTwo];
+        RegionAdjacencyGraph graph = new(3, unorderedEdges);
+
+        Assert.Equal(2, graph.GetDegree(0));
+        Assert.Equal(zeroEdges, graph.GetEdges(0));
+        Assert.Equal(oneEdges, graph.GetEdges(1));
+        Assert.Equal(twoEdges, graph.GetEdges(2));
+    }
+
     [Fact]
     public void TryGetEdgeIsSymmetric()
     {
@@ -66,5 +85,10 @@ public sealed class RegionAdjacencyGraphTests
         Assert.Throws<ArgumentException>(() => new RegionAdjacency(1, 0, 1));
         Assert.Throws<ArgumentException>(() => new RegionAdjacency(0, 1, 1, meanGradient: 2d, maximumGradient: 1d));
         Assert.Throws<ArgumentOutOfRangeException>(() => new RegionAdjacency(0, 1, 1, boundaryStrength: 1.1d));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RegionAdjacency(
+            0,
+            1,
+            1,
+            prevailingTangentRadians: Math.PI));
     }
 }

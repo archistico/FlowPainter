@@ -38,7 +38,15 @@ public sealed class RegionAdjacency
         ValidateNonNegative(luminanceDifference, nameof(luminanceDifference));
         ValidateNonNegative(textureDifference, nameof(textureDifference));
         ValidateUnitInterval(continuity, nameof(continuity));
-        ValidateFinite(prevailingTangentRadians, nameof(prevailingTangentRadians));
+        if (!double.IsFinite(prevailingTangentRadians)
+            || prevailingTangentRadians < 0d
+            || prevailingTangentRadians >= Math.PI)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(prevailingTangentRadians),
+                prevailingTangentRadians,
+                "The prevailing tangent must be finite and in the half-open interval [0, PI).");
+        }
         ValidateUnitInterval(boundaryStrength, nameof(boundaryStrength));
 
         FirstRegionId = firstRegionId;
@@ -80,14 +88,6 @@ public sealed class RegionAdjacency
     {
         return (FirstRegionId == firstRegionId && SecondRegionId == secondRegionId)
             || (FirstRegionId == secondRegionId && SecondRegionId == firstRegionId);
-    }
-
-    private static void ValidateFinite(double value, string parameterName)
-    {
-        if (!double.IsFinite(value))
-        {
-            throw new ArgumentOutOfRangeException(parameterName, value, "The value must be finite.");
-        }
     }
 
     private static void ValidateNonNegative(double value, string parameterName)

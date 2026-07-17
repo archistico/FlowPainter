@@ -45,13 +45,13 @@ Contains orchestration and policies that operate on domain objects:
 - generation requests;
 - explicit memory estimation;
 - `IDetailMapAnalyzer` and deterministic structural analysis;
-- current M8–M13.3 `ISemanticImportanceAnalyzer` compatibility pipeline, semantic maps and normalized semantic regions;
-- current composition of structural, subject, silhouette and focal importance;
-- current non-destructive semantic-correction composition before scene-boundary analysis;
+- historical M8–M13.3 `ISemanticImportanceAnalyzer` implementation retained for compatibility tests and older documentation;
+- active M14.7 SLIC regional-structure composition, generalized roles and legacy semantic compatibility adapters;
+- region-aware scene-boundary and background composition without automatic class or subject recognition;
 - M13.4.4 `AnalysisCoordinator`, detached analysis results, immutable cache identities and transactional adoption;
 - M14.1 `IRegionSegmentationAnalyzer`, immutable segmentation request/result/progress contracts and exact resource estimator;
-- planned M14.2+ SLIC clustering, descriptor calculation, adjacency accumulation and hierarchy policies;
-- deterministic overlay hit testing and semantic-correction editing;
+- M14.2 deterministic SLIC clustering, M14.3 connectivity/diagnostics, M14.4 regional descriptors, M14.5 adjacency evidence, M14.6 hierarchy and M14.7 active-pipeline adoption;
+- deterministic overlay hit testing, legacy semantic-correction editing and runtime conversion to generalized region roles;
 - composition of automatic/manual detail information;
 - normalized viewport coordinate mapping;
 - characterized legacy density and planning behaviour;
@@ -103,7 +103,7 @@ Stroke rendering delegates material deposition to the validated SolidRound, Soft
 Avalonia desktop composition root and presentation layer. The current workflow is:
 
 ```text
-Current M13.4.4 compatibility workflow:
+Current M14.7 workflow:
 
 Open image or project
     ↓
@@ -111,37 +111,23 @@ Resolve source and create selected-quality proxy
     ↓
 Create immutable analysis request and cache key
     ↓
-Analyze structural and legacy semantic importance
+Analyze structural detail + deterministic SLIC segmentation
     ↓
-Apply persistent schema-11 semantic corrections
+Connected labels + descriptors + RAG + hierarchy
     ↓
-Analyze corrected scene boundaries and background confidence
+Convert schema-11 corrections into generalized region roles
     ↓
-Compose manual detail regions and background suppression
+Compose regional importance and region-aware boundaries
+    ↓
+Compose automatic/manual detail and background suppression
     ↓
 Adopt the complete detached result transactionally
     ↓
-Generate Flow / Primitive / Hybrid plans
+Generate Flow / Primitive / Hybrid plans from the shared result
     ↓
 Render, persist and export
 
-Approved M14 target workflow:
-
-Open image or project
-    ↓
-Resolve source and create selected-quality proxy
-    ↓
-Structural analysis + deterministic SLIC segmentation
-    ↓
-Connected label map + descriptors + Region Adjacency Graph
-    ↓
-Hierarchical merge + boundary strength/tangent/distance fields
-    ↓
-Manual region roles and detail corrections
-    ↓
-Shared artistic-detail policy for Flow / Primitive / Hybrid
-    ↓
-Render, persist and export
+M14.8 exposes and persists the SLIC, merge, overlay and generalized role controls.
 ```
 
 The window owns source, proxy, rendered and Avalonia preview resources. Replacement is transactional: new previews are constructed before old resources are released, and failed operations retain or dispose ownership explicitly.
@@ -172,8 +158,8 @@ M13.4.4 and ADR-0020 move the complete derived-map lifecycle into `FlowPainter.A
 ```text
 AnalysisRequest
 ├── IRgbaPixelSource proxy
-├── structural / semantic / boundary / background settings
-├── copied manual regions and semantic corrections
+├── structural / SLIC / merge / boundary / background settings
+├── copied manual regions and schema-11 correction compatibility values
 └── AnalysisCacheKey
         ↓
 AnalysisCoordinator.AnalyzeAsync / RecomposeAsync
@@ -192,19 +178,19 @@ UI replacement callback succeeds
 CurrentKey + CurrentResult are published
 ```
 
-`AnalysisCacheKey` is value-based and includes a non-empty per-source session identity, proxy dimensions, detail-region revision, semantic-correction revision and an invariant fingerprint of every setting that affects derived analysis output. Renderer-only settings are excluded. Candidate image/project loads use a temporary source identity and revision pair; after the workspace is committed, `TryRetagCurrent` moves the accepted result to the committed revisions without recomputation.
+`AnalysisCacheKey` is value-based and includes a non-empty per-source session identity, proxy dimensions, detail-region revision, semantic-correction revision and an invariant fingerprint of every setting that affects derived analysis output. M14.7 includes SLIC and merge settings and deliberately excludes retired semantic-analysis settings. Renderer-only settings are excluded. Candidate image/project loads use a temporary source identity and revision pair; after the workspace is committed, `TryRetagCurrent` moves the accepted result to the committed revisions without recomputation.
 
 Every full analysis or recomposition increments a coordinator generation. `TryAdopt` rejects a pending result unless it belongs to the latest requested generation and matches the caller's freshly rebuilt expected key. Starting, cancelling or failing a newer run does not erase the last successfully adopted result. `Invalidate` deliberately clears it and makes all outstanding generations stale.
 
 The adoption callback is synchronous and intentionally limited to short native/UI ownership swaps. The coordinator publishes its cache only after that callback returns successfully. Overlay creation, source/proxy replacement and Avalonia bitmap construction therefore cannot leave a cache entry claiming that a failed UI adoption succeeded.
 
-Manual detail-region edits use `RecomposeAsync` when structural, semantic and boundary inputs are unchanged. That path reuses the accepted structural, corrected-semantic, boundary and automatic-detail maps, then rebuilds only manual composition and background suppression. Semantic-correction or analyzer-setting changes still require the full pipeline.
+Manual detail-region edits use `RecomposeAsync` when structural, regional-role and boundary inputs are unchanged. That path reuses the accepted structural map, SLIC result, regional maps, compatibility envelope, boundary result and automatic-detail map, then rebuilds only manual composition and background suppression. Role-correction, SLIC, merge, structural or boundary-setting changes require the full pipeline.
 
-`MainWindow` remains the desktop composition root: it reads controls, owns disposable native resources, renders temporary overlays and supplies the final adoption callback. It no longer invokes the three analyzers or the map composers directly. This is the lifecycle boundary that M14 will extend with SLIC labels, descriptors and hierarchy results.
+`MainWindow` remains the desktop composition root: it reads controls, owns disposable native resources, renders temporary overlays and supplies the final adoption callback. It no longer invokes the three analyzers or the map composers directly. M14.7 extends this lifecycle with accepted SLIC labels, descriptors, adjacency, hierarchy and regional-role maps.
 
 ## Analysis fields
 
-FlowPainter separates four control structures in the approved target architecture:
+FlowPainter separates four control structures in the active M14.7 architecture:
 
 ```text
 Region field      → complete pixel partition, adjacency and hierarchy
@@ -213,11 +199,11 @@ Importance field  → allocation of strokes, primitives and optimization effort
 Boundary field    → protected separations and tangent direction
 ```
 
-Detail and importance remain normalized scalar values. The region field is a compact integer label map plus descriptor/graph tables. M11 provides scalar boundary evidence and a vector-valued `BoundaryDirectionField`; M14 will derive equivalent evidence from the regional graph. Keeping these structures separate allows the UI to diagnose whether a weak result comes from segmentation, hierarchy, boundary direction or rendering policy.
+Detail and importance remain normalized scalar values. The region field is a compact integer label map plus descriptor/graph tables. M11 provides scalar boundary evidence and a vector-valued `BoundaryDirectionField`; M14.7 now feeds the analyzer with shared-boundary evidence derived from the regional graph. Keeping these structures separate allows the UI to diagnose whether a weak result comes from segmentation, hierarchy, boundary direction or rendering policy.
 
-### Structural importance and legacy semantic baseline
+### Structural importance and active regional analysis
 
-M4's `ImageDetailAnalyzer` calculates luminance-edge and local RGB-contrast signals. M8 added `ISemanticImportanceAnalyzer`, whose deterministic provider produces generic saliency, subject, silhouette and focal maps. This remains the validated M8–M13.3 compatibility baseline, but it is no longer an extension point for future model-backed providers. ADR-0017 supersedes that direction: M14.7 will remove automatic semantic evidence from active planning after SLIC regional segmentation is validated.
+M4's `ImageDetailAnalyzer` calculates luminance-edge and local RGB-contrast signals. M8's `ISemanticImportanceAnalyzer` remains a validated historical subsystem, but M14.7 no longer injects or calls it from `AnalysisCoordinator`. `RegionalStructureAnalysisComposer` now combines structural detail, fine-region descriptors, RAG boundary strength, hierarchy specificity and generalized manual roles. `RegionalSemanticCompatibilityAdapter` exposes those maps only to legacy desktop/boundary consumers; it performs no object classification or primary-subject ranking.
 
 Current manual-region composition remains:
 
@@ -228,7 +214,7 @@ Reduce:   value × (1 - strength)
 
 This keeps values in `[0, 1]` and makes repeated adjustments deterministic.
 
-### SLIC regional segmentation contracts and planned implementation
+### SLIC regional segmentation and active implementation
 
 M14 introduces a local, deterministic and model-free regional representation across Domain and Application:
 
@@ -246,15 +232,25 @@ RegionSegmentationResult
 └── diagnostics
 ```
 
-The first implementation is SLIC in CIELAB + image-coordinate space. It must provide complete pixel ownership, connected regions, compact identifiers, deterministic output, cancellation and progress. The initial SLIC labels are intentionally fine-grained building blocks, not semantic objects. Later M14 steps calculate descriptors, shared-boundary evidence and deterministic hierarchical merges.
+The first implementation is SLIC in CIELAB + image-coordinate space. M14.2 samples the proxy into a reusable colour buffer, composites transparent pixels against white, optionally applies a separable Gaussian pre-blur, converts normalized sRGB to D65 CIELAB, initializes a regular grid at low-gradient locations and performs deterministic local assignment/update iterations. Spatial convergence is measured in proxy pixels and all equal-cost decisions preserve stable cluster order. No random state is involved.
 
-M14.1 places compact `RegionLabelMap`, `ImageRegion`, `RegionAdjacencyGraph` and `RegionHierarchy` values in Domain. Request, settings, result, diagnostics, progress and estimation policies belong in Application because they consume `IRgbaPixelSource` and coordinate use cases. The future algorithm remains independent of SkiaSharp and Avalonia. Imaging.Skia continues to own decode and proxy generation only. No SAM, ONNX, Python, model checkpoint or GPU dependency is permitted by the approved segmentation decision.
+M14.1 places compact `RegionLabelMap`, `ImageRegion`, `RegionAdjacencyGraph` and `RegionHierarchy` values in Domain. Request, settings, result, diagnostics, progress and estimation policies belong in Application because they consume `IRgbaPixelSource` and coordinate use cases. M14.2 implements `SlicRegionSegmentationAnalyzer` in Application, keeping the algorithm independent of SkiaSharp and Avalonia. Imaging.Skia continues to own decode and proxy generation only. No SAM, ONNX, Python, model checkpoint or GPU dependency is permitted by the approved segmentation decision.
+
+M14.3 normalizes the provisional M14.2 assignments into four-neighbour connected regions. `RegionConnectivityNormalizer` splits disconnected raw labels, merges undersized components only into adjacent regions using stable shared-boundary/size/id priority, compacts labels by first appearance and reports all repairs. The detached result has valid topology, basic area/bounds/centroid values, an identity hierarchy and an empty adjacency graph at that stage; M14.7 now adopts the completed M14.6 result in the active pipeline. `SegmentationDiagnosticRenderer` can create mean-colour previews and boundary overlays without Avalonia or SkiaSharp.
+
+M14.4 replaces the basic geometry builder with `RegionDescriptorCalculator`. The calculator rescans the original proxy rather than the optionally blurred SLIC working buffer, composites alpha against white, converts to D65 CIELAB and publishes immutable per-region geometry, population colour statistics, internal texture energy, edge density and an undirected dominant tangent. Digital perimeter counts exposed four-neighbour pixel edges and compactness uses `4πA / P²`. Internal gradients only use same-region neighbours, leaving cross-region contrast to the M14.5 adjacency stage. Memory remains `O(pixels + regions)`: one global `float` lightness buffer and scalar accumulator arrays, never a full-size mask per region.
+
+M14.5 adds `RegionAdjacencyGraphBuilder`. A single deterministic right/down scan creates one normalized undirected edge per adjacent region pair. Each edge stores exact shared digital-boundary length, local CIELAB ΔE mean/maximum, regional mean-colour and lightness differences, texture-energy difference, doubled-angle tangent continuity, prevailing tangent and a documented continuous boundary-strength score. `RegionSegmentationResult` verifies graph completeness and exact shared-boundary lengths against the label map. Per-region neighbour lists are immutable and ordered by neighbouring identifier for M14.6 merge traversal.
+
+M14.6 adds `RegionHierarchyBuilder`, `RegionMergeSettings` and `RegionMergeCostModel`. It starts from the immutable fine graph and produces intermediate and broad-mass levels without rewriting fine labels. Candidate parents must be adjacent; aggregate means are pixel-weighted; perimeter removes twice the shared digital boundary; cost combines colour, texture, mean boundary strength, merged compactness and resulting area. Aggregate boundaries retain weighted mean strength and maximum contributing fine-edge strength, so a protected contour cannot disappear when weak neighbours merge. Versioned priority-queue entries are invalidated whenever an endpoint changes, and affected costs are recomputed before publication. Compact parent identifiers follow first fine-region appearance, while each hierarchy level exposes both fine-to-parent and parent-to-fine-child traversal.
+
+M14.7 adds `RegionRole`, `RegionRoleOverride`, `LegacySemanticCorrectionAdapter`, `RegionalStructureAnalysisComposer` and `RegionalDetailMapComposer`. `AnalysisCoordinator` now runs structural analysis, SLIC, role composition, region-aware boundary analysis, shared detail composition and background suppression as one detached transaction. Existing schema-11 corrections are converted at runtime to `Focal`, `Subject`, `Background` or `Ignore`; legacy semantic settings remain readable but do not participate in the cache fingerprint. `AnalysisResult` carries both the immutable regional result and a read-only semantic compatibility envelope for presentation code pending M14.8.
 
 For large sources, the global partition is computed on an aspect-ratio-preserving proxy. Labels are projected to source coordinates and M17 may refine only border bands or selected complex regions. A full-resolution floating-point segmentation field is not allowed.
 
 ### Scene-boundary analysis
 
-M11 introduces `ISceneBoundaryAnalyzer`. The current built-in `HeuristicSceneBoundaryAnalyzer` consumes the source proxy and the M8 semantic result, then produces:
+M11 introduced `ISceneBoundaryAnalyzer`. In M14.7, `RegionalSceneBoundaryAnalyzerAdapter` converts the active regional maps into a read-only compatibility envelope and delegates to the validated `HeuristicSceneBoundaryAnalyzer`, which produces:
 
 ```text
 SceneBoundaryAnalysisResult
@@ -268,15 +264,15 @@ SceneBoundaryAnalysisResult
 └── BoundaryDirectionField
 ```
 
-The implementation combines luminance and colour gradients at fine/coarse scales, contour continuity and semantic silhouette confidence. The direction field stores the **tangent** of the estimated contour, not the gradient normal, because future strokes must follow rather than cross important edges.
+The implementation combines luminance and colour gradients at fine/coarse scales, contour continuity and the regional shared-boundary/protection evidence exposed through the compatibility envelope. The direction field stores the **tangent** of the estimated contour, not the gradient normal, because future strokes must follow rather than cross important edges.
 
 M11 remains a diagnostic analyzer boundary. M12 consumes its immutable result through a separate `BoundaryGuidanceField`; the analyzer itself still does not decide whether a stroke aligns, deflects or terminates. This staged design prevents an analyzer mistake from being confused with a planning-policy mistake.
 
 ### Background confidence and uncertainty
 
-Background confidence is not defined as `1 - subject`. It combines low semantic importance, low saliency, distance from detected subjects and structural freedom. A configurable protection radius lowers background confidence around subjects and silhouettes. The uncertainty map identifies pixels for which neither subject nor background confidence is sufficiently strong.
+Background confidence is not defined as `1 - subject`. In the active path it combines low regional importance, low saliency, distance from protected/focal areas and structural freedom. A configurable protection radius lowers background confidence around subjects and silhouettes. The uncertainty map identifies pixels for which neither subject nor background confidence is sufficiently strong.
 
-M12 uses uncertainty as boundary protection. M13 consumes background confidence and uncertainty through a signed suppression policy while keeping the M11 analyzer immutable. M14.7 will adapt this boundary stage to regional descriptors, shared-boundary strength and manual region roles, without requiring subject-class recognition.
+M12 uses uncertainty as boundary protection. M13 consumes background confidence and uncertainty through a signed suppression policy while keeping the M11 analyzer immutable. M14.7 now adapts this stage to regional descriptors, shared-boundary strength and manual region roles without subject-class recognition.
 
 ## Detail-aware stroke policy
 
@@ -313,7 +309,7 @@ The 10,000 × 10,000 decoded-size limit is enforced by `ImageSize` and metadata 
 
 M13.4.2 and ADR-0018 introduce `WorkloadBudgetPolicy` as the shared Application-level admission boundary. The supported estimated peak working set is 2 GiB. The policy is invoked before proxy analysis, before final export and inside each generative planner, so future callers cannot bypass the desktop checks.
 
-`AnalysisMemoryEstimator` includes decoded source RGBA, proxy RGBA, a conservative 160-byte-per-proxy-pixel reserve for current analysis fields and the exact M14.1 `RegionSegmentationEstimator` peak. The segmentation estimate selects two- or four-byte labels from the projected region count and includes Lab, distance, assignment, optional smoothing and cluster-state buffers plus deterministic assignment-work estimates.
+`AnalysisMemoryEstimator` includes decoded source RGBA, proxy RGBA, a conservative 160-byte-per-proxy-pixel reserve for current analysis fields and the exact M14.1/M14.2 `RegionSegmentationEstimator` peak. The segmentation estimate selects two- or four-byte labels from the projected region count and includes Lab, distance, assignment, optional smoothing, connectivity flood-fill/adjacency and cluster-state buffers plus deterministic assignment-work estimates.
 
 `FinalRenderMemoryEstimator` is mode-aware. Flow and Primitive conservatively represent three output-sized buffers: render surface, copied bitmap and encoding reserve. Hybrid represents four output-sized buffers at its layered render peak: retained primitive and flow layers, refinement surface and copied result. The estimate also includes source, proxy, preview, optional overlay and analysis/SLIC reserves. The desktop reports estimated MiB, output-buffer count, risk and whether policy allows the export. An approved preview plan takes precedence over the currently selected combo-box mode, matching final-render behaviour.
 
@@ -340,9 +336,9 @@ Serializers and encoders retain generic `Stream` contracts and remain independen
 ### Flow engine
 
 ```text
-IDetailMapAnalyzer + ISemanticImportanceAnalyzer + ISceneBoundaryAnalyzer
+IDetailMapAnalyzer + IRegionSegmentationAnalyzer + IRegionalSceneBoundaryAnalyzer
             ↓
-Structural importance + semantic importance + scene-boundary evidence
+Structural importance + SLIC regional structure + scene-boundary evidence
             ↓
 DetailRegion[] + BoundaryPaintingSettings
             ↓
@@ -354,7 +350,7 @@ IFlowField → FlowPainterPlanner → StrokePlan → IBrushRenderer
 Current implementation:
 
 ```text
-ImageDetailAnalyzer + semantic analysis + scene-boundary analysis
+ImageDetailAnalyzer + SLIC regional analysis + region-aware scene-boundary analysis
             ↓
 DetailMapComposer + BoundaryGuidanceField.Create
             ↓
@@ -413,7 +409,7 @@ SkiaHybridPlanRenderer → PNG/JPEG
 
 `PrimitiveInfluenceFlowField` decorates the selected base field. It combines the base vector with distance-weighted primitive directions using AxisAlignment, rotated-envelope BoundaryTangent, Vortex or Mixed strategies. The primitive plan remains immutable. M12 reuses the same `FlowPainterPlanner` with an optional precomputed `BoundaryGuidanceField`, so primitive-derived deformation and scene-boundary guidance compose in both hybrid stroke layers.
 
-`SkiaHybridPlanRenderer` owns the intermediate primitive and flow images. It returns only the final refinement image, transferring that ownership to the caller. Preview and high-resolution export reuse the same `HybridPlan` and brush settings. Hybrid settings introduced in project schema 6 remain persisted in current schema 11; generated plans are never persisted.
+`SkiaHybridPlanRenderer` owns the intermediate primitive and flow images. It returns only the final refinement image, transferring that ownership to the caller. Preview and high-resolution export reuse the same `HybridPlan` and brush settings. Hybrid settings introduced in project schema 6 remain persisted in current schema 12; generated plans are never persisted.
 
 ## Boundary-aware planner boundary
 
@@ -531,8 +527,8 @@ Proxy + detail map + seed + primitive settings
 Hybrid output is derived state. The desktop composition root retains the approved `HybridPlan` only while source, proxy, composed detail map, seed, flow settings, primitive settings and hybrid settings remain unchanged. Any relevant edit invalidates the cached preview plan.
 
 ```text
-Project schema 11 settings
-(including schema-6 hybrid settings)
+Project schema 12 settings
+(including schema-6 hybrid and schema-12 regional settings)
         ↓
 Reproducible HybridPlan
         ├── proxy preview
@@ -563,9 +559,9 @@ The transition radius is a fraction of the shorter map dimension, so portrait an
 The composed-map cache includes `RegionTransitionWidth`. Editing it invalidates the effective detail map and any approved Flow, Primitive or Hybrid plan. Renderers remain unaware of manual regions and consume only immutable plans/maps.
 
 
-## M13.3 semantic-correction compatibility pipeline
+## M13.3 historical semantic-correction pipeline and M14.7 compatibility
 
-Automatic semantic evidence and user decisions are represented separately:
+M13.3 originally represented automatic semantic evidence and user decisions separately:
 
 ```text
 ISemanticImportanceAnalyzer
@@ -588,7 +584,7 @@ ISceneBoundaryAnalyzer → detail/background composition → planners
 
 Corrections never mutate or remove the analyzer's `SemanticRegion` list. The desktop renders automatic evidence and manual corrections as different overlays. Correction kinds use explicit precedence: ordinary subject promotion, background/ignore suppression, then primary-subject promotion. Same-kind overlap uses maximum local influence.
 
-Project schema 11 persists semantic corrections; schema-10 and earlier documents receive an empty collection. Preset schema remains 8 because corrections are image-specific state. Any correction edit invalidates semantic/boundary/detail analyses and cached Flow, Primitive or Hybrid preview plans. During M14.7 these values will be migrated into generalized region-role overrides while schema-11 remains readable.
+Project schema 11 introduced semantic corrections; schema-10 and earlier documents receive an empty collection. M14.7 converts those values at runtime into generalized `RegionRoleOverride` values. M14.8 advances the project schema to 12 and persists those generalized overrides directly while retaining the legacy values for round-trip compatibility. Preset schema 9 persists only reusable SLIC/merge settings because role overrides are image-specific.
 
 ## M13 signed background-suppression pipeline
 
@@ -607,9 +603,9 @@ The four outputs have distinct responsibilities. `ProtectionMap` and `Suppressio
 
 Primitive optimization receives the effective normalized map rather than a new primitive-specific policy. Hybrid planning passes the same immutable suppression result to both stroke layers. No renderer interprets scene importance; renderers consume already-approved immutable plans.
 
-## M14 target regional pipeline
+## M14 active regional pipeline
 
-The approved replacement pipeline is:
+M14.7 activates the approved replacement pipeline:
 
 ```text
 Structural proxy ───────────────────────────────┐
@@ -625,8 +621,41 @@ Manual region-role overrides ─────────────────
 Migration rules:
 
 - M8–M13.3 files remain historical documentation of implemented behaviour;
-- schema-1 through schema-11 projects remain readable;
+- schema-1 through schema-11 projects remain readable and migrate into current schema 12 values;
 - manual user decisions are preserved, even when their internal representation changes;
 - automatic semantic regions are derived legacy data and need not be persisted into the new pipeline;
 - renderers remain unaware of SLIC and consume only approved immutable plans;
-- the active path changes only in M14.7, after contracts, topology, descriptors, graph and hierarchy have independent validation.
+- M14.7 changes the active path only after contracts, topology, descriptors, graph and hierarchy received independent validation through M14.6.
+
+
+## M14.8 regional desktop and persistence boundary
+
+M14.8 keeps derived segmentation data out of project files:
+
+```text
+Project schema 12 / preset schema 9
+        ├── RegionSegmentationSettings
+        ├── RegionMergeSettings
+        └── project-only RegionRoleOverride[]
+                    ↓ deterministic reanalysis
+RegionLabelMap + descriptors + RAG + hierarchy
+                    ↓
+diagnostic overlays / active generative plans
+```
+
+`MainWindow` exposes SLIC settings, a simplified merge-intensity mapper, hierarchy selection and diagnostic overlays. Overlay mode and inspected-region selection are presentation state and do not mark the project dirty. `SegmentationDiagnosticRenderer` remains in Application and produces immutable RGBA diagnostics; `SkiaImageFactory` is the Imaging.Skia ownership boundary used to present those values in Avalonia.
+
+Obsolete semantic tuning values are hidden but still populated from old documents so a load/save cycle does not discard historical data. Compatibility role lists and commands consume the active regional compatibility envelope; no semantic analyzer or model is reintroduced.
+
+Project schema 12 persists generalized role overrides directly and falls back to deterministic schema-11 correction conversion when they are absent. Preset schema 9 stores reusable SLIC and merge settings only. Labels, descriptors, adjacency and hierarchy are derived, potentially large values and are intentionally recomputed rather than serialized.
+
+
+## M15.1 regional boundary field
+
+M15.1 converts the discrete SLIC/RAG structure into a continuous field used during stroke planning. `RegionalBoundaryField` scans exact fine-label adjacencies, reads each corresponding `RegionAdjacency.BoundaryStrength` and `PrevailingTangentRadians`, assigns side-aware normals and propagates the nearest boundary through a deterministic bounded eight-neighbour search. Distance is primary; equal-distance candidates prefer higher strength and then stable seed order.
+
+`RegionalBoundaryFieldSettings` is derived from existing boundary-painting controls, so M15.1 requires no schema change. Weak boundaries receive a broad SmoothStep-derived transition, while strong barriers keep higher peak strength in a narrower band. Samples outside the bounded range remain empty.
+
+`BoundaryGuidanceField` first builds and propagates the validated M11–M12 scene evidence, then blends regional strength, distance, normal, tangent, hardness and contour reinforcement. Regional tangents participate in corner detection. Existing scene-only overloads remain unchanged.
+
+Flow plans using the new field publish `flow-field-regional-boundary-v1`; regional background plans publish `flow-field-background-regional-boundary-v1`. Hybrid constructs one combined field and reuses it for both stroke layers. M15.2 will consume the same samples to vary local stroke geometry; M15.1 itself does not yet change the detail policy.

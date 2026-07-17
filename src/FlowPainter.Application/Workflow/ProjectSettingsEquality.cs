@@ -6,6 +6,7 @@ using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.Hybrid;
 using FlowPainter.Application.PrimitiveGeneration;
 using FlowPainter.Application.Semantics;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Domain.Brushes;
 
 namespace FlowPainter.Application.Workflow;
@@ -33,7 +34,9 @@ internal static class ProjectSettingsEquality
             && SemanticAnalysisIsEquivalent(first.SemanticAnalysis, second.SemanticAnalysis)
             && BoundaryAnalysisIsEquivalent(first.BoundaryAnalysis, second.BoundaryAnalysis)
             && BoundaryPaintingIsEquivalent(first.BoundaryPainting, second.BoundaryPainting)
-            && BackgroundSuppressionIsEquivalent(first.BackgroundSuppression, second.BackgroundSuppression);
+            && BackgroundSuppressionIsEquivalent(first.BackgroundSuppression, second.BackgroundSuppression)
+            && RegionalSegmentationIsEquivalent(first.RegionalSegmentation, second.RegionalSegmentation)
+            && RegionMergeIsEquivalent(first.RegionMerge, second.RegionMerge);
     }
 
     public static bool AreEquivalent(PrimitiveGenerationSettings first, PrimitiveGenerationSettings second)
@@ -170,4 +173,28 @@ internal static class ProjectSettingsEquality
             && first.CurveFreedomMultiplier == second.CurveFreedomMultiplier
             && first.ColorSimplification == second.ColorSimplification;
     }
+    private static bool RegionalSegmentationIsEquivalent(
+        RegionSegmentationSettings first,
+        RegionSegmentationSettings second)
+    {
+        return first.Enabled == second.Enabled
+            && first.TargetRegionSize == second.TargetRegionSize
+            && first.Compactness == second.Compactness
+            && first.PreBlurSigma == second.PreBlurSigma
+            && first.MaximumIterations == second.MaximumIterations
+            && first.ConvergenceTolerance == second.ConvergenceTolerance;
+    }
+
+    private static bool RegionMergeIsEquivalent(
+        RegionMergeSettings first,
+        RegionMergeSettings second)
+    {
+        return first.IntermediateTargetRatio == second.IntermediateTargetRatio
+            && first.BroadMassTargetRatio == second.BroadMassTargetRatio
+            && first.IntermediateMaximumCost == second.IntermediateMaximumCost
+            && first.BroadMassMaximumCost == second.BroadMassMaximumCost
+            && first.StrongBoundaryThreshold == second.StrongBoundaryThreshold
+            && first.MaximumParentAreaFraction == second.MaximumParentAreaFraction;
+    }
+
 }

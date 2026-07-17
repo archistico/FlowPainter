@@ -1,4 +1,5 @@
 using FlowPainter.Application.Boundaries;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Detail;
 
@@ -7,6 +8,27 @@ namespace FlowPainter.Application.Background;
 public static class BackgroundSuppressionComposer
 {
     private const int ProgressRowBatch = 16;
+
+    public static BackgroundSuppressionResult Compose(
+        DetailMap automaticDetailMap,
+        DetailMap composedDetailMap,
+        RegionalStructureAnalysisResult regionalAnalysis,
+        SceneBoundaryAnalysisResult boundaryAnalysis,
+        BackgroundSuppressionSettings settings,
+        IProgress<BackgroundSuppressionProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(regionalAnalysis);
+        SemanticAnalysisResult compatibility = RegionalSemanticCompatibilityAdapter.Create(regionalAnalysis);
+        return Compose(
+            automaticDetailMap,
+            composedDetailMap,
+            compatibility,
+            boundaryAnalysis,
+            settings,
+            progress,
+            cancellationToken);
+    }
 
     public static BackgroundSuppressionResult Compose(
         DetailMap automaticDetailMap,

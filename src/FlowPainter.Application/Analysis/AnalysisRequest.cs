@@ -2,10 +2,12 @@ using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.Images;
 using FlowPainter.Domain.Semantics;
+using FlowPainter.Domain.Segmentation;
 
 namespace FlowPainter.Application.Analysis;
 
@@ -13,6 +15,7 @@ public sealed class AnalysisRequest
 {
     private readonly IReadOnlyList<DetailRegion> _detailRegions;
     private readonly IReadOnlyList<SemanticCorrectionRegion> _semanticCorrections;
+    private readonly IReadOnlyList<RegionRoleOverride> _regionRoleOverrides;
 
     public AnalysisRequest(
         IRgbaPixelSource source,
@@ -25,7 +28,10 @@ public sealed class AnalysisRequest
         IReadOnlyList<DetailRegion>? detailRegions,
         IReadOnlyList<SemanticCorrectionRegion>? semanticCorrections,
         long detailRegionRevision,
-        long semanticCorrectionRevision)
+        long semanticCorrectionRevision,
+        RegionSegmentationSettings? segmentationSettings = null,
+        RegionMergeSettings? mergeSettings = null,
+        IReadOnlyList<RegionRoleOverride>? regionRoleOverrides = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(detailSettings);
@@ -38,10 +44,13 @@ public sealed class AnalysisRequest
         DetailSettings = detailSettings;
         DetailInfluenceSettings = detailInfluenceSettings;
         SemanticSettings = semanticSettings;
+        SegmentationSettings = segmentationSettings ?? new RegionSegmentationSettings();
+        MergeSettings = mergeSettings ?? new RegionMergeSettings();
         BoundarySettings = boundarySettings;
         BackgroundSettings = backgroundSettings;
         _detailRegions = Array.AsReadOnly(detailRegions?.ToArray() ?? []);
         _semanticCorrections = Array.AsReadOnly(semanticCorrections?.ToArray() ?? []);
+        _regionRoleOverrides = Array.AsReadOnly(regionRoleOverrides?.ToArray() ?? []);
         CacheKey = AnalysisCacheKey.Create(
             sourceIdentity,
             source.Size,
@@ -51,7 +60,9 @@ public sealed class AnalysisRequest
             boundarySettings,
             backgroundSettings,
             detailRegionRevision,
-            semanticCorrectionRevision);
+            semanticCorrectionRevision,
+            SegmentationSettings,
+            MergeSettings);
     }
 
     public IRgbaPixelSource Source { get; }
@@ -62,6 +73,10 @@ public sealed class AnalysisRequest
 
     public SemanticAnalysisSettings SemanticSettings { get; }
 
+    public RegionSegmentationSettings SegmentationSettings { get; }
+
+    public RegionMergeSettings MergeSettings { get; }
+
     public SceneBoundaryAnalysisSettings BoundarySettings { get; }
 
     public BackgroundSuppressionSettings BackgroundSettings { get; }
@@ -69,6 +84,8 @@ public sealed class AnalysisRequest
     public IReadOnlyList<DetailRegion> DetailRegions => _detailRegions;
 
     public IReadOnlyList<SemanticCorrectionRegion> SemanticCorrections => _semanticCorrections;
+
+    public IReadOnlyList<RegionRoleOverride> RegionRoleOverrides => _regionRoleOverrides;
 
     public AnalysisCacheKey CacheKey { get; }
 }

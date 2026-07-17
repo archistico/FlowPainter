@@ -1,5 +1,6 @@
 using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Detail;
 
@@ -9,6 +10,8 @@ public sealed class AnalysisResult
 {
     public AnalysisResult(
         DetailMap structuralDetailMap,
+        RegionSegmentationResult regionalSegmentation,
+        RegionalStructureAnalysisResult regionalAnalysis,
         SemanticAnalysisResult semanticAnalysis,
         SceneBoundaryAnalysisResult boundaryAnalysis,
         DetailMap automaticDetailMap,
@@ -16,13 +19,17 @@ public sealed class AnalysisResult
         BackgroundSuppressionResult backgroundSuppression)
     {
         ArgumentNullException.ThrowIfNull(structuralDetailMap);
+        ArgumentNullException.ThrowIfNull(regionalSegmentation);
+        ArgumentNullException.ThrowIfNull(regionalAnalysis);
         ArgumentNullException.ThrowIfNull(semanticAnalysis);
         ArgumentNullException.ThrowIfNull(boundaryAnalysis);
         ArgumentNullException.ThrowIfNull(automaticDetailMap);
         ArgumentNullException.ThrowIfNull(manuallyComposedDetailMap);
         ArgumentNullException.ThrowIfNull(backgroundSuppression);
 
-        if (structuralDetailMap.Size != semanticAnalysis.ImportanceMap.Size
+        if (structuralDetailMap.Size != regionalSegmentation.Labels.Size
+            || structuralDetailMap.Size != regionalAnalysis.ImportanceMap.Size
+            || structuralDetailMap.Size != semanticAnalysis.ImportanceMap.Size
             || structuralDetailMap.Size != boundaryAnalysis.EdgeStrengthMap.Size
             || structuralDetailMap.Size != automaticDetailMap.Size
             || structuralDetailMap.Size != manuallyComposedDetailMap.Size
@@ -32,6 +39,8 @@ public sealed class AnalysisResult
         }
 
         StructuralDetailMap = structuralDetailMap;
+        RegionalSegmentation = regionalSegmentation;
+        RegionalAnalysis = regionalAnalysis;
         SemanticAnalysis = semanticAnalysis;
         BoundaryAnalysis = boundaryAnalysis;
         AutomaticDetailMap = automaticDetailMap;
@@ -40,6 +49,10 @@ public sealed class AnalysisResult
     }
 
     public DetailMap StructuralDetailMap { get; }
+
+    public RegionSegmentationResult RegionalSegmentation { get; }
+
+    public RegionalStructureAnalysisResult RegionalAnalysis { get; }
 
     public SemanticAnalysisResult SemanticAnalysis { get; }
 

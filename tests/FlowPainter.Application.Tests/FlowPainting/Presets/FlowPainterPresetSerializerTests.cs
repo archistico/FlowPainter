@@ -109,7 +109,7 @@ public sealed class FlowPainterPresetSerializerTests
             new FlowPainterPreset("Invalid version", new FlowPainterSettings(strokeCount: 1)),
             valid);
         string json = Encoding.UTF8.GetString(valid.ToArray())
-            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 99", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 99", StringComparison.Ordinal);
         await using MemoryStream stream = new(Encoding.UTF8.GetBytes(json), writable: false);
 
         await Assert.ThrowsAsync<NotSupportedException>(
@@ -166,7 +166,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 2", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 2", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -187,7 +187,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 3", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 3", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()
@@ -210,7 +210,7 @@ public sealed class FlowPainterPresetSerializerTests
         await using MemoryStream current = new();
         await FlowPainterPresetSerializer.SerializeAsync(preset, current);
         string json = Encoding.UTF8.GetString(current.ToArray())
-            .Replace("\"schemaVersion\": 8", "\"schemaVersion\": 4", StringComparison.Ordinal);
+            .Replace("\"schemaVersion\": 9", "\"schemaVersion\": 4", StringComparison.Ordinal);
         System.Text.Json.Nodes.JsonObject root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
             ?? throw new InvalidOperationException("The serialized preset JSON is empty.");
         System.Text.Json.Nodes.JsonObject settings = root["preset"]?["settings"]?.AsObject()

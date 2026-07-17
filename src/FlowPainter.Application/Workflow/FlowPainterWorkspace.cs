@@ -2,9 +2,11 @@ using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.Hybrid;
 using FlowPainter.Application.PrimitiveGeneration;
 using FlowPainter.Application.Projects;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.Generation;
 using FlowPainter.Domain.Semantics;
+using FlowPainter.Domain.Segmentation;
 
 namespace FlowPainter.Application.Workflow;
 
@@ -12,6 +14,8 @@ public sealed class FlowPainterWorkspace
 {
     private readonly List<WorkspaceValidationMessage> _validationMessages = [];
     private readonly IReadOnlyList<WorkspaceValidationMessage> _readOnlyValidationMessages;
+    private readonly List<RegionRoleOverride> _regionRoleOverrides = [];
+    private readonly IReadOnlyList<RegionRoleOverride> _readOnlyRegionRoleOverrides;
 
     public FlowPainterWorkspace(
         ulong seed,
@@ -29,6 +33,7 @@ public sealed class FlowPainterWorkspace
         }
 
         _readOnlyValidationMessages = _validationMessages.AsReadOnly();
+        _readOnlyRegionRoleOverrides = _regionRoleOverrides.AsReadOnly();
         Seed = seed;
         Settings = settings;
         Preview = preview ?? new PreviewSettings();
@@ -69,6 +74,8 @@ public sealed class FlowPainterWorkspace
 
     public IReadOnlyList<WorkspaceValidationMessage> ValidationMessages => _readOnlyValidationMessages;
 
+    public IReadOnlyList<RegionRoleOverride> RegionRoleOverrides => _readOnlyRegionRoleOverrides;
+
     public bool IsDirty { get; private set; }
 
     public long DetailRegionRevision { get; private set; }
@@ -101,6 +108,7 @@ public sealed class FlowPainterWorkspace
         ProjectName = null;
         Regions.Clear();
         SemanticCorrections.Clear();
+        _regionRoleOverrides.Clear();
         AdvanceDetailRegionRevision();
         AdvanceSemanticCorrectionRevision();
         MarkDirty();
@@ -294,6 +302,7 @@ public sealed class FlowPainterWorkspace
             kind,
             label,
             sourceSemanticRegionId);
+        UpsertRegionRoleOverride(LegacySemanticCorrectionAdapter.Convert([correction])[0]);
         AdvanceSemanticCorrectionRevision();
         MarkDirty();
         return correction;
@@ -304,6 +313,10 @@ public sealed class FlowPainterWorkspace
         bool removed = SemanticCorrections.Remove(id);
         if (removed)
         {
+            _regionRoleOverrides.RemoveAll(roleOverride => string.Equals(
+                roleOverride.Id,
+                id,
+                StringComparison.OrdinalIgnoreCase));
             AdvanceSemanticCorrectionRevision();
             MarkDirty();
         }
@@ -318,7 +331,11 @@ public sealed class FlowPainterWorkspace
             return;
         }
 
+        string[] removedIds = SemanticCorrections.Regions.Select(correction => correction.Id).ToArray();
         SemanticCorrections.Clear();
+        _regionRoleOverrides.RemoveAll(roleOverride => removedIds.Contains(
+            roleOverride.Id,
+            StringComparer.OrdinalIgnoreCase));
         AdvanceSemanticCorrectionRevision();
         MarkDirty();
     }
@@ -328,6 +345,7 @@ public sealed class FlowPainterWorkspace
         return new WorkspaceEditSnapshot(
             Regions.Regions,
             SemanticCorrections.Regions,
+            RegionRoleOverrides,
             IsDirty);
     }
 
@@ -346,6 +364,8 @@ public sealed class FlowPainterWorkspace
             AdvanceSemanticCorrectionRevision();
         }
 
+        _regionRoleOverrides.Clear();
+        _regionRoleOverrides.AddRange(snapshot.RegionRoleOverrides);
         IsDirty = snapshot.IsDirty;
     }
 
@@ -368,7 +388,8 @@ public sealed class FlowPainterWorkspace
             Mode,
             PrimitiveGeneration,
             HybridGeneration,
-            SemanticCorrections.Regions);
+            SemanticCorrections.Regions,
+            RegionRoleOverrides);
     }
 
     public void LoadProject(FlowPainterProject project, string? projectPath = null)
@@ -385,6 +406,7 @@ public sealed class FlowPainterWorkspace
         validatedRegions.ReplaceAll(project.DetailRegions);
         SemanticCorrectionRegionEditor validatedCorrections = new();
         validatedCorrections.ReplaceAll(project.SemanticCorrections);
+        ValidateRegionRoleOverrides(project.RegionRoleOverrides);
         return new WorkspaceProjectCandidate(project, NormalizeOptionalPath(projectPath));
     }
 
@@ -404,6 +426,8 @@ public sealed class FlowPainterWorkspace
         HybridGeneration = project.HybridGeneration;
         Regions.ReplaceAll(project.DetailRegions);
         SemanticCorrections.ReplaceAll(project.SemanticCorrections);
+        _regionRoleOverrides.Clear();
+        _regionRoleOverrides.AddRange(project.RegionRoleOverrides);
         AdvanceDetailRegionRevision();
         AdvanceSemanticCorrectionRevision();
         IsDirty = false;
@@ -484,6 +508,45 @@ public sealed class FlowPainterWorkspace
     public void ClearValidation()
     {
         _validationMessages.Clear();
+    }
+
+    private void UpsertRegionRoleOverride(RegionRoleOverride roleOverride)
+    {
+        int index = _regionRoleOverrides.FindIndex(existing => string.Equals(
+            existing.Id,
+            roleOverride.Id,
+            StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+        {
+            _regionRoleOverrides[index] = roleOverride;
+        }
+        else
+        {
+            _regionRoleOverrides.Add(roleOverride);
+        }
+    }
+
+    private void SynchronizeLegacyRegionRoleOverrides()
+    {
+        foreach (RegionRoleOverride roleOverride in LegacySemanticCorrectionAdapter.Convert(
+            SemanticCorrections.Regions))
+        {
+            UpsertRegionRoleOverride(roleOverride);
+        }
+    }
+
+    private static void ValidateRegionRoleOverrides(IEnumerable<RegionRoleOverride> roleOverrides)
+    {
+        HashSet<string> identifiers = new(StringComparer.OrdinalIgnoreCase);
+        foreach (RegionRoleOverride roleOverride in roleOverrides)
+        {
+            if (!identifiers.Add(roleOverride.Id))
+            {
+                throw new ArgumentException(
+                    $"Duplicate region-role override identifier '{roleOverride.Id}'.",
+                    nameof(roleOverrides));
+            }
+        }
     }
 
     private void MarkDirty()

@@ -1,6 +1,6 @@
 # M14.1 — Regional segmentation contracts
 
-**Status: READY FOR VALIDATION**
+**Status: DONE — validated 2026-07-17 with 863 tests**
 
 ## Purpose
 
@@ -30,7 +30,7 @@ The milestone makes invalid or ambiguous segmentation data difficult to represen
 
 The map exposes indexed access, allocation-free row views, explicit copies and per-region pixel counts. Callers cannot mutate the backing storage.
 
-Connectivity remains a required final-result invariant. M14.2 may produce raw working labels internally; M14.3 repairs and verifies connectivity before publishing a `RegionSegmentationResult`.
+Connectivity remains a required active-pipeline invariant. M14.2 publishes a detached provisional result for algorithm validation; M14.3 repairs and verifies connectivity before any regional result can be adopted by the active analysis and painting pipeline.
 
 ### Graph and hierarchy invariants
 
@@ -93,7 +93,7 @@ M14.1 adds **59** tests:
 - 30 Domain cases for label ownership/storage, rows, bounds, descriptors, adjacency and hierarchy;
 - 29 Application cases for settings, requests, progress, diagnostics, detached-result consistency and resource estimation.
 
-Expected complete suite: **863 tests**.
+Validated complete suite: **863 tests**.
 
 ## Manual validation
 
@@ -113,4 +113,4 @@ No new visual behaviour is expected. Confirm only that:
 - settings and progress reject invalid finite/range values;
 - segmentation resource estimates are checked and deterministic;
 - current runtime analysis and rendering behaviour is unchanged;
-- all **863** tests pass.
+- all **863** tests pass (validated 2026-07-17).

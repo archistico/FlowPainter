@@ -3,6 +3,7 @@ using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Images;
 
@@ -55,13 +56,17 @@ public sealed record AnalysisCacheKey
         SceneBoundaryAnalysisSettings boundarySettings,
         BackgroundSuppressionSettings backgroundSettings,
         long detailRegionRevision,
-        long semanticCorrectionRevision)
+        long semanticCorrectionRevision,
+        RegionSegmentationSettings? segmentationSettings = null,
+        RegionMergeSettings? mergeSettings = null)
     {
         ArgumentNullException.ThrowIfNull(detailSettings);
         ArgumentNullException.ThrowIfNull(detailInfluenceSettings);
         ArgumentNullException.ThrowIfNull(semanticSettings);
         ArgumentNullException.ThrowIfNull(boundarySettings);
         ArgumentNullException.ThrowIfNull(backgroundSettings);
+        segmentationSettings ??= new RegionSegmentationSettings();
+        mergeSettings ??= new RegionMergeSettings();
 
         string fingerprint = string.Join(
             "|",
@@ -70,18 +75,18 @@ public sealed record AnalysisCacheKey
             Format(detailSettings.ContrastWeight),
             detailSettings.SmoothingRadius.ToString(CultureInfo.InvariantCulture),
             Format(detailInfluenceSettings.RegionTransitionWidth),
-            semanticSettings.Enabled ? "1" : "0",
-            Format(semanticSettings.OverallInfluence),
-            Format(semanticSettings.SaliencyWeight),
-            Format(semanticSettings.SubjectWeight),
-            Format(semanticSettings.SilhouetteWeight),
-            Format(semanticSettings.FocalWeight),
-            Format(semanticSettings.SubjectThreshold),
-            Format(semanticSettings.MinimumSubjectAreaRatio),
-            semanticSettings.MaximumSubjects.ToString(CultureInfo.InvariantCulture),
-            Format(semanticSettings.CenterBias),
-            semanticSettings.SmoothingRadius.ToString(CultureInfo.InvariantCulture),
-            semanticSettings.BoundaryRadius.ToString(CultureInfo.InvariantCulture),
+            segmentationSettings.Enabled ? "1" : "0",
+            segmentationSettings.TargetRegionSize.ToString(CultureInfo.InvariantCulture),
+            Format(segmentationSettings.Compactness),
+            Format(segmentationSettings.PreBlurSigma),
+            segmentationSettings.MaximumIterations.ToString(CultureInfo.InvariantCulture),
+            Format(segmentationSettings.ConvergenceTolerance),
+            Format(mergeSettings.IntermediateTargetRatio),
+            Format(mergeSettings.BroadMassTargetRatio),
+            Format(mergeSettings.IntermediateMaximumCost),
+            Format(mergeSettings.BroadMassMaximumCost),
+            Format(mergeSettings.StrongBoundaryThreshold),
+            Format(mergeSettings.MaximumParentAreaFraction),
             boundarySettings.Enabled ? "1" : "0",
             Format(boundarySettings.LuminanceWeight),
             Format(boundarySettings.ColorWeight),

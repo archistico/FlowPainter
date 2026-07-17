@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted and in progress. M13.4 stabilization is validated; M14.1 contracts are implemented and awaiting validation.
+Accepted and in progress. M13.4 stabilization and M14.1–M14.7 are validated through 998 tests. M14.8 regional UI, settings and persistence is ready for validation with an expected 1,024-test suite.
 
 ## Context
 
@@ -69,8 +69,8 @@ A successful `RegionSegmentationResult` must guarantee:
 
 ## Storage and memory
 
-- use `UInt16` labels when the result has at most 65,536 regions;
-- use `UInt32` only when required;
+- use compact 16-bit label storage when the result has at most 65,536 regions;
+- use wide 32-bit label storage only when required;
 - reject unsupported memory/work estimates before allocation;
 - compute global segmentation on a proxy rather than allocating full-resolution Lab or floating-point fields;
 - project labels and boundaries to source coordinates;
@@ -79,12 +79,12 @@ A successful `RegionSegmentationResult` must guarantee:
 
 ## Migration from M8–M13.3
 
-The current semantic analyzer remains operational until M14.7. Migration rules are:
+M14.7 performs the active migration. The semantic analyzer remains in source only for historical compatibility and direct legacy tests. Migration rules are:
 
 - schema-1 through schema-11 projects remain readable;
 - M13.3 manual corrections are durable user intent and become generalized region-role overrides;
 - automatic semantic regions are derived evidence and need not be retained;
-- semantic settings may be read for compatibility but stop influencing new plans after migration;
+- semantic settings remain readable for compatibility but no longer influence active cache identity or new plans;
 - Flow, Primitive and Hybrid switch together to one shared regional pipeline.
 
 ## Alternatives considered
@@ -124,3 +124,8 @@ Costs:
 - proxy-to-source projection and high-resolution refinement require dedicated validation.
 
 These costs are accepted because the project needs painterly structure and editable regions, not automatic labels.
+
+
+## M14.8 persistence consequence
+
+M14.8 advances project schema to 12 and preset schema to 9. Reusable SLIC and merge parameters are persisted in both. Image-specific generalized role overrides are persisted only in projects. Derived labels, descriptors, adjacency graphs and hierarchy levels are never serialized. Legacy semantic tuning values remain readable for round-trip compatibility but are hidden from the active UI and do not affect the active analysis cache or plans.

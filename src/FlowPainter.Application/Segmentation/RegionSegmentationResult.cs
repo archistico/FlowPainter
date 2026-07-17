@@ -63,6 +63,8 @@ public sealed class RegionSegmentationResult
             throw new ArgumentException("The adjacency graph must use the label-map region count.", nameof(adjacency));
         }
 
+        ValidateAdjacency(labels, adjacency);
+
         if (hierarchy.FineRegionCount != labels.RegionCount)
         {
             throw new ArgumentException("The hierarchy must map every fine label.", nameof(hierarchy));
@@ -71,6 +73,23 @@ public sealed class RegionSegmentationResult
         if (diagnostics.FinalRegionCount != labels.RegionCount)
         {
             throw new ArgumentException("Diagnostics must report the final label-map region count.", nameof(diagnostics));
+        }
+
+        if (diagnostics.RegionSizes is not null)
+        {
+            RegionSizeDistribution expectedDistribution = RegionSizeDistribution.Create(labelCounts);
+            RegionSizeDistribution actualDistribution = diagnostics.RegionSizes;
+            if (actualDistribution.MinimumPixelCount != expectedDistribution.MinimumPixelCount
+                || actualDistribution.MaximumPixelCount != expectedDistribution.MaximumPixelCount
+                || Math.Abs(actualDistribution.MeanPixelCount - expectedDistribution.MeanPixelCount) > 1e-12d
+                || Math.Abs(
+                    actualDistribution.StandardDeviationPixelCount
+                    - expectedDistribution.StandardDeviationPixelCount) > 1e-12d)
+            {
+                throw new ArgumentException(
+                    "Diagnostic region-size statistics must match the label map.",
+                    nameof(diagnostics));
+            }
         }
 
         Labels = labels;
@@ -89,4 +108,68 @@ public sealed class RegionSegmentationResult
     public RegionHierarchy Hierarchy { get; }
 
     public SegmentationDiagnostics Diagnostics { get; }
+
+    private static void ValidateAdjacency(
+        RegionLabelMap labels,
+        RegionAdjacencyGraph adjacency)
+    {
+        Dictionary<(int First, int Second), int> expectedLengths = new();
+        for (int y = 0; y < labels.Size.Height; y++)
+        {
+            RegionLabelRow row = labels.GetRow(y);
+            for (int x = 0; x + 1 < labels.Size.Width; x++)
+            {
+                AddExpectedBoundary(expectedLengths, row[x], row[x + 1]);
+            }
+
+            if (y + 1 >= labels.Size.Height)
+            {
+                continue;
+            }
+
+            RegionLabelRow nextRow = labels.GetRow(y + 1);
+            for (int x = 0; x < labels.Size.Width; x++)
+            {
+                AddExpectedBoundary(expectedLengths, row[x], nextRow[x]);
+            }
+        }
+
+        if (adjacency.Edges.Count != expectedLengths.Count)
+        {
+            throw new ArgumentException(
+                "The adjacency graph must contain exactly one edge for every adjacent label pair.",
+                nameof(adjacency));
+        }
+
+        foreach (KeyValuePair<(int First, int Second), int> pair in expectedLengths)
+        {
+            if (!adjacency.TryGetEdge(pair.Key.First, pair.Key.Second, out RegionAdjacency? edge)
+                || edge is null
+                || edge.SharedBoundaryLength != pair.Value)
+            {
+                throw new ArgumentException(
+                    "Adjacency edges and shared-boundary lengths must match the label map.",
+                    nameof(adjacency));
+            }
+        }
+    }
+
+    private static void AddExpectedBoundary(
+        Dictionary<(int First, int Second), int> expectedLengths,
+        uint firstLabel,
+        uint secondLabel)
+    {
+        if (firstLabel == secondLabel)
+        {
+            return;
+        }
+
+        uint lowerLabel = firstLabel < secondLabel ? firstLabel : secondLabel;
+        uint higherLabel = firstLabel < secondLabel ? secondLabel : firstLabel;
+        int firstRegionId = checked((int)lowerLabel);
+        int secondRegionId = checked((int)higherLabel);
+        (int First, int Second) key = (firstRegionId, secondRegionId);
+        expectedLengths.TryGetValue(key, out int currentLength);
+        expectedLengths[key] = checked(currentLength + 1);
+    }
 }

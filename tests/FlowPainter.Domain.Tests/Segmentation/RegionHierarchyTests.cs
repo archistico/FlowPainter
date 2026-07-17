@@ -79,4 +79,25 @@ public sealed class RegionHierarchyTests
             3,
             new[] { 0, 0, 2, 2 }));
     }
+
+    [Fact]
+    public void HierarchyLevelExposesFineChildrenInStableOrder()
+    {
+        RegionHierarchyLevel level = new(1, 2, new[] { 0, 1, 0, 1 });
+
+        Assert.Equal(2, level.GetFineRegionIds(0).Count);
+        Assert.Equal(0, level.GetFineRegionIds(0)[0]);
+        Assert.Equal(2, level.GetFineRegionIds(0)[1]);
+        Assert.Equal(2, level.GetFineRegionIds(1).Count);
+        Assert.Equal(1, level.GetFineRegionIds(1)[0]);
+        Assert.Equal(3, level.GetFineRegionIds(1)[1]);
+    }
+
+    [Fact]
+    public void HierarchyLevelRejectsInvalidParentLookup()
+    {
+        RegionHierarchyLevel level = new(1, 1, new[] { 0, 0 });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => level.GetFineRegionIds(1));
+    }
 }

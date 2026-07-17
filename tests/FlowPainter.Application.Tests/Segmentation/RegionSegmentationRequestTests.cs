@@ -11,11 +11,13 @@ public sealed class RegionSegmentationRequestTests
     {
         RgbaImage source = CreateSource();
         RegionSegmentationSettings settings = new();
+        RegionMergeSettings mergeSettings = new();
 
-        RegionSegmentationRequest request = new(source, settings, 4, 7);
+        RegionSegmentationRequest request = new(source, settings, 4, 7, mergeSettings);
 
         Assert.Same(source, request.Source);
         Assert.Same(settings, request.Settings);
+        Assert.Same(mergeSettings, request.MergeSettings);
         Assert.Equal(4, request.SourceRevision);
         Assert.Equal(7, request.SettingsRevision);
     }
@@ -37,6 +39,16 @@ public sealed class RegionSegmentationRequestTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => new RegionSegmentationRequest(source, settings, -1, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => new RegionSegmentationRequest(source, settings, 0, -1));
+    }
+
+    [Fact]
+    public void ConstructorCreatesDefaultMergeSettingsWhenOmitted()
+    {
+        RegionSegmentationRequest request = new(CreateSource(), new RegionSegmentationSettings());
+
+        Assert.Equal(
+            RegionMergeSettings.DefaultIntermediateTargetRatio,
+            request.MergeSettings.IntermediateTargetRatio);
     }
 
     private static RgbaImage CreateSource()

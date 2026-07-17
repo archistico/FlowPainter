@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Segmentation;
 
 namespace FlowPainter.Application.FlowPainting.Presets;
 
@@ -79,18 +80,37 @@ public static class FlowPainterPresetSerializer
 
     private static void ApplyCompatibilityDefaults(JsonNode documentNode, int schemaVersion)
     {
-        if (schemaVersion >= FlowPainterPresetDocument.CurrentSchemaVersion
-            || documentNode is not JsonObject document
+        if (documentNode is not JsonObject document
             || document["preset"] is not JsonObject preset
-            || preset["settings"] is not JsonObject settings
-            || settings["detailInfluence"] is not JsonObject detailInfluence
-            || detailInfluence.ContainsKey("regionTransitionWidth"))
+            || preset["settings"] is not JsonObject settings)
         {
             return;
         }
 
-        detailInfluence["regionTransitionWidth"] =
-            DetailInfluenceSettings.DefaultRegionTransitionWidth;
+        if (schemaVersion < 8
+            && settings["detailInfluence"] is JsonObject detailInfluence
+            && !detailInfluence.ContainsKey("regionTransitionWidth"))
+        {
+            detailInfluence["regionTransitionWidth"] =
+                DetailInfluenceSettings.DefaultRegionTransitionWidth;
+        }
+
+        if (schemaVersion < 9)
+        {
+            if (!settings.ContainsKey("regionalSegmentation"))
+            {
+                settings["regionalSegmentation"] = JsonSerializer.SerializeToNode(
+                    new RegionSegmentationSettings(),
+                    SerializerOptions);
+            }
+
+            if (!settings.ContainsKey("regionMerge"))
+            {
+                settings["regionMerge"] = JsonSerializer.SerializeToNode(
+                    new RegionMergeSettings(),
+                    SerializerOptions);
+            }
+        }
     }
 
     private static JsonSerializerOptions CreateOptions()

@@ -1,6 +1,7 @@
 using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.FlowPainting.Fields;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Workloads;
 using FlowPainter.Domain.Boundaries;
 using FlowPainter.Domain.Color;
@@ -17,7 +18,9 @@ public sealed class FlowPainterPlanner
     public const string PlannerVersion = "flow-field-v1";
     public const string DetailPlannerVersion = "flow-field-detail-v1";
     public const string BoundaryPlannerVersion = "flow-field-boundary-v1";
+    public const string RegionalBoundaryPlannerVersion = "flow-field-regional-boundary-v1";
     public const string BackgroundPlannerVersion = "flow-field-background-v1";
+    public const string RegionalBackgroundPlannerVersion = "flow-field-background-regional-boundary-v1";
     private const int ProgressBatchSize = 256;
     private const int CrossingSampleCount = 4;
     private readonly IFlowFieldFactory _fieldFactory;
@@ -115,6 +118,50 @@ public sealed class FlowPainterPlanner
         IRgbaPixelSource source,
         StrokeDensityMap densityMap,
         DetailMap detailMap,
+        SceneBoundaryAnalysisResult boundaryAnalysis,
+        RegionSegmentationResult regionalSegmentation,
+        ulong seed,
+        FlowPainterSettings settings,
+        IProgress<StrokePlanningProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(boundaryAnalysis);
+        ArgumentNullException.ThrowIfNull(regionalSegmentation);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!settings.BoundaryPainting.Enabled)
+        {
+            return CreatePlan(
+                source,
+                densityMap,
+                detailMap,
+                seed,
+                settings,
+                progress,
+                cancellationToken);
+        }
+
+        BoundaryGuidanceField guidance = BoundaryGuidanceField.Create(
+            boundaryAnalysis,
+            regionalSegmentation,
+            settings.BoundaryPainting,
+            cancellationToken);
+        return CreateBoundaryGuidedPlan(
+            source,
+            densityMap,
+            detailMap,
+            guidance,
+            artisticDetailField: null,
+            seed,
+            settings,
+            RegionalBoundaryPlannerVersion,
+            progress,
+            cancellationToken);
+    }
+
+    public StrokePlan CreatePlan(
+        IRgbaPixelSource source,
+        StrokeDensityMap densityMap,
+        DetailMap detailMap,
         BoundaryGuidanceField guidanceField,
         ulong seed,
         FlowPainterSettings settings,
@@ -136,18 +183,53 @@ public sealed class FlowPainterPlanner
                 cancellationToken);
         }
 
-        DetailMap reinforcedDetailMap = guidanceField.CreateReinforcedDetailMap(
-            detailMap,
-            settings.BoundaryPainting.ContourReinforcement);
-        return CreatePlanCore(
+        return CreateBoundaryGuidedPlan(
             source,
             densityMap,
-            reinforcedDetailMap,
+            detailMap,
             guidanceField,
             artisticDetailField: null,
             seed,
             settings,
             BoundaryPlannerVersion,
+            progress,
+            cancellationToken);
+    }
+
+    public StrokePlan CreateRegionalPlan(
+        IRgbaPixelSource source,
+        StrokeDensityMap densityMap,
+        DetailMap detailMap,
+        BoundaryGuidanceField guidanceField,
+        ulong seed,
+        FlowPainterSettings settings,
+        IProgress<StrokePlanningProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(detailMap);
+        ArgumentNullException.ThrowIfNull(guidanceField);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!settings.BoundaryPainting.Enabled)
+        {
+            return CreatePlan(
+                source,
+                densityMap,
+                detailMap,
+                seed,
+                settings,
+                progress,
+                cancellationToken);
+        }
+
+        return CreateBoundaryGuidedPlan(
+            source,
+            densityMap,
+            detailMap,
+            guidanceField,
+            artisticDetailField: null,
+            seed,
+            settings,
+            RegionalBoundaryPlannerVersion,
             progress,
             cancellationToken);
     }
@@ -198,6 +280,152 @@ public sealed class FlowPainterPlanner
             seed,
             settings,
             BackgroundPlannerVersion,
+            progress,
+            cancellationToken);
+    }
+
+    public StrokePlan CreatePlan(
+        IRgbaPixelSource source,
+        StrokeDensityMap densityMap,
+        BackgroundSuppressionResult backgroundSuppression,
+        SceneBoundaryAnalysisResult boundaryAnalysis,
+        RegionSegmentationResult regionalSegmentation,
+        ulong seed,
+        FlowPainterSettings settings,
+        IProgress<StrokePlanningProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(backgroundSuppression);
+        ArgumentNullException.ThrowIfNull(boundaryAnalysis);
+        ArgumentNullException.ThrowIfNull(regionalSegmentation);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!settings.BackgroundSuppression.Enabled)
+        {
+            return CreatePlan(
+                source,
+                densityMap,
+                backgroundSuppression.EffectiveDetailMap,
+                boundaryAnalysis,
+                regionalSegmentation,
+                seed,
+                settings,
+                progress,
+                cancellationToken);
+        }
+
+        BoundaryGuidanceField? guidance = settings.BoundaryPainting.Enabled
+            ? BoundaryGuidanceField.Create(
+                boundaryAnalysis,
+                regionalSegmentation,
+                settings.BoundaryPainting,
+                cancellationToken)
+            : null;
+        if (guidance is null)
+        {
+            return CreatePlanCore(
+                source,
+                densityMap,
+                backgroundSuppression.EffectiveDetailMap,
+                guidanceField: null,
+                backgroundSuppression.ArtisticDetailField,
+                seed,
+                settings,
+                BackgroundPlannerVersion,
+                progress,
+                cancellationToken);
+        }
+
+        return CreateBoundaryGuidedPlan(
+            source,
+            densityMap,
+            backgroundSuppression.EffectiveDetailMap,
+            guidance,
+            backgroundSuppression.ArtisticDetailField,
+            seed,
+            settings,
+            RegionalBackgroundPlannerVersion,
+            progress,
+            cancellationToken);
+    }
+
+    public StrokePlan CreateRegionalPlan(
+        IRgbaPixelSource source,
+        StrokeDensityMap densityMap,
+        BackgroundSuppressionResult backgroundSuppression,
+        BoundaryGuidanceField guidanceField,
+        ulong seed,
+        FlowPainterSettings settings,
+        IProgress<StrokePlanningProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(backgroundSuppression);
+        ArgumentNullException.ThrowIfNull(guidanceField);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!settings.BackgroundSuppression.Enabled)
+        {
+            return CreateRegionalPlan(
+                source,
+                densityMap,
+                backgroundSuppression.EffectiveDetailMap,
+                guidanceField,
+                seed,
+                settings,
+                progress,
+                cancellationToken);
+        }
+
+        if (!settings.BoundaryPainting.Enabled)
+        {
+            return CreatePlanCore(
+                source,
+                densityMap,
+                backgroundSuppression.EffectiveDetailMap,
+                guidanceField: null,
+                backgroundSuppression.ArtisticDetailField,
+                seed,
+                settings,
+                BackgroundPlannerVersion,
+                progress,
+                cancellationToken);
+        }
+
+        return CreateBoundaryGuidedPlan(
+            source,
+            densityMap,
+            backgroundSuppression.EffectiveDetailMap,
+            guidanceField,
+            backgroundSuppression.ArtisticDetailField,
+            seed,
+            settings,
+            RegionalBackgroundPlannerVersion,
+            progress,
+            cancellationToken);
+    }
+
+    private StrokePlan CreateBoundaryGuidedPlan(
+        IRgbaPixelSource source,
+        StrokeDensityMap densityMap,
+        DetailMap detailMap,
+        BoundaryGuidanceField guidanceField,
+        ArtisticDetailField? artisticDetailField,
+        ulong seed,
+        FlowPainterSettings settings,
+        string plannerVersion,
+        IProgress<StrokePlanningProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        DetailMap reinforcedDetailMap = guidanceField.CreateReinforcedDetailMap(
+            detailMap,
+            settings.BoundaryPainting.ContourReinforcement);
+        return CreatePlanCore(
+            source,
+            densityMap,
+            reinforcedDetailMap,
+            guidanceField,
+            artisticDetailField,
+            seed,
+            settings,
+            plannerVersion,
             progress,
             cancellationToken);
     }

@@ -15,7 +15,7 @@ public sealed class AnalysisMemoryEstimatorTests
         Assert.Equal(2_000_000L, estimate.SourceBytes);
         Assert.Equal(500_000L, estimate.ProxyRgbaBytes);
         Assert.Equal(20_000_000L, estimate.CurrentAnalysisBytes);
-        Assert.Equal(3_253_072L, estimate.SegmentationReserveBytes);
-        Assert.Equal(25_753_072L, estimate.KnownPeakBytes);
+        Assert.Equal(4_866_736L, estimate.SegmentationReserveBytes);
+        Assert.Equal(27_366_736L, estimate.KnownPeakBytes);
     }
 }

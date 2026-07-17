@@ -10,6 +10,11 @@ public readonly record struct RegionSegmentationEstimate(
     long DistanceBufferBytes,
     long AssignmentBufferBytes,
     long SmoothingBufferBytes,
+    long ConnectivityBufferBytes,
+    long DescriptorBufferBytes,
+    long DescriptorRegionBytes,
+    long AdjacencyRegionBytes,
+    long HierarchyRegionBytes,
     long ClusterBytes,
     long EstimatedAssignmentEvaluations)
 {
@@ -19,5 +24,10 @@ public readonly record struct RegionSegmentationEstimate(
         + DistanceBufferBytes
         + AssignmentBufferBytes
         + SmoothingBufferBytes
+        + ConnectivityBufferBytes
+        + DescriptorBufferBytes
+        + DescriptorRegionBytes
+        + AdjacencyRegionBytes
+        + HierarchyRegionBytes
         + ClusterBytes);
 }

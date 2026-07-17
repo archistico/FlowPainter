@@ -19,7 +19,8 @@ public sealed class RegionSegmentationSettings
         double compactness = DefaultCompactness,
         double preBlurSigma = DefaultPreBlurSigma,
         int maximumIterations = DefaultMaximumIterations,
-        double convergenceTolerance = DefaultConvergenceTolerance)
+        double convergenceTolerance = DefaultConvergenceTolerance,
+        bool enabled = true)
     {
         if (targetRegionSize < MinimumTargetRegionSize || targetRegionSize > MaximumTargetRegionSize)
         {
@@ -45,12 +46,15 @@ public sealed class RegionSegmentationSettings
             MaximumConvergenceTolerance,
             nameof(convergenceTolerance));
 
+        Enabled = enabled;
         TargetRegionSize = targetRegionSize;
         Compactness = compactness;
         PreBlurSigma = preBlurSigma;
         MaximumIterations = maximumIterations;
         ConvergenceTolerance = convergenceTolerance;
     }
+
+    public bool Enabled { get; }
 
     public int TargetRegionSize { get; }
 

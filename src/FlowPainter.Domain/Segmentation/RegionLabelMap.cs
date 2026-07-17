@@ -89,6 +89,51 @@ public sealed class RegionLabelMap
         return new RegionLabelMap(size, regionCount, null, wideLabels);
     }
 
+    public static RegionLabelMap Create(
+        ImageSize size,
+        int regionCount,
+        ReadOnlySpan<int> labels)
+    {
+        ValidateRegionCount(size, regionCount);
+
+        if (labels.Length != size.PixelCount)
+        {
+            throw new ArgumentException(
+                $"Expected {size.PixelCount} labels but received {labels.Length}.",
+                nameof(labels));
+        }
+
+        bool[] usedLabels = new bool[regionCount];
+        RegionLabelStorageKind storageKind = SelectStorage(regionCount);
+
+        if (storageKind == RegionLabelStorageKind.Compact)
+        {
+            ushort[] compactLabels = new ushort[labels.Length];
+            for (int index = 0; index < labels.Length; index++)
+            {
+                int label = labels[index];
+                ValidateLabel(label, regionCount, nameof(labels));
+                compactLabels[index] = checked((ushort)label);
+                usedLabels[label] = true;
+            }
+
+            ValidateAllLabelsUsed(usedLabels, nameof(labels));
+            return new RegionLabelMap(size, regionCount, compactLabels, null);
+        }
+
+        uint[] wideLabels = new uint[labels.Length];
+        for (int index = 0; index < labels.Length; index++)
+        {
+            int label = labels[index];
+            ValidateLabel(label, regionCount, nameof(labels));
+            wideLabels[index] = checked((uint)label);
+            usedLabels[label] = true;
+        }
+
+        ValidateAllLabelsUsed(usedLabels, nameof(labels));
+        return new RegionLabelMap(size, regionCount, null, wideLabels);
+    }
+
     public static RegionLabelStorageKind SelectStorage(int regionCount)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(regionCount);
@@ -158,6 +203,16 @@ public sealed class RegionLabelMap
     private static void ValidateLabel(uint label, int regionCount, string parameterName)
     {
         if (label >= regionCount)
+        {
+            throw new ArgumentException(
+                $"Label {label} is outside the compact range 0 to {regionCount - 1}.",
+                parameterName);
+        }
+    }
+
+    private static void ValidateLabel(int label, int regionCount, string parameterName)
+    {
+        if (label < 0 || label >= regionCount)
         {
             throw new ArgumentException(
                 $"Label {label} is outside the compact range 0 to {regionCount - 1}.",

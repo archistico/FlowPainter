@@ -7,7 +7,15 @@ public readonly record struct BoundaryGuidanceSample(
     double Hardness,
     double SubjectBoundary,
     double CornerStrength,
-    BoundaryVector Tangent)
+    BoundaryVector Tangent,
+    double RegionalBoundaryStrength,
+    double RegionalDistancePixels,
+    BoundaryVector Normal,
+    bool IsHardBarrier)
 {
     public bool HasDirection => Tangent.IsDefined && Influence > 0d;
+
+    public bool HasRegionalBoundary =>
+        RegionalBoundaryStrength > 0d
+        && double.IsFinite(RegionalDistancePixels);
 }

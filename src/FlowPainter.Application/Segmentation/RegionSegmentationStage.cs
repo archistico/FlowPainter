@@ -10,5 +10,7 @@ public enum RegionSegmentationStage
     UpdatingClusters = 5,
     RepairingConnectivity = 6,
     BuildingResult = 7,
-    Completed = 8,
+    BuildingAdjacency = 8,
+    BuildingHierarchy = 9,
+    Completed = 10,
 }

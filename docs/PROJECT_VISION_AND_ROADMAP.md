@@ -1,9 +1,9 @@
 # FlowPainter — Project vision and living roadmap
 
-**Document status:** living specification  
-**Last updated:** 2026-07-16  
-**Current validated baseline:** M13.4.4 — Analysis orchestration extraction (804 tests)  
-**Next milestone:** M14.1 — Regional segmentation contracts  
+**Document status:** living specification
+**Last updated:** 2026-07-17
+**Current validated baseline:** M14.6 — Hierarchical regional merge (964 tests)
+**Current milestone:** M15.1 — Regional boundary field — READY FOR VALIDATION
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -91,7 +91,7 @@ Flow painting and primitive generation must remain independently usable, but the
 
 ### 3.3 Automatic regional and structural analysis
 
-The approved future architecture uses deterministic, local and model-free analysis:
+The approved active architecture uses deterministic, local and model-free analysis:
 
 - SLIC superpixel segmentation in CIELAB + image-coordinate space;
 - connected-region normalization and compact label maps;
@@ -102,7 +102,7 @@ The approved future architecture uses deterministic, local and model-free analys
 - structural contrast and optional model-free saliency signals;
 - explicit manual roles for subject, background, focus and protected areas.
 
-SAM, MobileSAM, ONNX providers, Python inference and other machine-learning segmentation paths are outside the approved roadmap. The validated M8–M13.3 semantic subsystem remains readable and operational only as a compatibility baseline until M14.7 replaces its active automatic contribution.
+SAM, MobileSAM, ONNX providers, Python inference and other machine-learning segmentation paths are outside the approved roadmap. The validated M8–M13.3 semantic subsystem remains readable as a historical and schema-compatibility baseline. M14.7 replaces its active automatic contribution with SLIC regional evidence while retaining adapters for the existing desktop overlays and schema-11 corrections.
 
 ### 3.4 Manual detail editing
 
@@ -711,7 +711,7 @@ Exit criteria:
 - schema-10 projects load with no corrections;
 - build has zero warnings/errors and all 755 repository cases pass.
 
-Roadmap note: M13.3 remains supported for schema-11 compatibility. No further automatic primary-subject ranking or ML provider work is planned; M14.7 replaces the active automatic semantic path with SLIC regional segmentation while migrating manual corrections to generalized region-role overrides.
+Roadmap note: M13.3 remains supported for schema-11 compatibility. No further automatic primary-subject ranking or ML provider work is planned. M14.7 now replaces the active automatic semantic path with SLIC regional segmentation and migrates manual corrections at runtime to generalized region-role overrides.
 
 ### M13.4 — Pre-SLIC stabilization
 
@@ -786,13 +786,13 @@ Exit criteria:
 
 ### M14 — SLIC regional segmentation
 
-**Status: IN PROGRESS — M14.1 ready for validation**
+**Status: DONE — validated through M14.8 with 1,024 tests**
 
 Detailed plan: [`M14_SLIC_REGIONAL_SEGMENTATION.md`](M14_SLIC_REGIONAL_SEGMENTATION.md). Architectural decision: [`ADR-0017`](decisions/ADR-0017-SLIC-REGIONAL-SEGMENTATION.md).
 
 #### M14.1 — Regional segmentation contracts
 
-**Status: READY FOR VALIDATION**
+**Status: DONE — validated with 863 tests**
 
 Detailed validation plan: [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md).
 
@@ -801,17 +801,29 @@ Detailed validation plan: [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REG
 - `ImageRegion`, bounds, diagnostics and progress contracts;
 - invariants for complete coverage, unique ownership, compact labels, graph consistency, monotonic hierarchy and deterministic ownership;
 - exact `RegionSegmentationEstimator` integrated into analysis/final-render admission;
-- 59 new Domain/Application cases, bringing the expected suite to 863.
+- 59 new Domain/Application cases, validated as part of the 863-test baseline.
 
 #### M14.2 — Deterministic SLIC implementation
 
-- RGB to CIELAB conversion;
-- regular centroid initialization and low-gradient relocation;
-- localized assignment/update iterations;
+**Status: DONE — validated with 882 tests**
+
+Detailed validation plan: [`M14_2_DETERMINISTIC_SLIC_IMPLEMENTATION.md`](M14_2_DETERMINISTIC_SLIC_IMPLEMENTATION.md).
+
+- deterministic normalized-sRGB to D65 CIELAB conversion;
+- optional separable Gaussian pre-smoothing with transparent pixels composited against white;
+- regular centroid initialization and deterministic low-gradient relocation;
+- localized assignment/update iterations with compactness-weighted spatial distance;
 - `TargetRegionSize`, `Compactness`, `PreBlurSigma`, iteration and convergence controls;
-- cancellation and progress reporting.
+- compact direct label publication, basic region geometry and identity hierarchy;
+- cancellation, monotonic progress and pre-sampling resource admission;
+- multi-resolution application icon for Avalonia, executable and publish output;
+- 19 new Domain/Application cases, validated at 882 total tests.
 
 #### M14.3 — Connectivity and diagnostics
+
+**Status: DONE — validated with 907 tests**
+
+Detailed validation plan: [`M14_3_CONNECTIVITY_AND_DIAGNOSTICS.md`](M14_3_CONNECTIVITY_AND_DIAGNOSTICS.md).
 
 - split disconnected components;
 - merge undersized components;
@@ -821,12 +833,23 @@ Detailed validation plan: [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REG
 
 #### M14.4 — Regional descriptors
 
-- area, bounds, centroid, perimeter and compactness;
-- mean/variance in Lab and luminance;
-- texture energy, edge density and dominant orientation;
-- immutable descriptor tables derived from the label map.
+**Status: DONE — validated with 920 tests**
+
+Detailed validation plan: [`M14_4_REGIONAL_DESCRIPTORS.md`](M14_4_REGIONAL_DESCRIPTORS.md).
+
+- area, bounds, centroid, digital perimeter and compactness;
+- mean and population variance in CIELAB, using `L*` as perceptual lightness;
+- internal texture energy and edge density that exclude cross-region contrast;
+- undirected dominant tangent orientation normalized to `[0, π)`;
+- one global lightness buffer plus fixed per-region accumulators;
+- descriptor-aware memory admission before SLIC allocation;
+- 13 new Application cases, validated at 920 total tests.
 
 #### M14.5 — Region Adjacency Graph
+
+**Status: DONE — validated with 940 tests**
+
+Detailed validation plan: [`M14_5_REGION_ADJACENCY_GRAPH.md`](M14_5_REGION_ADJACENCY_GRAPH.md).
 
 - one node per region and one edge per shared boundary;
 - shared-boundary length, colour/texture difference and gradient statistics;
@@ -835,27 +858,47 @@ Detailed validation plan: [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REG
 
 #### M14.6 — Hierarchical merge
 
-- deterministic merge costs based on colour, texture, boundary and shape;
-- protection of strong contours;
+**Status: DONE — validated with 964 tests**
+
+Detailed validation plan: [`M14_6_HIERARCHICAL_MERGE.md`](M14_6_HIERARCHICAL_MERGE.md).
+
+- deterministic adjacent-only merge costs based on colour, texture, boundary, shape and resulting size;
+- strong-contour protection retained across aggregate boundaries;
+- cost recomputation after every accepted merge with stable identifier tie breaking;
 - fine, intermediate and broad-mass hierarchy levels;
-- traceable parent/child region mapping.
+- compact traceable parent/child region mapping;
+- cancellation and hierarchy-aware memory admission;
+- 24 Domain/Application cases, validated as part of the 964-test baseline.
 
 #### M14.7 — Pipeline adoption and semantic-path retirement
 
-- SLIC regions become the active automatic regional representation;
-- no automatic class labels or primary-subject recognizer are required;
-- legacy M8 semantic output is removed from active Flow, Primitive and Hybrid planning;
-- schema-11 semantic corrections migrate to generalized region-role overrides;
+**Status: DONE — validated with 998 tests**
+
+Detailed validation plan: [`M14_7_ACTIVE_PIPELINE_MIGRATION.md`](M14_7_ACTIVE_PIPELINE_MIGRATION.md).
+
+- SLIC labels, descriptors, RAG and hierarchy are now produced by the active `AnalysisCoordinator`;
+- no automatic class labels, primary-subject recognizer or `ISemanticImportanceAnalyzer` invocation is required;
+- regional structure and shared-boundary evidence feed active detail, boundary and background composition;
+- schema-11 semantic corrections migrate deterministically to generalized region-role overrides at runtime;
 - old project schemas remain readable and retain their intentional manual decisions;
-- all three generative modes consume one shared regional/boundary/detail pipeline.
+- legacy semantic maps are a read-only UI compatibility envelope, not automatic recognition evidence;
+- legacy semantic settings no longer affect cache identity or new plans;
+- all three generative modes consume one shared regional/boundary/detail pipeline;
+- 34 new Domain/Application cases were validated as part of the 998-test baseline.
 
 #### M14.8 — UI, settings and persistence
 
-- region-size, compactness, smoothing, merge and hierarchy controls;
-- label, boundary, hierarchy and diagnostic overlays;
-- explicit reanalysis and cache invalidation;
-- project-schema migration for SLIC settings and image-specific role overrides;
-- presets persist reusable segmentation parameters but never source-specific region edits.
+**Status: DONE — validated with 1,024 tests**
+
+Detailed validation plan: [`M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md`](M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md).
+
+- enable, region-size, compactness, smoothing, convergence and merge-intensity controls;
+- fine mean-colour, fine-boundary, strong-boundary and hierarchy overlays;
+- explicit reanalysis, cache invalidation and click inspection of regional descriptors;
+- hidden preservation of obsolete semantic settings for backward-compatible round trips only;
+- project schema 12 for SLIC/merge settings and image-specific generalized role overrides;
+- preset schema 9 for reusable segmentation parameters, never source-specific region edits;
+- 26 new Application/Imaging cases were validated at 1,024 total tests.
 
 Exit criteria:
 
@@ -868,14 +911,21 @@ Exit criteria:
 
 ### M15 — Region-guided painterly rendering
 
-**Status: PLANNED**
+**Status: IN PROGRESS — M15.1 ready for validation**
 
 #### M15.1 — Regional boundary field
 
-- derive distance, strength, normal and tangent from the SLIC/RAG boundary model;
-- distinguish strong barriers from soft transitions;
-- integrate with the validated M11–M12 guidance policy;
-- preserve gradual parameter blending around weak borders.
+**Status: READY FOR VALIDATION**
+
+Detailed validation plan: [`M15_1_REGIONAL_BOUNDARY_FIELD.md`](M15_1_REGIONAL_BOUNDARY_FIELD.md).
+
+- derive bounded nearest-boundary distance, RAG strength, side-aware normal and prevailing tangent;
+- prefer stronger boundaries only for deterministic equal-distance ties;
+- use broad smooth transitions for weak edges and narrower protection bands for strong barriers;
+- blend regional evidence after the validated M11–M12 scene-guidance propagation;
+- reuse one regional guidance field across both Hybrid stroke layers;
+- retain compatibility overloads and introduce explicit regional planner versions;
+- 25 new Application cases raise the expected suite from 1,024 to 1,049.
 
 #### M15.2 — High-detail local stroke policy
 

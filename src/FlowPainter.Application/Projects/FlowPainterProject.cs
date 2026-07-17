@@ -1,9 +1,11 @@
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.Hybrid;
 using FlowPainter.Application.PrimitiveGeneration;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.Generation;
 using FlowPainter.Domain.Semantics;
+using FlowPainter.Domain.Segmentation;
 
 namespace FlowPainter.Application.Projects;
 
@@ -11,6 +13,7 @@ public sealed class FlowPainterProject
 {
     private readonly IReadOnlyList<DetailRegion> _detailRegions;
     private readonly IReadOnlyList<SemanticCorrectionRegion> _semanticCorrections;
+    private readonly IReadOnlyList<RegionRoleOverride> _regionRoleOverrides;
 
     public FlowPainterProject(
         string name,
@@ -23,7 +26,8 @@ public sealed class FlowPainterProject
         GenerativeMode mode = GenerativeMode.FlowPainting,
         PrimitiveGenerationSettings? primitiveGeneration = null,
         HybridGenerationSettings? hybridGeneration = null,
-        IReadOnlyList<SemanticCorrectionRegion>? semanticCorrections = null)
+        IReadOnlyList<SemanticCorrectionRegion>? semanticCorrections = null,
+        IReadOnlyList<RegionRoleOverride>? regionRoleOverrides = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -100,6 +104,21 @@ public sealed class FlowPainterProject
         }
 
         _semanticCorrections = Array.AsReadOnly(copiedCorrections);
+
+        RegionRoleOverride[] copiedRoleOverrides = regionRoleOverrides?.ToArray()
+            ?? LegacySemanticCorrectionAdapter.Convert(copiedCorrections).ToArray();
+        identifiers.Clear();
+        foreach (RegionRoleOverride roleOverride in copiedRoleOverrides)
+        {
+            if (!identifiers.Add(roleOverride.Id))
+            {
+                throw new ArgumentException(
+                    $"Duplicate region-role override identifier '{roleOverride.Id}'.",
+                    nameof(regionRoleOverrides));
+            }
+        }
+
+        _regionRoleOverrides = Array.AsReadOnly(copiedRoleOverrides);
     }
 
     public string Name { get; }
@@ -123,4 +142,6 @@ public sealed class FlowPainterProject
     public IReadOnlyList<DetailRegion> DetailRegions => _detailRegions;
 
     public IReadOnlyList<SemanticCorrectionRegion> SemanticCorrections => _semanticCorrections;
+
+    public IReadOnlyList<RegionRoleOverride> RegionRoleOverrides => _regionRoleOverrides;
 }

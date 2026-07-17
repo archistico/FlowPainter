@@ -27,7 +27,15 @@ public sealed class RegionVisualDescriptors
         ValidateNonNegative(bVariance, nameof(bVariance));
         ValidateNonNegative(textureEnergy, nameof(textureEnergy));
         ValidateUnitInterval(edgeDensity, nameof(edgeDensity));
-        ValidateFinite(dominantOrientationRadians, nameof(dominantOrientationRadians));
+        if (!double.IsFinite(dominantOrientationRadians)
+            || dominantOrientationRadians < 0d
+            || dominantOrientationRadians >= Math.PI)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(dominantOrientationRadians),
+                dominantOrientationRadians,
+                "Dominant orientation must be finite and in the half-open interval [0, PI).");
+        }
 
         Perimeter = perimeter;
         Compactness = compactness;

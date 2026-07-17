@@ -3,6 +3,7 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="FlowPainter"
+    Icon="/Assets/FlowPainter.ico"
     Width="1660"
     Height="940"
     MinWidth="1280"
@@ -13,7 +14,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="3">
                     <TextBlock FontSize="24" FontWeight="SemiBold" Foreground="White" Text="FlowPainter" />
-                    <TextBlock Foreground="#AEB4BF" Text="M13.4.1 · dirty state and data-loss protection" />
+                    <TextBlock Foreground="#AEB4BF" Text="M14.8 · regional segmentation controls and diagnostics" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <Button x:Name="OpenProjectButton" Padding="16,9" Click="OpenProjectClick" Content="Open project" />
@@ -273,73 +274,124 @@
                                 <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Smoothing radius" />
                                 <TextBox x:Name="SmoothingRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
                             </Grid>
-                            <Button Click="ReanalyzeDetailClick" Content="Reanalyze detail + subjects + boundaries" />
+                            <Button Click="ReanalyzeDetailClick" Content="Reanalyze detail + regions + boundaries" />
 
-                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Semantic importance" />
-                            <CheckBox x:Name="EnableSemanticAnalysisCheckBox"
-                                      Content="Enable generic subject analysis"
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="SLIC regional segmentation" />
+                            <CheckBox x:Name="EnableRegionalSegmentationCheckBox"
+                                      Content="Enable deterministic SLIC regions"
                                       IsChecked="True" />
-                            <TextBlock Foreground="#AEB4BF" Text="Overlay map" />
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Target region size (px)" />
+                                <TextBox x:Name="RegionalTargetSizeTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Compactness" />
+                                <TextBox x:Name="RegionalCompactnessTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Pre-smoothing sigma" />
+                                <TextBox x:Name="RegionalPreBlurSigmaTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Maximum iterations" />
+                                <TextBox x:Name="RegionalMaximumIterationsTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Convergence tolerance" />
+                                <TextBox x:Name="RegionalConvergenceToleranceTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Merge intensity (%)" />
+                                <TextBox x:Name="RegionalMergeIntensityTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                            </Grid>
+                            <TextBlock Foreground="#AEB4BF" Text="Diagnostic overlay" />
+                            <ComboBox x:Name="RegionalOverlayModeComboBox"
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="RegionalOverlayModeChanged" />
+                            <TextBlock Foreground="#AEB4BF" Text="Hierarchy display level" />
+                            <ComboBox x:Name="RegionalHierarchyLevelComboBox"
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="RegionalHierarchyLevelChanged" />
+                            <Button Click="ReanalyzeRegionalSegmentationClick" Content="Reanalyze SLIC regions" />
+                            <TextBlock x:Name="RegionalDiagnosticsText"
+                                       TextWrapping="Wrap"
+                                       Foreground="#AEB4BF"
+                                       Text="No regional segmentation available." />
+                            <TextBlock x:Name="SelectedRegionalRegionText"
+                                       TextWrapping="Wrap"
+                                       Foreground="#7F8794"
+                                       Text="Click the source preview to inspect a SLIC region." />
+
+                            <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Regional roles and compatibility" />
+                            <TextBlock TextWrapping="Wrap"
+                                       Foreground="#7F8794"
+                                       Text="Role candidates and legacy project corrections are derived from the active SLIC structure. Obsolete semantic tuning values remain hidden and are preserved only for backward-compatible project round trips." />
+                            <StackPanel IsVisible="False">
+                                <CheckBox x:Name="EnableSemanticAnalysisCheckBox"
+                                          Content="Legacy semantic setting"
+                                          IsChecked="True" />
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Overall influence (%)" />
+                                    <TextBox x:Name="SemanticInfluenceTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Saliency weight" />
+                                    <TextBox x:Name="SemanticSaliencyWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Subject weight" />
+                                    <TextBox x:Name="SemanticSubjectWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Silhouette weight" />
+                                    <TextBox x:Name="SemanticSilhouetteWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Focal weight" />
+                                    <TextBox x:Name="SemanticFocalWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Subject threshold (%)" />
+                                    <TextBox x:Name="SemanticThresholdTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Minimum area (%)" />
+                                    <TextBox x:Name="SemanticMinimumAreaTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Maximum subjects" />
+                                    <TextBox x:Name="SemanticMaximumSubjectsTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Center bias" />
+                                    <TextBox x:Name="SemanticCenterBiasTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Semantic smoothing" />
+                                    <TextBox x:Name="SemanticSmoothingRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
+                                    <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Silhouette radius" />
+                                    <TextBox x:Name="SemanticBoundaryRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                            <TextBlock Foreground="#AEB4BF" Text="Regional compatibility overlay" />
                             <ComboBox x:Name="SemanticOverlayModeComboBox"
                                       HorizontalAlignment="Stretch"
                                       SelectionChanged="SemanticOverlayModeChanged" />
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Overall influence (%)" />
-                                <TextBox x:Name="SemanticInfluenceTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Saliency weight" />
-                                <TextBox x:Name="SemanticSaliencyWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Subject weight" />
-                                <TextBox x:Name="SemanticSubjectWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Silhouette weight" />
-                                <TextBox x:Name="SemanticSilhouetteWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Focal weight" />
-                                <TextBox x:Name="SemanticFocalWeightTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Subject threshold (%)" />
-                                <TextBox x:Name="SemanticThresholdTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Minimum area (%)" />
-                                <TextBox x:Name="SemanticMinimumAreaTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Maximum subjects" />
-                                <TextBox x:Name="SemanticMaximumSubjectsTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Center bias" />
-                                <TextBox x:Name="SemanticCenterBiasTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Semantic smoothing" />
-                                <TextBox x:Name="SemanticSmoothingRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
-                            <Grid ColumnDefinitions="*,100" ColumnSpacing="8">
-                                <TextBlock VerticalAlignment="Center" Foreground="#AEB4BF" Text="Silhouette radius" />
-                                <TextBox x:Name="SemanticBoundaryRadiusTextBox" Grid.Column="1" HorizontalContentAlignment="Right" />
-                            </Grid>
                             <TextBlock x:Name="SemanticRegionCountText"
                                        Foreground="#AEB4BF"
-                                       Text="No semantic subjects analyzed" />
+                                       Text="No regional role candidates available" />
                             <ListBox x:Name="SemanticRegionListBox"
                                      Height="105"
                                      SelectionChanged="SemanticRegionSelectionChanged" />
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                <Button Click="SetSemanticPrimarySubjectClick" Content="Set primary subject" />
-                                <Button Grid.Column="1" Click="SetSemanticSubjectClick" Content="Mark as subject" />
+                                <Button Click="SetSemanticPrimarySubjectClick" Content="Set focal region" />
+                                <Button Grid.Column="1" Click="SetSemanticSubjectClick" Content="Mark as subject region" />
                             </Grid>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Button Click="SetSemanticBackgroundClick" Content="Mark as background" />
-                                <Button Grid.Column="1" Click="IgnoreSemanticDetectionClick" Content="Ignore detection" />
+                                <Button Grid.Column="1" Click="IgnoreSemanticDetectionClick" Content="Ignore region" />
                             </Grid>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Button Click="PromoteSemanticFocusClick" Content="Promote to focus" />
@@ -348,20 +400,20 @@
                             <TextBlock Margin="0,6,0,0"
                                        FontWeight="SemiBold"
                                        Foreground="White"
-                                       Text="Semantic corrections" />
+                                       Text="Region role overrides" />
                             <TextBlock x:Name="SemanticCorrectionCountText"
                                        Foreground="#AEB4BF"
-                                       Text="0 semantic corrections" />
+                                       Text="0 region role overrides" />
                             <ListBox x:Name="SemanticCorrectionListBox"
                                      Height="90"
                                      SelectionChanged="SemanticCorrectionSelectionChanged" />
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Button Click="DeleteSelectedSemanticCorrectionClick" Content="Delete selected" />
-                                <Button Grid.Column="1" Click="ClearSemanticCorrectionsClick" Content="Clear corrections" />
+                                <Button Grid.Column="1" Click="ClearSemanticCorrectionsClick" Content="Clear overrides" />
                             </Grid>
                             <TextBlock TextWrapping="Wrap"
                                        Foreground="#7F8794"
-                                       Text="Click a detected rectangle to select it, then correct its role. Manual corrections are saved in the project and override automatic semantic maps using the same soft transition as detail regions." />
+                                       Text="Manual role overrides are saved in the project and applied over deterministic SLIC regional evidence with the same soft transition used by detail regions." />
 
                             <TextBlock Margin="0,10,0,0" FontWeight="SemiBold" Foreground="White" Text="Scene boundaries" />
                             <CheckBox x:Name="EnableBoundaryAnalysisCheckBox"

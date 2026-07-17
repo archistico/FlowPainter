@@ -1,7 +1,9 @@
+using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.Hybrid;
 using FlowPainter.Application.PrimitiveGeneration;
+using FlowPainter.Application.Tests.Boundaries;
 using FlowPainter.Domain.Boundaries;
 using FlowPainter.Domain.Color;
 using FlowPainter.Domain.Detail;
@@ -38,6 +40,66 @@ public sealed class BoundaryAwareHybridPlanComposerTests
 
         Assert.Equal(FlowPainterPlanner.BoundaryPlannerVersion, plan.FlowStrokePlan.PlannerVersion);
         Assert.Equal(FlowPainterPlanner.BoundaryPlannerVersion, plan.RefinementStrokePlan.PlannerVersion);
+    }
+
+    [Fact]
+    public void CreatePlanUsesRegionalBoundaryPlannerForBothStrokeLayers()
+    {
+        RgbaImage image = CreateImage();
+        DetailMap detail = DetailMap.CreateUniform(image.Size, 0.5f);
+        StrokeDensityMap density = StrokeDensityMap.CreateUniform(image.Size, 8d);
+        FlowPainterSettings flowSettings = new(
+            strokeCount: 12,
+            segmentCount: 3,
+            boundaryPainting: new BoundaryPaintingSettings(enabled: true, alignmentRadius: 2));
+
+        FlowPainter.Domain.Hybrid.HybridPlan plan = new HybridPlanComposer().CreatePlan(
+            image,
+            density,
+            detail,
+            SceneBoundaryAnalysisResult.CreateEmpty(image.Size),
+            RegionalBoundaryTestFactory.CreateVerticalSplit(8, 8, 4, 0.9d),
+            23UL,
+            flowSettings,
+            new PrimitiveGenerationSettings(
+                primitiveCount: 4,
+                candidatesPerStep: 2,
+                mutationIterations: 1),
+            new HybridGenerationSettings());
+
+        Assert.Equal(FlowPainterPlanner.RegionalBoundaryPlannerVersion, plan.FlowStrokePlan.PlannerVersion);
+        Assert.Equal(FlowPainterPlanner.RegionalBoundaryPlannerVersion, plan.RefinementStrokePlan.PlannerVersion);
+    }
+
+
+    [Fact]
+    public void RegionalSegmentationDoesNotRequireBoundaryGuidanceWhenBoundaryPaintingIsDisabled()
+    {
+        RgbaImage image = CreateImage();
+        DetailMap detail = DetailMap.CreateUniform(image.Size, 0.5f);
+        StrokeDensityMap density = StrokeDensityMap.CreateUniform(image.Size, 8d);
+        FlowPainterSettings flowSettings = new(
+            strokeCount: 12,
+            segmentCount: 3,
+            boundaryPainting: new BoundaryPaintingSettings(enabled: false),
+            backgroundSuppression: new BackgroundSuppressionSettings(enabled: true));
+
+        FlowPainter.Domain.Hybrid.HybridPlan plan = new HybridPlanComposer().CreatePlan(
+            image,
+            density,
+            BackgroundSuppressionResult.CreateDisabled(detail),
+            SceneBoundaryAnalysisResult.CreateEmpty(image.Size),
+            RegionalBoundaryTestFactory.CreateVerticalSplit(8, 8, 4, 0.9d),
+            29UL,
+            flowSettings,
+            new PrimitiveGenerationSettings(
+                primitiveCount: 4,
+                candidatesPerStep: 2,
+                mutationIterations: 1),
+            new HybridGenerationSettings());
+
+        Assert.Equal(FlowPainterPlanner.BackgroundPlannerVersion, plan.FlowStrokePlan.PlannerVersion);
+        Assert.Equal(FlowPainterPlanner.BackgroundPlannerVersion, plan.RefinementStrokePlan.PlannerVersion);
     }
 
     [Fact]

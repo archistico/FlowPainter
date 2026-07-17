@@ -55,6 +55,10 @@ public sealed class ImageRegionTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new RegionVisualDescriptors(compactness: 1.1d));
         Assert.Throws<ArgumentOutOfRangeException>(() => new RegionVisualDescriptors(meanLightness: 101d));
         Assert.Throws<ArgumentOutOfRangeException>(() => new RegionVisualDescriptors(edgeDensity: -0.1d));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RegionVisualDescriptors(
+            dominantOrientationRadians: -0.1d));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RegionVisualDescriptors(
+            dominantOrientationRadians: Math.PI));
     }
 
     [Fact]

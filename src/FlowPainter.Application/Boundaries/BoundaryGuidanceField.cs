@@ -1,3 +1,4 @@
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Domain.Boundaries;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.Geometry;
@@ -12,6 +13,10 @@ public sealed class BoundaryGuidanceField
     private readonly float[] _subjectBoundary;
     private readonly float[] _cornerStrength;
     private readonly BoundaryVector[] _tangents;
+    private readonly float[] _regionalBoundaryStrength;
+    private readonly float[] _regionalDistancePixels;
+    private readonly BoundaryVector[] _normals;
+    private readonly bool[] _hardBarriers;
 
     private BoundaryGuidanceField(
         ImageSize size,
@@ -19,7 +24,11 @@ public sealed class BoundaryGuidanceField
         float[] hardness,
         float[] subjectBoundary,
         float[] cornerStrength,
-        BoundaryVector[] tangents)
+        BoundaryVector[] tangents,
+        float[] regionalBoundaryStrength,
+        float[] regionalDistancePixels,
+        BoundaryVector[] normals,
+        bool[] hardBarriers)
     {
         Size = size;
         _influence = influence;
@@ -27,6 +36,10 @@ public sealed class BoundaryGuidanceField
         _subjectBoundary = subjectBoundary;
         _cornerStrength = cornerStrength;
         _tangents = tangents;
+        _regionalBoundaryStrength = regionalBoundaryStrength;
+        _regionalDistancePixels = regionalDistancePixels;
+        _normals = normals;
+        _hardBarriers = hardBarriers;
     }
 
     public ImageSize Size { get; }
@@ -41,7 +54,11 @@ public sealed class BoundaryGuidanceField
             _hardness[index],
             _subjectBoundary[index],
             _cornerStrength[index],
-            _tangents[index]);
+            _tangents[index],
+            _regionalBoundaryStrength[index],
+            _regionalDistancePixels[index],
+            _normals[index],
+            _hardBarriers[index]);
     }
 
     public DetailMap CreateReinforcedDetailMap(
@@ -87,6 +104,46 @@ public sealed class BoundaryGuidanceField
         BoundaryPaintingSettings settings,
         CancellationToken cancellationToken = default)
     {
+        return CreateCore(
+            analysis,
+            settings,
+            regionalField: null,
+            cancellationToken);
+    }
+
+    public static BoundaryGuidanceField Create(
+        SceneBoundaryAnalysisResult analysis,
+        RegionSegmentationResult segmentation,
+        BoundaryPaintingSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(analysis);
+        ArgumentNullException.ThrowIfNull(segmentation);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (analysis.EdgeImportanceMap.Size != segmentation.Labels.Size)
+        {
+            throw new ArgumentException(
+                "The boundary analysis and regional segmentation must have identical dimensions.",
+                nameof(segmentation));
+        }
+
+        RegionalBoundaryField regionalField = RegionalBoundaryField.Create(
+            segmentation,
+            RegionalBoundaryFieldSettings.FromBoundaryPainting(settings),
+            cancellationToken);
+        return CreateCore(
+            analysis,
+            settings,
+            regionalField,
+            cancellationToken);
+    }
+
+    private static BoundaryGuidanceField CreateCore(
+        SceneBoundaryAnalysisResult analysis,
+        BoundaryPaintingSettings settings,
+        RegionalBoundaryField? regionalField,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(analysis);
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -104,6 +161,10 @@ public sealed class BoundaryGuidanceField
         float[] contour = new float[length];
         float[] corners = new float[length];
         BoundaryVector[] tangents = new BoundaryVector[length];
+        float[] regionalStrength = new float[length];
+        float[] regionalDistance = Enumerable.Repeat(float.PositiveInfinity, length).ToArray();
+        BoundaryVector[] normals = new BoundaryVector[length];
+        bool[] hardBarriers = new bool[length];
 
         for (int index = 0; index < length; index++)
         {
@@ -140,13 +201,95 @@ public sealed class BoundaryGuidanceField
             settings.AlignmentRadius,
             cancellationToken);
 
+        if (regionalField is not null)
+        {
+            BlendRegionalField(
+                regionalField,
+                influence,
+                hardness,
+                contour,
+                corners,
+                tangents,
+                regionalStrength,
+                regionalDistance,
+                normals,
+                hardBarriers,
+                size,
+                cancellationToken);
+        }
+
         return new BoundaryGuidanceField(
             size,
             influence,
             hardness,
             contour,
             corners,
-            tangents);
+            tangents,
+            regionalStrength,
+            regionalDistance,
+            normals,
+            hardBarriers);
+    }
+
+    private static void BlendRegionalField(
+        RegionalBoundaryField regionalField,
+        float[] influence,
+        float[] hardness,
+        float[] contour,
+        float[] corners,
+        BoundaryVector[] tangents,
+        float[] regionalStrength,
+        float[] regionalDistance,
+        BoundaryVector[] normals,
+        bool[] hardBarriers,
+        ImageSize size,
+        CancellationToken cancellationToken)
+    {
+        float[] regionalCorners = new float[influence.Length];
+        for (int y = 0; y < size.Height; y++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            for (int x = 0; x < size.Width; x++)
+            {
+                int index = checked((y * size.Width) + x);
+                RegionalBoundarySample sample = regionalField.Sample(x, y);
+                regionalStrength[index] = (float)sample.BoundaryStrength;
+                regionalDistance[index] = (float)sample.DistancePixels;
+                normals[index] = sample.Normal;
+                hardBarriers[index] = sample.IsHardBarrier;
+                if (!sample.HasBoundary)
+                {
+                    continue;
+                }
+
+                float previousInfluence = influence[index];
+                float regionalInfluence = (float)sample.Influence;
+                influence[index] = Math.Max(previousInfluence, regionalInfluence);
+                double regionalHardness = sample.IsHardBarrier
+                    ? sample.Influence
+                    : sample.Influence * (0.35d + (0.45d * sample.BoundaryStrength));
+                hardness[index] = Math.Max(
+                    hardness[index],
+                    (float)Math.Clamp(regionalHardness, 0d, 1d));
+                contour[index] = Math.Max(contour[index], regionalInfluence);
+                if (sample.HasDirection
+                    && (!tangents[index].IsDefined || regionalInfluence >= previousInfluence))
+                {
+                    tangents[index] = sample.Tangent;
+                }
+            }
+        }
+
+        ComputeCornerStrength(
+            influence,
+            tangents,
+            regionalCorners,
+            size,
+            cancellationToken);
+        for (int index = 0; index < corners.Length; index++)
+        {
+            corners[index] = Math.Max(corners[index], regionalCorners[index]);
+        }
     }
 
     private static void ComputeCornerStrength(

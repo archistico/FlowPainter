@@ -1,8 +1,8 @@
 # M14 — SLIC regional segmentation
 
-**Status:** IN PROGRESS — M14.1 ready for validation  
-**Approved:** 2026-07-16  
-**Depends on:** M13.4 pre-SLIC stabilization  
+**Status:** IN PROGRESS — M14.8 ready for validation
+**Approved:** 2026-07-16
+**Depends on:** M13.4 pre-SLIC stabilization
 **Decision:** [`ADR-0017-SLIC-REGIONAL-SEGMENTATION.md`](decisions/ADR-0017-SLIC-REGIONAL-SEGMENTATION.md)
 
 ## Purpose
@@ -106,7 +106,7 @@ The precise number of levels may be configurable, but parentage must be determin
 
 ## M14.1 — Contracts and invariants
 
-**Status:** READY FOR VALIDATION
+**Status:** DONE — validated with 863 tests
 
 Detailed specification: [`M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md).
 
@@ -141,6 +141,10 @@ Exit criteria:
 
 ## M14.2 — Deterministic SLIC implementation
 
+**Status:** DONE — validated with 882 tests
+
+Detailed specification: [`M14_2_DETERMINISTIC_SLIC_IMPLEMENTATION.md`](M14_2_DETERMINISTIC_SLIC_IMPLEMENTATION.md).
+
 Algorithm stages:
 
 1. optionally pre-smooth the proxy;
@@ -173,6 +177,10 @@ Requirements:
 
 ## M14.3 — Connectivity and diagnostics
 
+**Status:** DONE — validated with 907 tests
+
+Detailed specification: [`M14_3_CONNECTIVITY_AND_DIAGNOSTICS.md`](M14_3_CONNECTIVITY_AND_DIAGNOSTICS.md).
+
 Raw cluster labels are normalized into valid FlowPainter regions:
 
 - identify connected components per label;
@@ -193,19 +201,30 @@ Exit criteria:
 
 ## M14.4 — Regional descriptors
 
-Descriptors are calculated in deterministic passes over the label map and source proxy.
+**Status:** DONE — validated with 920 tests
 
-Validation uses synthetic fixtures with analytically known:
+Detailed specification: [`M14_4_REGIONAL_DESCRIPTORS.md`](M14_4_REGIONAL_DESCRIPTORS.md).
 
-- areas and centroids;
-- mean colours and luminance;
-- straight and stepped perimeters;
-- horizontal/vertical dominant orientations;
-- uniform versus textured regions.
+Descriptors are calculated in deterministic passes over the final connected label map and the original source proxy.
 
-Descriptor calculation must not allocate one full-size buffer per region.
+Implemented values:
+
+- area, exclusive bounds and pixel-centre centroid;
+- exposed four-neighbour digital perimeter and `4πA / P²` compactness;
+- mean and population variance of D65 CIELAB `L*`, `a*` and `b*`;
+- mean squared internal-lightness gradient energy;
+- internal edge-pixel density above a fixed `2 L*` threshold;
+- doubled-angle dominant tangent orientation in `[0, π)`.
+
+Cross-region contrast is deliberately excluded from texture/orientation descriptors because shared-boundary evidence belongs to M14.5. The implementation allocates one full-proxy `float` lightness buffer and scalar arrays proportional to region count, never one full-size buffer per region.
+
+Validation uses synthetic fixtures with analytically known geometry, colour statistics, straight/stepped perimeters, horizontal/vertical tangents and uniform/textured regions. Thirteen focused Application cases were validated at 920 total tests.
 
 ## M14.5 — Region Adjacency Graph
+
+**Status: DONE — validated with 940 tests**
+
+Detailed specification: [`M14_5_REGION_ADJACENCY_GRAPH.md`](M14_5_REGION_ADJACENCY_GRAPH.md).
 
 The graph is constructed by scanning right/down pixel neighbours once and accumulating undirected edges in normalized identifier order.
 
@@ -223,114 +242,74 @@ The RAG is the bridge to boundary-aware painting. A SLIC border is not automatic
 
 ## M14.6 — Hierarchical merge
 
-Candidate merge cost initially combines:
+**Status: DONE — validated with 964 tests**
 
-```text
-colour difference
-+ texture difference
-+ shared-boundary strength
-+ shape penalty
-+ resulting-size penalty
-```
+Detailed specification: [`M14_6_HIERARCHICAL_MERGE.md`](M14_6_HIERARCHICAL_MERGE.md).
 
-Rules:
+Implemented behaviour:
 
-- only adjacent regions can merge;
-- strong boundaries receive explicit protection;
-- costs are recomputed after each accepted merge;
-- equal-cost ties use stable identifiers;
-- every hierarchy level maps all fine labels to exactly one parent;
-- source fine labels remain immutable.
+- three deterministic levels: fine, intermediate and broad mass;
+- adjacent-only priority-queue merging with stale-candidate version rejection;
+- weighted colour, texture, boundary, shape and resulting-size cost;
+- explicit maximum fine-edge protection across aggregate boundaries;
+- cost and perimeter recomputation after every accepted merge;
+- stable equal-cost ordering and compact first-appearance parent identifiers;
+- immutable fine labels plus direct parent/child traceability;
+- cancellation and hierarchy-aware memory admission;
+- request-level merge settings, with UI/persistence deferred to M14.8.
 
-Presets may expose a user-facing merge intensity rather than raw weights.
+Twenty-four focused cases were validated, raising the suite from 940 to 964.
 
 ## M14.7 — Active-pipeline migration
 
-Only after M14.1–M14.6 validation:
+**Status: DONE — validated with 998 tests**
 
-- SLIC hierarchy replaces automatic semantic maps as the active regional representation;
-- scene-boundary analysis consumes regional/shared-boundary evidence;
+Detailed specification: [`M14_7_ACTIVE_PIPELINE_MIGRATION.md`](M14_7_ACTIVE_PIPELINE_MIGRATION.md).
+
+Implemented behaviour:
+
+- `AnalysisCoordinator` executes structural analysis followed by SLIC segmentation, descriptors, RAG and hierarchy;
+- automatic semantic analysis is no longer injected or called by the active path;
+- regional/shared-boundary evidence reaches scene-boundary analysis through a compatibility adapter;
 - background and focus treatment derive from regional structure, structural contrast and manual roles;
-- Flow, Primitive and Hybrid switch together;
-- semantic settings no longer affect newly generated plans;
-- schema-11 corrections migrate to generalized region-role overrides;
-- old project schemas remain readable;
-- automatic semantic detections are treated as derived legacy evidence, not durable state.
+- Flow, Primitive and Hybrid switch together through their shared detail/boundary inputs;
+- semantic settings no longer affect cache identity or newly generated plans;
+- schema-11 corrections migrate at runtime to generalized `RegionRoleOverride` values;
+- old project schemas remain readable without a project-schema increment;
+- legacy semantic maps remain a read-only UI compatibility envelope only.
 
-A compatibility test must prove that intentional manual subject/background/focus decisions survive migration even though the automatic analyzer changes.
+Thirty-four focused Domain/Application cases were validated, raising the suite from 964 to 998.
 
 ## M14.8 — UI and persistence
 
-Planned controls:
+**Status: READY FOR VALIDATION**
+
+Detailed specification: [`M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md`](M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md).
+
+Implemented controls:
 
 - segmentation enabled;
-- target region size;
-- compactness;
-- pre-smoothing;
-- merge intensity;
-- hierarchy level used for diagnostics/rendering;
-- reanalyze command.
+- target region size and compactness;
+- pre-smoothing, iteration limit and convergence tolerance;
+- simplified merge intensity;
+- hierarchy level used for diagnostics;
+- explicit reanalysis command.
 
-Planned overlays:
+Implemented overlays and diagnostics:
 
-- fine SLIC labels;
-- mean-colour regions;
+- fine mean-colour regions;
 - raw SLIC borders;
-- strong regional boundaries;
+- strong RAG boundaries;
 - selected hierarchy level;
-- region statistics and selected-region descriptors.
+- region/hierarchy/connectivity statistics;
+- click inspection of selected-region descriptors.
 
 Persistence policy:
 
-- project schema advances only when implementation is ready;
-- project stores reusable settings and source-specific manual role overrides;
-- presets store reusable SLIC/merge settings only;
-- large derived label maps are rebuilt rather than persisted initially;
-- all existing project and preset schemas remain readable.
+- project schema 12 stores reusable settings and source-specific generalized role overrides;
+- preset schema 9 stores reusable SLIC/merge settings only;
+- large derived label maps, descriptors, graphs and hierarchy values are rebuilt rather than persisted;
+- project schemas 1–11 and preset schemas 1–8 remain readable;
+- obsolete semantic tuning values remain hidden and round-trippable only for compatibility.
 
-## Memory and high-resolution policy
-
-For a 10,000 × 10,000 source:
-
-- `UInt16` full-size labels would require about 191 MiB;
-- `UInt32` full-size labels would require about 381 MiB;
-- a full-size three-channel `float32` Lab field would require about 1.12 GiB before other buffers.
-
-M14 therefore segments the selected analysis proxy globally. Rendering queries region/hierarchy information through normalized coordinates. M17 may refine borders at source resolution using narrow bands or local SLIC, subject to the M13.4 budget policy.
-
-## Test strategy
-
-M14 adds deterministic tests for:
-
-- contract validation and compact storage;
-- uniform, two-colour, striped, gradient and textured fixtures;
-- expected region-count ranges rather than fragile full-map hashes;
-- exact coverage and connectivity;
-- deterministic output and tie breaking;
-- cancellation and progress;
-- descriptor values;
-- adjacency and shared-boundary counts;
-- hierarchy parentage and strong-edge protection;
-- project/preset migration;
-- active-path integration across Flow, Primitive and Hybrid.
-
-Visual/manual validation compares:
-
-- source;
-- fine mean-colour segmentation;
-- boundary overlay;
-- several hierarchy levels;
-- resulting Flow, Primitive and Hybrid previews.
-
-## Completion criteria
-
-M14 is complete when:
-
-- SLIC provides a deterministic, connected and complete partition;
-- descriptors, RAG and hierarchy pass all invariants;
-- memory/work estimates reject unsafe operations before allocation;
-- UI diagnostics make segmentation failures inspectable;
-- Flow, Primitive and Hybrid use the same regional representation;
-- new planning no longer depends on automatic semantic recognition;
-- schema-1 through the new schema remain readable;
-- build has zero warnings/errors and the full test suite passes.
+Twenty-six focused Application/Imaging cases raise the expected suite from the validated 998 baseline to 1,024.

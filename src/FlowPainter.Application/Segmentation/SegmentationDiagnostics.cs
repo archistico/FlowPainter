@@ -9,7 +9,8 @@ public sealed class SegmentationDiagnostics
         int rawRegionCount,
         int finalRegionCount,
         int disconnectedComponentsRepaired = 0,
-        int undersizedComponentsMerged = 0)
+        int undersizedComponentsMerged = 0,
+        RegionSizeDistribution? regionSizes = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(iterationCount);
         if (!double.IsFinite(finalMaximumDisplacement) || finalMaximumDisplacement < 0d)
@@ -22,6 +23,14 @@ public sealed class SegmentationDiagnostics
 
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rawRegionCount);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(finalRegionCount);
+        if (finalRegionCount > rawRegionCount)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(finalRegionCount),
+                finalRegionCount,
+                "The final region count cannot exceed the pre-merge component count.");
+        }
+
         ArgumentOutOfRangeException.ThrowIfNegative(disconnectedComponentsRepaired);
         ArgumentOutOfRangeException.ThrowIfNegative(undersizedComponentsMerged);
 
@@ -32,6 +41,7 @@ public sealed class SegmentationDiagnostics
         FinalRegionCount = finalRegionCount;
         DisconnectedComponentsRepaired = disconnectedComponentsRepaired;
         UndersizedComponentsMerged = undersizedComponentsMerged;
+        RegionSizes = regionSizes;
     }
 
     public int IterationCount { get; }
@@ -47,4 +57,6 @@ public sealed class SegmentationDiagnostics
     public int DisconnectedComponentsRepaired { get; }
 
     public int UndersizedComponentsMerged { get; }
+
+    public RegionSizeDistribution? RegionSizes { get; }
 }

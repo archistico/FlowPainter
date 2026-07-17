@@ -3,11 +3,13 @@ using FlowPainter.Application.Background;
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.Detail;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Domain.Color;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.Geometry;
 using FlowPainter.Domain.Images;
+using FlowPainter.Domain.Segmentation;
 using FlowPainter.Domain.Semantics;
 
 namespace FlowPainter.Application.Tests.Analysis;
@@ -43,6 +45,38 @@ public sealed class AnalysisCoordinatorTests
     }
 
     [Fact]
+    public void CacheKeyIgnoresRetiredSemanticSettings()
+    {
+        Guid sourceIdentity = Guid.NewGuid();
+        AnalysisCacheKey baseline = CreateRequest(sourceIdentity: sourceIdentity).CacheKey;
+        AnalysisCacheKey changed = CreateRequest(
+            sourceIdentity: sourceIdentity,
+            semanticSettings: new SemanticAnalysisSettings(
+                enabled: true,
+                overallInfluence: 0.99d,
+                saliencyWeight: 2d,
+                subjectWeight: 3d)).CacheKey;
+
+        Assert.Equal(baseline, changed);
+    }
+
+    [Fact]
+    public void CacheKeyIncludesSegmentationAndMergeSettings()
+    {
+        Guid sourceIdentity = Guid.NewGuid();
+        AnalysisCacheKey baseline = CreateRequest(sourceIdentity: sourceIdentity).CacheKey;
+        AnalysisCacheKey segmentationChanged = CreateRequest(
+            sourceIdentity: sourceIdentity,
+            segmentationSettings: new RegionSegmentationSettings(targetRegionSize: 32)).CacheKey;
+        AnalysisCacheKey mergeChanged = CreateRequest(
+            sourceIdentity: sourceIdentity,
+            mergeSettings: new RegionMergeSettings(intermediateTargetRatio: 0.55d)).CacheKey;
+
+        Assert.NotEqual(baseline, segmentationChanged);
+        Assert.NotEqual(baseline, mergeChanged);
+    }
+
+    [Fact]
     public void RequestCopiesMutableRegionCollections()
     {
         List<DetailRegion> regions =
@@ -73,23 +107,26 @@ public sealed class AnalysisCoordinatorTests
     }
 
     [Fact]
-    public async Task AnalyzeAsyncProducesDetachedCompleteResult()
+    public async Task AnalyzeAsyncProducesDetachedCompleteRegionalResult()
     {
         RecordingDetailAnalyzer detail = new();
-        RecordingSemanticAnalyzer semantic = new();
-        RecordingBoundaryAnalyzer boundary = new();
-        AnalysisCoordinator coordinator = new(detail, semantic, boundary);
+        RecordingSegmentationAnalyzer segmentation = new();
+        RecordingRegionalBoundaryAnalyzer boundary = new();
+        AnalysisCoordinator coordinator = new(detail, segmentation, boundary);
         AnalysisRequest request = CreateRequest();
 
         PendingAnalysis pending = await coordinator.AnalyzeAsync(request);
 
         Assert.Equal(request.CacheKey, pending.CacheKey);
         Assert.Equal(request.Source.Size, pending.Result.StructuralDetailMap.Size);
+        Assert.Equal(request.Source.Size, pending.Result.RegionalSegmentation.Labels.Size);
+        Assert.Equal(request.Source.Size, pending.Result.RegionalAnalysis.ImportanceMap.Size);
         Assert.Equal(request.Source.Size, pending.Result.AutomaticDetailMap.Size);
         Assert.Equal(request.Source.Size, pending.Result.ManuallyComposedDetailMap.Size);
         Assert.Equal(request.Source.Size, pending.Result.BackgroundSuppression.EffectiveDetailMap.Size);
+        Assert.Equal(RegionalSemanticCompatibilityAdapter.ProviderIdentifier, pending.Result.SemanticAnalysis.ProviderId);
         Assert.Equal(1, detail.CallCount);
-        Assert.Equal(1, semantic.CallCount);
+        Assert.Equal(1, segmentation.CallCount);
         Assert.Equal(1, boundary.CallCount);
         Assert.Null(coordinator.CurrentKey);
     }
@@ -105,6 +142,8 @@ public sealed class AnalysisCoordinatorTests
 
         Assert.NotEmpty(reported);
         Assert.Equal(AnalysisPipelineStage.Preparing, reported[0].Stage);
+        Assert.Contains(reported, value => value.Stage == AnalysisPipelineStage.RegionalSegmentation);
+        Assert.Contains(reported, value => value.Stage == AnalysisPipelineStage.RegionRoles);
         Assert.Equal(AnalysisPipelineStage.Completed, reported[^1].Stage);
         Assert.Equal(1d, reported[^1].Fraction);
         for (int index = 1; index < reported.Count; index++)
@@ -132,11 +171,11 @@ public sealed class AnalysisCoordinatorTests
     [Fact]
     public async Task AnalyzeAsyncFailureLeavesCurrentResultUnchanged()
     {
-        FailAfterFirstSemanticAnalyzer semantic = new();
+        FailAfterFirstSegmentationAnalyzer segmentation = new();
         AnalysisCoordinator coordinator = new(
             new RecordingDetailAnalyzer(),
-            semantic,
-            new RecordingBoundaryAnalyzer());
+            segmentation,
+            new RecordingRegionalBoundaryAnalyzer());
         PendingAnalysis accepted = await coordinator.AnalyzeAsync(CreateRequest());
         Assert.True(coordinator.TryAdopt(accepted, accepted.CacheKey, _ => { }));
         AnalysisResult current = Assert.IsType<AnalysisResult>(coordinator.GetCurrent(accepted.CacheKey));
@@ -224,12 +263,12 @@ public sealed class AnalysisCoordinatorTests
     }
 
     [Fact]
-    public async Task RecomposeAsyncReusesAutomaticMapsWithoutCallingAnalyzers()
+    public async Task RecomposeAsyncReusesRegionalAutomaticMapsWithoutCallingAnalyzers()
     {
         RecordingDetailAnalyzer detail = new();
-        RecordingSemanticAnalyzer semantic = new();
-        RecordingBoundaryAnalyzer boundary = new();
-        AnalysisCoordinator coordinator = new(detail, semantic, boundary);
+        RecordingSegmentationAnalyzer segmentation = new();
+        RecordingRegionalBoundaryAnalyzer boundary = new();
+        AnalysisCoordinator coordinator = new(detail, segmentation, boundary);
         PendingAnalysis initial = await coordinator.AnalyzeAsync(CreateRequest());
         Assert.True(coordinator.TryAdopt(initial, initial.CacheKey, _ => { }));
         AnalysisRequest changed = CreateRequest(detailRegionRevision: 2L);
@@ -239,11 +278,13 @@ public sealed class AnalysisCoordinatorTests
             initial.Result);
 
         Assert.Same(initial.Result.StructuralDetailMap, recomposed.Result.StructuralDetailMap);
+        Assert.Same(initial.Result.RegionalSegmentation, recomposed.Result.RegionalSegmentation);
+        Assert.Same(initial.Result.RegionalAnalysis, recomposed.Result.RegionalAnalysis);
         Assert.Same(initial.Result.SemanticAnalysis, recomposed.Result.SemanticAnalysis);
         Assert.Same(initial.Result.BoundaryAnalysis, recomposed.Result.BoundaryAnalysis);
         Assert.Same(initial.Result.AutomaticDetailMap, recomposed.Result.AutomaticDetailMap);
         Assert.Equal(1, detail.CallCount);
-        Assert.Equal(1, semantic.CallCount);
+        Assert.Equal(1, segmentation.CallCount);
         Assert.Equal(1, boundary.CallCount);
     }
 
@@ -281,13 +322,16 @@ public sealed class AnalysisCoordinatorTests
     {
         return new AnalysisCoordinator(
             new RecordingDetailAnalyzer(),
-            new RecordingSemanticAnalyzer(),
-            new RecordingBoundaryAnalyzer());
+            new RecordingSegmentationAnalyzer(),
+            new RecordingRegionalBoundaryAnalyzer());
     }
 
     private static AnalysisRequest CreateRequest(
         Guid? sourceIdentity = null,
         DetailAnalysisSettings? detailSettings = null,
+        SemanticAnalysisSettings? semanticSettings = null,
+        RegionSegmentationSettings? segmentationSettings = null,
+        RegionMergeSettings? mergeSettings = null,
         IReadOnlyList<DetailRegion>? detailRegions = null,
         IReadOnlyList<SemanticCorrectionRegion>? semanticCorrections = null,
         long detailRegionRevision = 1L,
@@ -300,13 +344,40 @@ public sealed class AnalysisCoordinatorTests
             sourceIdentity ?? Guid.NewGuid(),
             detailSettings ?? new DetailAnalysisSettings(),
             new DetailInfluenceSettings(),
-            new SemanticAnalysisSettings(enabled: false),
+            semanticSettings ?? new SemanticAnalysisSettings(enabled: false),
             new SceneBoundaryAnalysisSettings(enabled: false),
             new BackgroundSuppressionSettings(enabled: false),
             detailRegions,
             semanticCorrections,
             detailRegionRevision,
-            semanticCorrectionRevision);
+            semanticCorrectionRevision,
+            segmentationSettings,
+            mergeSettings);
+    }
+
+    private static RegionSegmentationResult CreateSegmentationResult(ImageSize size)
+    {
+        int pixelCount = checked((int)size.PixelCount);
+        RegionLabelMap labels = RegionLabelMap.Create(size, 1, new int[pixelCount]);
+        ImageRegion region = new(
+            0,
+            pixelCount,
+            1d,
+            new PixelBounds(0, 0, size.Width, size.Height),
+            new RegionCentroid(size.Width * 0.5d, size.Height * 0.5d));
+        SegmentationDiagnostics diagnostics = new(
+            1,
+            true,
+            0d,
+            1,
+            1,
+            regionSizes: RegionSizeDistribution.Create([pixelCount]));
+        return new RegionSegmentationResult(
+            labels,
+            [region],
+            RegionAdjacencyGraph.CreateEmpty(1),
+            RegionHierarchy.CreateIdentity(1),
+            diagnostics);
     }
 
     private sealed class RecordingDetailAnalyzer : IDetailMapAnalyzer
@@ -331,67 +402,65 @@ public sealed class AnalysisCoordinatorTests
         }
     }
 
-    private sealed class RecordingSemanticAnalyzer : ISemanticImportanceAnalyzer
+    private sealed class RecordingSegmentationAnalyzer : IRegionSegmentationAnalyzer
     {
         public int CallCount { get; private set; }
 
-        public Task<SemanticAnalysisResult> AnalyzeAsync(
-            IRgbaPixelSource source,
-            SemanticAnalysisSettings settings,
-            IProgress<SemanticAnalysisProgress>? progress = null,
+        public Task<RegionSegmentationResult> AnalyzeAsync(
+            RegionSegmentationRequest request,
+            IProgress<RegionSegmentationProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            _ = settings;
             cancellationToken.ThrowIfCancellationRequested();
             CallCount++;
-            progress?.Report(new SemanticAnalysisProgress(
-                SemanticAnalysisStage.Completed,
-                source.Size.Height,
-                source.Size.Height,
-                1d));
-            return Task.FromResult(SemanticAnalysisResult.CreateEmpty(source.Size, "test-semantic"));
+            progress?.Report(new RegionSegmentationProgress(
+                RegionSegmentationStage.Completed,
+                1d,
+                1d,
+                1,
+                1));
+            return Task.FromResult(CreateSegmentationResult(request.Source.Size));
         }
     }
 
-    private sealed class FailAfterFirstSemanticAnalyzer : ISemanticImportanceAnalyzer
+    private sealed class FailAfterFirstSegmentationAnalyzer : IRegionSegmentationAnalyzer
     {
         private int _callCount;
 
-        public Task<SemanticAnalysisResult> AnalyzeAsync(
-            IRgbaPixelSource source,
-            SemanticAnalysisSettings settings,
-            IProgress<SemanticAnalysisProgress>? progress = null,
+        public Task<RegionSegmentationResult> AnalyzeAsync(
+            RegionSegmentationRequest request,
+            IProgress<RegionSegmentationProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            _ = settings;
             cancellationToken.ThrowIfCancellationRequested();
             _callCount++;
             if (_callCount > 1)
             {
-                throw new InvalidOperationException("Semantic analysis failed.");
+                throw new InvalidOperationException("Regional segmentation failed.");
             }
 
-            progress?.Report(new SemanticAnalysisProgress(
-                SemanticAnalysisStage.Completed,
-                source.Size.Height,
-                source.Size.Height,
-                1d));
-            return Task.FromResult(SemanticAnalysisResult.CreateEmpty(source.Size, "test-semantic"));
+            progress?.Report(new RegionSegmentationProgress(
+                RegionSegmentationStage.Completed,
+                1d,
+                1d,
+                1,
+                1));
+            return Task.FromResult(CreateSegmentationResult(request.Source.Size));
         }
     }
 
-    private sealed class RecordingBoundaryAnalyzer : ISceneBoundaryAnalyzer
+    private sealed class RecordingRegionalBoundaryAnalyzer : IRegionalSceneBoundaryAnalyzer
     {
         public int CallCount { get; private set; }
 
         public Task<SceneBoundaryAnalysisResult> AnalyzeAsync(
             IRgbaPixelSource source,
-            SemanticAnalysisResult semanticAnalysis,
+            RegionalStructureAnalysisResult regionalAnalysis,
             SceneBoundaryAnalysisSettings settings,
             IProgress<SceneBoundaryAnalysisProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            _ = semanticAnalysis;
+            _ = regionalAnalysis;
             _ = settings;
             cancellationToken.ThrowIfCancellationRequested();
             CallCount++;
@@ -400,7 +469,7 @@ public sealed class AnalysisCoordinatorTests
                 source.Size.Height,
                 source.Size.Height,
                 1d));
-            return Task.FromResult(SceneBoundaryAnalysisResult.CreateEmpty(source.Size, "test-boundary"));
+            return Task.FromResult(SceneBoundaryAnalysisResult.CreateEmpty(source.Size, "test-regional-boundary"));
         }
     }
 

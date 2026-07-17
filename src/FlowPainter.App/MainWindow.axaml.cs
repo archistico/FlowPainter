@@ -26,6 +26,7 @@ using FlowPainter.Application.Hybrid;
 using FlowPainter.Application.PrimitiveGeneration;
 using FlowPainter.Application.Persistence;
 using FlowPainter.Application.Projects;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Semantics;
 using FlowPainter.Application.Workflow;
 using FlowPainter.Application.Workloads;
@@ -40,6 +41,7 @@ using FlowPainter.Domain.Hybrid;
 using FlowPainter.Domain.Primitives;
 using FlowPainter.Domain.Strokes;
 using FlowPainter.Domain.Semantics;
+using FlowPainter.Domain.Segmentation;
 using FlowPainter.Imaging.Skia.Images;
 using FlowPainter.Rendering.Skia.Boundaries;
 using FlowPainter.Rendering.Skia.Detail;
@@ -67,8 +69,8 @@ public partial class MainWindow : Window
     private readonly SkiaImageEncoder _imageEncoder = new();
     private readonly AnalysisCoordinator _analysisCoordinator = new(
         new ImageDetailAnalyzer(),
-        new HeuristicSemanticImportanceAnalyzer(),
-        new HeuristicSceneBoundaryAnalyzer());
+        new SlicRegionSegmentationAnalyzer(),
+        new RegionalSceneBoundaryAnalyzerAdapter(new HeuristicSceneBoundaryAnalyzer()));
     private readonly DetailMapOverlayRenderer _detailOverlayRenderer = new();
     private readonly BoundaryDirectionOverlayRenderer _boundaryDirectionOverlayRenderer = new();
     private readonly FlowPainterPlanner _planner = new(new DefaultFlowFieldFactory());
@@ -99,6 +101,8 @@ public partial class MainWindow : Window
     private readonly ComboBox _brushKindComboBox;
     private readonly ComboBox _detailIntentComboBox;
     private readonly ComboBox _semanticOverlayModeComboBox;
+    private readonly ComboBox _regionalOverlayModeComboBox;
+    private readonly ComboBox _regionalHierarchyLevelComboBox;
     private readonly TextBox _presetNameTextBox;
     private readonly TextBox _primitiveCountTextBox;
     private readonly TextBox _primitiveCandidatesTextBox;
@@ -152,6 +156,12 @@ public partial class MainWindow : Window
     private readonly TextBox _backgroundWidthTextBox;
     private readonly TextBox _regionTransitionWidthTextBox;
     private readonly TextBox _regionStrengthTextBox;
+    private readonly TextBox _regionalTargetSizeTextBox;
+    private readonly TextBox _regionalCompactnessTextBox;
+    private readonly TextBox _regionalPreBlurSigmaTextBox;
+    private readonly TextBox _regionalMaximumIterationsTextBox;
+    private readonly TextBox _regionalConvergenceToleranceTextBox;
+    private readonly TextBox _regionalMergeIntensityTextBox;
     private readonly TextBox _semanticInfluenceTextBox;
     private readonly TextBox _semanticSaliencyWeightTextBox;
     private readonly TextBox _semanticSubjectWeightTextBox;
@@ -203,6 +213,7 @@ public partial class MainWindow : Window
     private readonly TextBox _regionWidthTextBox;
     private readonly TextBox _regionHeightTextBox;
     private readonly CheckBox _showDetailOverlayCheckBox;
+    private readonly CheckBox _enableRegionalSegmentationCheckBox;
     private readonly CheckBox _enableSemanticAnalysisCheckBox;
     private readonly CheckBox _enableBoundaryAnalysisCheckBox;
     private readonly CheckBox _enableBoundaryPaintingCheckBox;
@@ -221,6 +232,8 @@ public partial class MainWindow : Window
     private readonly TextBlock _finalOutputInfoText;
     private readonly TextBlock _finalMemoryInfoText;
     private readonly TextBlock _regionCountText;
+    private readonly TextBlock _regionalDiagnosticsText;
+    private readonly TextBlock _selectedRegionalRegionText;
     private readonly TextBlock _semanticRegionCountText;
     private readonly TextBlock _semanticCorrectionCountText;
     private readonly TextBlock _statusText;
@@ -232,10 +245,12 @@ public partial class MainWindow : Window
     private Bitmap? _sourcePreviewBitmap;
     private Bitmap? _detailOverlayPreviewBitmap;
     private Bitmap? _semanticOverlayPreviewBitmap;
+    private Bitmap? _regionalOverlayPreviewBitmap;
     private Bitmap? _resultPreviewBitmap;
     private DetailMap? _automaticDetailMap;
     private DetailMap? _composedDetailMap;
     private SemanticAnalysisResult? _semanticAnalysisResult;
+    private RegionSegmentationResult? _regionalSegmentationResult;
     private SceneBoundaryAnalysisResult? _sceneBoundaryAnalysisResult;
     private BackgroundSuppressionResult? _backgroundSuppressionResult;
     private StrokePlan? _previewStrokePlan;
@@ -248,6 +263,8 @@ public partial class MainWindow : Window
     private long _activeDetailRegionRevision = -1L;
     private long _activeSemanticCorrectionRevision = -1L;
     private SemanticAnalysisSettings? _activeSemanticAnalysisSettings;
+    private RegionSegmentationSettings? _activeRegionalSegmentationSettings;
+    private RegionMergeSettings? _activeRegionMergeSettings;
     private SceneBoundaryAnalysisSettings? _activeBoundaryAnalysisSettings;
     private BackgroundSuppressionSettings? _activeBackgroundSuppressionSettings;
     private readonly SynchronizedImageViewportState _imageViewportState = new();
@@ -264,6 +281,7 @@ public partial class MainWindow : Window
     private bool _suppressSemanticRegionSelectionChange;
     private bool _suppressSemanticCorrectionSelectionChange;
     private bool _suppressDirtyTracking;
+    private int? _selectedRegionalRegionId;
     private bool _allowClose;
     private bool _closeGuardRunning;
     private bool _isClosed;
@@ -294,6 +312,8 @@ public partial class MainWindow : Window
         _brushKindComboBox = FindRequiredControl<ComboBox>("BrushKindComboBox");
         _detailIntentComboBox = FindRequiredControl<ComboBox>("DetailIntentComboBox");
         _semanticOverlayModeComboBox = FindRequiredControl<ComboBox>("SemanticOverlayModeComboBox");
+        _regionalOverlayModeComboBox = FindRequiredControl<ComboBox>("RegionalOverlayModeComboBox");
+        _regionalHierarchyLevelComboBox = FindRequiredControl<ComboBox>("RegionalHierarchyLevelComboBox");
         _presetNameTextBox = FindRequiredControl<TextBox>("PresetNameTextBox");
         _primitiveCountTextBox = FindRequiredControl<TextBox>("PrimitiveCountTextBox");
         _primitiveCandidatesTextBox = FindRequiredControl<TextBox>("PrimitiveCandidatesTextBox");
@@ -347,6 +367,12 @@ public partial class MainWindow : Window
         _backgroundWidthTextBox = FindRequiredControl<TextBox>("BackgroundWidthTextBox");
         _regionTransitionWidthTextBox = FindRequiredControl<TextBox>("RegionTransitionWidthTextBox");
         _regionStrengthTextBox = FindRequiredControl<TextBox>("RegionStrengthTextBox");
+        _regionalTargetSizeTextBox = FindRequiredControl<TextBox>("RegionalTargetSizeTextBox");
+        _regionalCompactnessTextBox = FindRequiredControl<TextBox>("RegionalCompactnessTextBox");
+        _regionalPreBlurSigmaTextBox = FindRequiredControl<TextBox>("RegionalPreBlurSigmaTextBox");
+        _regionalMaximumIterationsTextBox = FindRequiredControl<TextBox>("RegionalMaximumIterationsTextBox");
+        _regionalConvergenceToleranceTextBox = FindRequiredControl<TextBox>("RegionalConvergenceToleranceTextBox");
+        _regionalMergeIntensityTextBox = FindRequiredControl<TextBox>("RegionalMergeIntensityTextBox");
         _semanticInfluenceTextBox = FindRequiredControl<TextBox>("SemanticInfluenceTextBox");
         _semanticSaliencyWeightTextBox = FindRequiredControl<TextBox>("SemanticSaliencyWeightTextBox");
         _semanticSubjectWeightTextBox = FindRequiredControl<TextBox>("SemanticSubjectWeightTextBox");
@@ -398,6 +424,7 @@ public partial class MainWindow : Window
         _regionWidthTextBox = FindRequiredControl<TextBox>("RegionWidthTextBox");
         _regionHeightTextBox = FindRequiredControl<TextBox>("RegionHeightTextBox");
         _showDetailOverlayCheckBox = FindRequiredControl<CheckBox>("ShowDetailOverlayCheckBox");
+        _enableRegionalSegmentationCheckBox = FindRequiredControl<CheckBox>("EnableRegionalSegmentationCheckBox");
         _enableSemanticAnalysisCheckBox = FindRequiredControl<CheckBox>("EnableSemanticAnalysisCheckBox");
         _enableBoundaryAnalysisCheckBox = FindRequiredControl<CheckBox>("EnableBoundaryAnalysisCheckBox");
         _enableBoundaryPaintingCheckBox = FindRequiredControl<CheckBox>("EnableBoundaryPaintingCheckBox");
@@ -416,6 +443,8 @@ public partial class MainWindow : Window
         _finalOutputInfoText = FindRequiredControl<TextBlock>("FinalOutputInfoText");
         _finalMemoryInfoText = FindRequiredControl<TextBlock>("FinalMemoryInfoText");
         _regionCountText = FindRequiredControl<TextBlock>("RegionCountText");
+        _regionalDiagnosticsText = FindRequiredControl<TextBlock>("RegionalDiagnosticsText");
+        _selectedRegionalRegionText = FindRequiredControl<TextBlock>("SelectedRegionalRegionText");
         _semanticRegionCountText = FindRequiredControl<TextBlock>("SemanticRegionCountText");
         _semanticCorrectionCountText = FindRequiredControl<TextBlock>("SemanticCorrectionCountText");
         _statusText = FindRequiredControl<TextBlock>("StatusText");
@@ -449,6 +478,10 @@ public partial class MainWindow : Window
         _detailIntentComboBox.ItemsSource = Enum.GetValues<DetailRegionIntent>();
         _semanticOverlayModeComboBox.ItemsSource = Enum.GetValues<SceneBoundaryOverlayMode>();
         _semanticOverlayModeComboBox.SelectedItem = SceneBoundaryOverlayMode.CombinedDetail;
+        _regionalOverlayModeComboBox.ItemsSource = Enum.GetValues<RegionDiagnosticOverlayMode>();
+        _regionalOverlayModeComboBox.SelectedItem = RegionDiagnosticOverlayMode.None;
+        _regionalHierarchyLevelComboBox.ItemsSource = Enum.GetValues<RegionHierarchyDisplayLevel>();
+        _regionalHierarchyLevelComboBox.SelectedItem = RegionHierarchyDisplayLevel.Intermediate;
         _detailIntentComboBox.SelectedItem = DetailRegionIntent.IncreaseDetail;
         _regionStrengthTextBox.Text = "80";
         _projectNameTextBox.Text = "Untitled project";
@@ -548,7 +581,8 @@ public partial class MainWindow : Window
             project.Mode,
             project.PrimitiveGeneration,
             project.HybridGeneration,
-            project.SemanticCorrections);
+            project.SemanticCorrections,
+            project.RegionRoleOverrides);
         WorkspaceProjectCandidate workspaceCandidate = FlowPainterWorkspace.PrepareProjectLoad(
             resolvedProject,
             projectPath);
@@ -587,7 +621,10 @@ public partial class MainWindow : Window
                 project.DetailRegions,
                 project.SemanticCorrections,
                 0L,
-                0L);
+                0L,
+                project.Settings.RegionalSegmentation,
+                project.Settings.RegionMerge,
+                project.RegionRoleOverrides);
             PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
                 analysisRequest,
                 CreateAnalysisPipelineProgress(),
@@ -606,11 +643,14 @@ public partial class MainWindow : Window
                     proxy,
                     result.AutomaticDetailMap,
                     result.BackgroundSuppression.EffectiveDetailMap,
+                    result.RegionalSegmentation,
                     result.SemanticAnalysis,
                     result.BoundaryAnalysis,
                     result.BackgroundSuppression,
                     project.Settings.DetailAnalysis,
                     project.Settings.DetailInfluence,
+                    project.Settings.RegionalSegmentation,
+                    project.Settings.RegionMerge,
                     project.Settings.SemanticAnalysis,
                     project.Settings.BoundaryAnalysis,
                     project.Settings.BackgroundSuppression,
@@ -636,7 +676,9 @@ public partial class MainWindow : Window
                 project.Settings.BoundaryAnalysis,
                 project.Settings.BackgroundSuppression,
                 _workspace.DetailRegionRevision,
-                _workspace.SemanticCorrectionRevision);
+                _workspace.SemanticCorrectionRevision,
+                project.Settings.RegionalSegmentation,
+                project.Settings.RegionMerge);
             if (!_analysisCoordinator.TryRetagCurrent(analysisRequest.CacheKey, activeKey))
             {
                 _analysisCoordinator.Invalidate();
@@ -648,7 +690,7 @@ public partial class MainWindow : Window
             _saveProjectButton.IsEnabled = true;
             _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
             UpdateFinalOutputEstimate();
-            _statusText.Text = $"Loaded project '{project.Name}' with {project.DetailRegions.Count:N0} detail regions and {project.SemanticCorrections.Count:N0} semantic corrections.";
+            _statusText.Text = $"Loaded project '{project.Name}' with {project.DetailRegions.Count:N0} detail regions and {project.RegionRoleOverrides.Count:N0} regional role overrides.";
             UpdateSourcePreviewSelection();
             RefreshRegionVisuals();
         }
@@ -747,7 +789,8 @@ public partial class MainWindow : Window
                 project.Mode,
                 project.PrimitiveGeneration,
                 project.HybridGeneration,
-                project.SemanticCorrections);
+                project.SemanticCorrections,
+                project.RegionRoleOverrides);
             await AtomicFileWriter.WriteAsync(
                 projectPath,
                 (output, writeCancellationToken) => FlowPainterProjectSerializer.SerializeAsync(
@@ -848,11 +891,14 @@ public partial class MainWindow : Window
                         proxy,
                         result.AutomaticDetailMap,
                         result.BackgroundSuppression.EffectiveDetailMap,
+                        result.RegionalSegmentation,
                         result.SemanticAnalysis,
                         result.BoundaryAnalysis,
                         result.BackgroundSuppression,
                         detailSettings,
                         detailInfluenceSettings,
+                        analysisRequest.SegmentationSettings,
+                        analysisRequest.MergeSettings,
                         semanticSettings,
                         boundarySettings,
                         backgroundSettings,
@@ -966,7 +1012,10 @@ public partial class MainWindow : Window
                     Array.Empty<DetailRegion>(),
                     Array.Empty<SemanticCorrectionRegion>(),
                     0L,
-                    0L);
+                    0L,
+                    settings.RegionalSegmentation,
+                    settings.RegionMerge,
+                    Array.Empty<RegionRoleOverride>());
                 PendingAnalysis pending = await _analysisCoordinator.AnalyzeAsync(
                     analysisRequest,
                     CreateAnalysisPipelineProgress(),
@@ -984,11 +1033,14 @@ public partial class MainWindow : Window
                         proxy,
                         result.AutomaticDetailMap,
                         result.BackgroundSuppression.EffectiveDetailMap,
+                        result.RegionalSegmentation,
                         result.SemanticAnalysis,
                         result.BoundaryAnalysis,
                         result.BackgroundSuppression,
                         detailSettings,
                         settings.DetailInfluence,
+                        settings.RegionalSegmentation,
+                        settings.RegionMerge,
                         settings.SemanticAnalysis,
                         settings.BoundaryAnalysis,
                         settings.BackgroundSuppression,
@@ -1020,7 +1072,9 @@ public partial class MainWindow : Window
                     settings.BoundaryAnalysis,
                     settings.BackgroundSuppression,
                     _workspace.DetailRegionRevision,
-                    _workspace.SemanticCorrectionRevision);
+                    _workspace.SemanticCorrectionRevision,
+                    settings.RegionalSegmentation,
+                    settings.RegionMerge);
                 if (!_analysisCoordinator.TryRetagCurrent(analysisRequest.CacheKey, activeKey))
                 {
                     _analysisCoordinator.Invalidate();
@@ -1029,7 +1083,7 @@ public partial class MainWindow : Window
                 _saveProjectButton.IsEnabled = true;
                 _sourceInfoText.Text = $"{loaded.Size.Width:N0} × {loaded.Size.Height:N0} → {proxy.Size.Width:N0} × {proxy.Size.Height:N0}";
                 UpdateFinalOutputEstimate();
-                _statusText.Text = "Image loaded and structural/semantic importance analyzed. Promote a detected region or drag on the image to refine focus.";
+                _statusText.Text = "Image loaded and structural/SLIC regional analysis completed. Select an overlay or drag on the image to refine detail.";
             }
             finally
             {
@@ -1128,29 +1182,52 @@ public partial class MainWindow : Window
 
             SceneBoundaryAnalysisResult boundaryAnalysis = _sceneBoundaryAnalysisResult
                 ?? SceneBoundaryAnalysisResult.CreateEmpty(proxyImage.Size);
+            RegionSegmentationResult? regionalSegmentation = _regionalSegmentationResult;
             BackgroundSuppressionResult backgroundSuppression = _backgroundSuppressionResult
                 ?? BackgroundSuppressionResult.CreateDisabled(detailMap);
             StrokePlan plan = await Task.Run(
                 () => settings.BackgroundSuppression.Enabled
-                    ? _planner.CreatePlan(
-                        proxyImage,
-                        densityMap,
-                        backgroundSuppression,
-                        boundaryAnalysis,
-                        seed,
-                        settings,
-                        planningProgress,
-                        cancellationToken)
-                    : settings.BoundaryPainting.Enabled
+                    ? regionalSegmentation is null
                         ? _planner.CreatePlan(
                             proxyImage,
                             densityMap,
-                            detailMap,
+                            backgroundSuppression,
                             boundaryAnalysis,
                             seed,
                             settings,
                             planningProgress,
                             cancellationToken)
+                        : _planner.CreatePlan(
+                            proxyImage,
+                            densityMap,
+                            backgroundSuppression,
+                            boundaryAnalysis,
+                            regionalSegmentation,
+                            seed,
+                            settings,
+                            planningProgress,
+                            cancellationToken)
+                    : settings.BoundaryPainting.Enabled
+                        ? regionalSegmentation is null
+                            ? _planner.CreatePlan(
+                                proxyImage,
+                                densityMap,
+                                detailMap,
+                                boundaryAnalysis,
+                                seed,
+                                settings,
+                                planningProgress,
+                                cancellationToken)
+                            : _planner.CreatePlan(
+                                proxyImage,
+                                densityMap,
+                                detailMap,
+                                boundaryAnalysis,
+                                regionalSegmentation,
+                                seed,
+                                settings,
+                                planningProgress,
+                                cancellationToken)
                         : _planner.CreatePlan(
                             proxyImage,
                             densityMap,
@@ -1293,26 +1370,16 @@ public partial class MainWindow : Window
                 ReportOperationProgress(value.Fraction * 0.72d, value.Message));
             SceneBoundaryAnalysisResult boundaryAnalysis = _sceneBoundaryAnalysisResult
                 ?? SceneBoundaryAnalysisResult.CreateEmpty(proxyImage.Size);
+            RegionSegmentationResult? regionalSegmentation = _regionalSegmentationResult;
             BackgroundSuppressionResult backgroundSuppression = _backgroundSuppressionResult
                 ?? BackgroundSuppressionResult.CreateDisabled(detailMap);
             HybridPlan plan = await Task.Run(
                 () => flowSettings.BackgroundSuppression.Enabled
-                    ? _hybridComposer.CreatePlan(
-                        proxyImage,
-                        densityMap,
-                        backgroundSuppression,
-                        boundaryAnalysis,
-                        seed,
-                        flowSettings,
-                        primitiveSettings,
-                        hybridSettings,
-                        planningProgress,
-                        cancellationToken)
-                    : flowSettings.BoundaryPainting.Enabled
+                    ? regionalSegmentation is null
                         ? _hybridComposer.CreatePlan(
                             proxyImage,
                             densityMap,
-                            detailMap,
+                            backgroundSuppression,
                             boundaryAnalysis,
                             seed,
                             flowSettings,
@@ -1320,6 +1387,43 @@ public partial class MainWindow : Window
                             hybridSettings,
                             planningProgress,
                             cancellationToken)
+                        : _hybridComposer.CreatePlan(
+                            proxyImage,
+                            densityMap,
+                            backgroundSuppression,
+                            boundaryAnalysis,
+                            regionalSegmentation,
+                            seed,
+                            flowSettings,
+                            primitiveSettings,
+                            hybridSettings,
+                            planningProgress,
+                            cancellationToken)
+                    : flowSettings.BoundaryPainting.Enabled
+                        ? regionalSegmentation is null
+                            ? _hybridComposer.CreatePlan(
+                                proxyImage,
+                                densityMap,
+                                detailMap,
+                                boundaryAnalysis,
+                                seed,
+                                flowSettings,
+                                primitiveSettings,
+                                hybridSettings,
+                                planningProgress,
+                                cancellationToken)
+                            : _hybridComposer.CreatePlan(
+                                proxyImage,
+                                densityMap,
+                                detailMap,
+                                boundaryAnalysis,
+                                regionalSegmentation,
+                                seed,
+                                flowSettings,
+                                primitiveSettings,
+                                hybridSettings,
+                                planningProgress,
+                                cancellationToken)
                         : _hybridComposer.CreatePlan(
                             proxyImage,
                             densityMap,
@@ -1826,10 +1930,134 @@ public partial class MainWindow : Window
                 boundarySettings,
                 backgroundSettings,
                 cancellationToken).ConfigureAwait(true);
-            _statusText.Text = semanticSettings.Enabled
-                ? $"Structural, semantic and boundary maps updated. {pending.Result.SemanticAnalysis.Regions.Count:N0} semantic regions found."
-                : "Structural and boundary maps updated; semantic analysis is disabled.";
+            _statusText.Text = $"Structural, SLIC regional and boundary maps updated. {pending.Result.RegionalSegmentation.Labels.RegionCount:N0} connected regions found.";
         }).ConfigureAwait(true);
+    }
+
+    private void ReanalyzeRegionalSegmentationClick(object? sender, RoutedEventArgs e)
+    {
+        ReanalyzeDetailClick(sender, e);
+    }
+
+    private async void RegionalOverlayModeChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        await RefreshRegionalOverlayAsync().ConfigureAwait(true);
+    }
+
+    private async void RegionalHierarchyLevelChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        if (ReadSelectedRegionalOverlayMode() == RegionDiagnosticOverlayMode.SelectedHierarchy)
+        {
+            await RefreshRegionalOverlayAsync().ConfigureAwait(true);
+        }
+    }
+
+    private async Task RefreshRegionalOverlayAsync()
+    {
+        RegionDiagnosticOverlayMode mode = ReadSelectedRegionalOverlayMode();
+        SkiaImage? proxy = _proxyImage;
+        RegionSegmentationResult? segmentation = _regionalSegmentationResult;
+        if (mode == RegionDiagnosticOverlayMode.None || proxy is null || segmentation is null)
+        {
+            ClearRegionalOverlayPreview();
+            return;
+        }
+
+        double strongBoundaryThreshold;
+        try
+        {
+            strongBoundaryThreshold = (_activeRegionMergeSettings ?? ReadRegionMergeSettings())
+                .StrongBoundaryThreshold;
+        }
+        catch (FormatException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+        catch (ArgumentException exception)
+        {
+            _statusText.Text = exception.Message;
+            return;
+        }
+
+        int hierarchyLevel = ResolveSelectedHierarchyLevel(segmentation.Hierarchy);
+        await RunAnalyzingDetailAsync(async cancellationToken =>
+        {
+            using SkiaImage overlay = await Task.Run(
+                () => CreateRegionalDiagnosticImage(
+                    proxy,
+                    segmentation,
+                    mode,
+                    strongBoundaryThreshold,
+                    hierarchyLevel,
+                    cancellationToken),
+                cancellationToken).ConfigureAwait(true);
+            ReplaceRegionalOverlayPreview(overlay);
+            _statusText.Text = $"Regional diagnostic overlay updated: {mode}.";
+        }).ConfigureAwait(true);
+    }
+
+    private static SkiaImage CreateRegionalDiagnosticImage(
+        SkiaImage proxy,
+        RegionSegmentationResult segmentation,
+        RegionDiagnosticOverlayMode mode,
+        double strongBoundaryThreshold,
+        int hierarchyLevel,
+        CancellationToken cancellationToken)
+    {
+        RgbaImage diagnostic = mode switch
+        {
+            RegionDiagnosticOverlayMode.FineMeanColor => SegmentationDiagnosticRenderer.CreateMeanColorPreview(
+                proxy,
+                segmentation.Labels,
+                cancellationToken),
+            RegionDiagnosticOverlayMode.FineBoundaries => SegmentationDiagnosticRenderer.CreateBoundaryOverlay(
+                proxy,
+                segmentation.Labels,
+                cancellationToken: cancellationToken),
+            RegionDiagnosticOverlayMode.StrongBoundaries => SegmentationDiagnosticRenderer.CreateStrongBoundaryOverlay(
+                proxy,
+                segmentation.Labels,
+                segmentation.Adjacency,
+                strongBoundaryThreshold,
+                cancellationToken: cancellationToken),
+            RegionDiagnosticOverlayMode.SelectedHierarchy => SegmentationDiagnosticRenderer.CreateHierarchyMeanColorPreview(
+                proxy,
+                segmentation.Labels,
+                segmentation.Hierarchy,
+                hierarchyLevel,
+                cancellationToken),
+            _ => throw new InvalidOperationException("Select a regional diagnostic overlay.")
+        };
+
+        return SkiaImageFactory.Create(diagnostic, "regional-diagnostic", cancellationToken);
+    }
+
+    private RegionDiagnosticOverlayMode ReadSelectedRegionalOverlayMode()
+    {
+        return _regionalOverlayModeComboBox.SelectedItem is RegionDiagnosticOverlayMode mode
+            ? mode
+            : RegionDiagnosticOverlayMode.None;
+    }
+
+    private int ResolveSelectedHierarchyLevel(RegionHierarchy hierarchy)
+    {
+        ArgumentNullException.ThrowIfNull(hierarchy);
+        RegionHierarchyDisplayLevel selected = _regionalHierarchyLevelComboBox.SelectedItem
+            is RegionHierarchyDisplayLevel level
+                ? level
+                : RegionHierarchyDisplayLevel.Intermediate;
+        return selected switch
+        {
+            RegionHierarchyDisplayLevel.Fine => 0,
+            RegionHierarchyDisplayLevel.Intermediate => Math.Min(1, hierarchy.Levels.Count - 1),
+            RegionHierarchyDisplayLevel.BroadMasses => hierarchy.Levels.Count - 1,
+            _ => 0
+        };
     }
 
     private async void RemoveLastRegionClick(object? sender, RoutedEventArgs e)
@@ -2018,7 +2246,7 @@ public partial class MainWindow : Window
         }
 
         bool succeeded = await ReanalyzeAfterSemanticCorrectionsAsync(
-            "Selected semantic correction deleted.").ConfigureAwait(true);
+            "Selected region-role override deleted.").ConfigureAwait(true);
         if (!succeeded)
         {
             RestoreWorkspaceEdit(snapshot, selectedCorrectionId: selected.Id);
@@ -2038,7 +2266,7 @@ public partial class MainWindow : Window
         string? selectedCorrectionId = GetSelectedSemanticCorrection()?.Id;
         _workspace.ClearSemanticCorrections();
         bool succeeded = await ReanalyzeAfterSemanticCorrectionsAsync(
-            "All semantic corrections cleared.").ConfigureAwait(true);
+            "All region-role overrides cleared.").ConfigureAwait(true);
         if (!succeeded)
         {
             RestoreWorkspaceEdit(snapshot, selectedCorrectionId: selectedCorrectionId);
@@ -2408,7 +2636,23 @@ public partial class MainWindow : Window
             ClearDetailAndAutomaticSemanticSelections();
             RefreshSemanticCorrections(correction.Id);
             RefreshRegionVisuals();
-            _statusText.Text = $"Selected semantic correction '{correction.Label ?? correction.Id}'.";
+            _statusText.Text = $"Selected region-role override '{correction.Label ?? correction.Id}'.";
+            return;
+        }
+
+        if (_showDetailOverlayCheckBox.IsChecked == true
+            && ReadSelectedRegionalOverlayMode() != RegionDiagnosticOverlayMode.None
+            && _regionalOverlayPreviewBitmap is not null
+            && _regionalSegmentationResult is not null)
+        {
+            RegionLabelMap labels = _regionalSegmentationResult.Labels;
+            int x = Math.Clamp((int)Math.Floor(point.X * labels.Size.Width), 0, labels.Size.Width - 1);
+            int y = Math.Clamp((int)Math.Floor(point.Y * labels.Size.Height), 0, labels.Size.Height - 1);
+            _selectedRegionalRegionId = checked((int)labels[x, y]);
+            ClearAllOverlaySelectionsExceptRegional();
+            RefreshRegionalDiagnostics();
+            RefreshRegionVisuals();
+            _statusText.Text = $"Selected SLIC region {_selectedRegionalRegionId.Value:N0}.";
             return;
         }
 
@@ -2424,7 +2668,7 @@ public partial class MainWindow : Window
             ClearDetailAndCorrectionSelections();
             SelectSemanticRegionInList(semantic.Id);
             RefreshRegionVisuals();
-            _statusText.Text = $"Selected detected region '{semantic.Label ?? semantic.Id}'.";
+            _statusText.Text = $"Selected regional role candidate '{semantic.Label ?? semantic.Id}'.";
             return;
         }
 
@@ -2961,6 +3205,8 @@ public partial class MainWindow : Window
         _detailedWidthTextBox.Text = FormatDouble(settings.DetailInfluence.DetailedWidthMultiplier * 100d);
         _backgroundWidthTextBox.Text = FormatDouble(settings.DetailInfluence.BackgroundWidthMultiplier * 100d);
         _regionTransitionWidthTextBox.Text = FormatDouble(settings.DetailInfluence.RegionTransitionWidth * 100d);
+        ApplyRegionalSegmentationSettings(settings.RegionalSegmentation);
+        ApplyRegionMergeSettings(settings.RegionMerge);
         _enableSemanticAnalysisCheckBox.IsChecked = settings.SemanticAnalysis.Enabled;
         _semanticInfluenceTextBox.Text = FormatDouble(settings.SemanticAnalysis.OverallInfluence * 100d);
         _semanticSaliencyWeightTextBox.Text = FormatDouble(settings.SemanticAnalysis.SaliencyWeight);
@@ -2997,6 +3243,23 @@ public partial class MainWindow : Window
         {
             _suppressDirtyTracking = previousSuppression;
         }
+    }
+
+    private void ApplyRegionalSegmentationSettings(RegionSegmentationSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _enableRegionalSegmentationCheckBox.IsChecked = settings.Enabled;
+        _regionalTargetSizeTextBox.Text = settings.TargetRegionSize.ToString(CultureInfo.CurrentCulture);
+        _regionalCompactnessTextBox.Text = FormatDouble(settings.Compactness);
+        _regionalPreBlurSigmaTextBox.Text = FormatDouble(settings.PreBlurSigma);
+        _regionalMaximumIterationsTextBox.Text = settings.MaximumIterations.ToString(CultureInfo.CurrentCulture);
+        _regionalConvergenceToleranceTextBox.Text = FormatDouble(settings.ConvergenceTolerance);
+    }
+
+    private void ApplyRegionMergeSettings(RegionMergeSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _regionalMergeIntensityTextBox.Text = FormatDouble(RegionMergeIntensityMapper.EstimatePercentage(settings));
     }
 
     private void ApplyBoundaryAnalysisSettings(SceneBoundaryAnalysisSettings settings)
@@ -3346,7 +3609,9 @@ public partial class MainWindow : Window
             ReadSemanticAnalysisSettings(),
             ReadBoundaryAnalysisSettings(),
             ReadBoundaryPaintingSettings(),
-            ReadBackgroundSuppressionSettings());
+            ReadBackgroundSuppressionSettings(),
+            ReadRegionalSegmentationSettings(),
+            ReadRegionMergeSettings());
     }
 
     private DetailAnalysisSettings ReadDetailAnalysisSettings()
@@ -3367,6 +3632,23 @@ public partial class MainWindow : Window
             ParseDouble(_detailedWidthTextBox, "Detailed width") / 100d,
             ParseDouble(_backgroundWidthTextBox, "Background width") / 100d,
             ParseDouble(_regionTransitionWidthTextBox, "Region transition width") / 100d);
+    }
+
+    private RegionSegmentationSettings ReadRegionalSegmentationSettings()
+    {
+        return new RegionSegmentationSettings(
+            ParseInteger(_regionalTargetSizeTextBox, "Target region size"),
+            ParseDouble(_regionalCompactnessTextBox, "Regional compactness"),
+            ParseDouble(_regionalPreBlurSigmaTextBox, "Regional pre-smoothing sigma"),
+            ParseInteger(_regionalMaximumIterationsTextBox, "Regional maximum iterations"),
+            ParseDouble(_regionalConvergenceToleranceTextBox, "Regional convergence tolerance"),
+            _enableRegionalSegmentationCheckBox.IsChecked == true);
+    }
+
+    private RegionMergeSettings ReadRegionMergeSettings()
+    {
+        return RegionMergeIntensityMapper.Create(
+            ParseDouble(_regionalMergeIntensityTextBox, "Regional merge intensity"));
     }
 
     private SemanticAnalysisSettings ReadSemanticAnalysisSettings()
@@ -3453,7 +3735,10 @@ public partial class MainWindow : Window
         IReadOnlyList<DetailRegion> detailRegions,
         IReadOnlyList<SemanticCorrectionRegion> semanticCorrections,
         long detailRegionRevision,
-        long semanticCorrectionRevision)
+        long semanticCorrectionRevision,
+        RegionSegmentationSettings? segmentationSettings = null,
+        RegionMergeSettings? mergeSettings = null,
+        IReadOnlyList<RegionRoleOverride>? regionRoleOverrides = null)
     {
         return new AnalysisRequest(
             proxy,
@@ -3466,7 +3751,10 @@ public partial class MainWindow : Window
             detailRegions,
             semanticCorrections,
             detailRegionRevision,
-            semanticCorrectionRevision);
+            semanticCorrectionRevision,
+            segmentationSettings,
+            mergeSettings,
+            regionRoleOverrides);
     }
 
     private AnalysisRequest CreateCurrentAnalysisRequest(
@@ -3493,7 +3781,10 @@ public partial class MainWindow : Window
             _workspace.Regions.Regions,
             _workspace.SemanticCorrections.Regions,
             _workspace.DetailRegionRevision,
-            _workspace.SemanticCorrectionRevision);
+            _workspace.SemanticCorrectionRevision,
+            ReadRegionalSegmentationSettings(),
+            ReadRegionMergeSettings(),
+            _workspace.RegionRoleOverrides);
     }
 
     private Progress<AnalysisPipelineProgress> CreateAnalysisPipelineProgress()
@@ -3594,6 +3885,7 @@ public partial class MainWindow : Window
             {
                 ReplaceDetailVisualization(result.BackgroundSuppression.EffectiveDetailMap, overlay);
                 _automaticDetailMap = result.AutomaticDetailMap;
+                _regionalSegmentationResult = result.RegionalSegmentation;
                 _semanticAnalysisResult = result.SemanticAnalysis;
                 _sceneBoundaryAnalysisResult = result.BoundaryAnalysis;
                 _backgroundSuppressionResult = result.BackgroundSuppression;
@@ -3601,10 +3893,14 @@ public partial class MainWindow : Window
                 _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
                 CaptureActiveWorkspaceRevisions();
                 _activeSemanticAnalysisSettings = semanticSettings;
+                _activeRegionalSegmentationSettings = expectedRequest.SegmentationSettings;
+                _activeRegionMergeSettings = expectedRequest.MergeSettings;
                 _activeBoundaryAnalysisSettings = boundarySettings;
                 _activeBackgroundSuppressionSettings = backgroundSettings;
                 ClearSemanticOverlayPreview();
+                ClearRegionalOverlayPreview();
                 RefreshSemanticRegions();
+                RefreshRegionalDiagnostics();
             });
         if (!adopted)
         {
@@ -3619,6 +3915,8 @@ public partial class MainWindow : Window
         DetailAnalysisSettings detailSettings = ReadDetailAnalysisSettings();
         DetailInfluenceSettings detailInfluenceSettings = ReadDetailInfluenceSettings();
         SemanticAnalysisSettings semanticSettings = ReadSemanticAnalysisSettings();
+        RegionSegmentationSettings regionalSegmentationSettings = ReadRegionalSegmentationSettings();
+        RegionMergeSettings regionMergeSettings = ReadRegionMergeSettings();
         SceneBoundaryAnalysisSettings boundarySettings = ReadBoundaryAnalysisSettings();
         BackgroundSuppressionSettings backgroundSettings = ReadBackgroundSuppressionSettings();
         AnalysisRequest request = CreateCurrentAnalysisRequest(
@@ -3632,7 +3930,10 @@ public partial class MainWindow : Window
         PendingAnalysis pending;
         if (basis is null
             || !DetailAnalysisSettingsEqual(_activeDetailAnalysisSettings, detailSettings)
-            || !SemanticAnalysisSettingsEqual(_activeSemanticAnalysisSettings, semanticSettings)
+            || !RegionalSegmentationSettingsEqual(
+                _activeRegionalSegmentationSettings,
+                regionalSegmentationSettings)
+            || !RegionMergeSettingsEqual(_activeRegionMergeSettings, regionMergeSettings)
             || !BoundaryAnalysisSettingsEqual(_activeBoundaryAnalysisSettings, boundarySettings)
             || (_workspace.SemanticCorrections.Count > 0
                 && _activeDetailRegionTransitionWidth != detailInfluenceSettings.RegionTransitionWidth))
@@ -3812,11 +4113,14 @@ public partial class MainWindow : Window
         SkiaImage proxy,
         DetailMap automaticDetailMap,
         DetailMap composedDetailMap,
+        RegionSegmentationResult regionalSegmentation,
         SemanticAnalysisResult semanticAnalysis,
         SceneBoundaryAnalysisResult boundaryAnalysis,
         BackgroundSuppressionResult backgroundSuppression,
         DetailAnalysisSettings detailSettings,
         DetailInfluenceSettings detailInfluenceSettings,
+        RegionSegmentationSettings regionalSegmentationSettings,
+        RegionMergeSettings regionMergeSettings,
         SemanticAnalysisSettings semanticSettings,
         SceneBoundaryAnalysisSettings boundarySettings,
         BackgroundSuppressionSettings backgroundSettings,
@@ -3830,6 +4134,7 @@ public partial class MainWindow : Window
         Bitmap? previousSourcePreview = _sourcePreviewBitmap;
         Bitmap? previousOverlayPreview = _detailOverlayPreviewBitmap;
         Bitmap? previousSemanticOverlayPreview = _semanticOverlayPreviewBitmap;
+        Bitmap? previousRegionalOverlayPreview = _regionalOverlayPreviewBitmap;
         Bitmap? previousResultPreview = _resultPreviewBitmap;
         bool adopted = false;
 
@@ -3849,9 +4154,11 @@ public partial class MainWindow : Window
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
             _semanticOverlayPreviewBitmap = null;
+            _regionalOverlayPreviewBitmap = null;
             _resultPreviewBitmap = null;
             _automaticDetailMap = automaticDetailMap;
             _composedDetailMap = composedDetailMap;
+            _regionalSegmentationResult = regionalSegmentation;
             _semanticAnalysisResult = semanticAnalysis;
             _sceneBoundaryAnalysisResult = boundaryAnalysis;
             _backgroundSuppressionResult = backgroundSuppression;
@@ -3860,9 +4167,14 @@ public partial class MainWindow : Window
             _activeDetailRegionRevision = -1L;
             _activeSemanticCorrectionRevision = -1L;
             _activeSemanticAnalysisSettings = semanticSettings;
+            _activeRegionalSegmentationSettings = regionalSegmentationSettings;
+            _activeRegionMergeSettings = regionMergeSettings;
             _activeBoundaryAnalysisSettings = boundarySettings;
             _activeBackgroundSuppressionSettings = backgroundSettings;
             _imageViewportState.Reset();
+            _selectedRegionalRegionId = null;
+            _regionalOverlayModeComboBox.SelectedItem = RegionDiagnosticOverlayMode.None;
+            RefreshRegionalDiagnostics();
 
             UpdateSourcePreviewSelection();
             _resultImageView.Source = null;
@@ -3884,6 +4196,7 @@ public partial class MainWindow : Window
                 previousSourcePreview?.Dispose();
                 previousOverlayPreview?.Dispose();
                 previousSemanticOverlayPreview?.Dispose();
+                previousRegionalOverlayPreview?.Dispose();
                 previousResultPreview?.Dispose();
             }
             else
@@ -3898,11 +4211,14 @@ public partial class MainWindow : Window
         SkiaImage proxy,
         DetailMap automaticDetailMap,
         DetailMap composedDetailMap,
+        RegionSegmentationResult regionalSegmentation,
         SemanticAnalysisResult semanticAnalysis,
         SceneBoundaryAnalysisResult boundaryAnalysis,
         BackgroundSuppressionResult backgroundSuppression,
         DetailAnalysisSettings detailSettings,
         DetailInfluenceSettings detailInfluenceSettings,
+        RegionSegmentationSettings regionalSegmentationSettings,
+        RegionMergeSettings regionMergeSettings,
         SemanticAnalysisSettings semanticSettings,
         SceneBoundaryAnalysisSettings boundarySettings,
         BackgroundSuppressionSettings backgroundSettings,
@@ -3915,6 +4231,7 @@ public partial class MainWindow : Window
         Bitmap? previousSourcePreview = _sourcePreviewBitmap;
         Bitmap? previousOverlayPreview = _detailOverlayPreviewBitmap;
         Bitmap? previousSemanticOverlayPreview = _semanticOverlayPreviewBitmap;
+        Bitmap? previousRegionalOverlayPreview = _regionalOverlayPreviewBitmap;
         Bitmap? previousResultPreview = _resultPreviewBitmap;
         bool adopted = false;
 
@@ -3933,9 +4250,11 @@ public partial class MainWindow : Window
             _sourcePreviewBitmap = preview;
             _detailOverlayPreviewBitmap = overlayPreview;
             _semanticOverlayPreviewBitmap = null;
+            _regionalOverlayPreviewBitmap = null;
             _resultPreviewBitmap = null;
             _automaticDetailMap = automaticDetailMap;
             _composedDetailMap = composedDetailMap;
+            _regionalSegmentationResult = regionalSegmentation;
             _semanticAnalysisResult = semanticAnalysis;
             _sceneBoundaryAnalysisResult = boundaryAnalysis;
             _backgroundSuppressionResult = backgroundSuppression;
@@ -3943,8 +4262,13 @@ public partial class MainWindow : Window
             _activeDetailRegionTransitionWidth = detailInfluenceSettings.RegionTransitionWidth;
             CaptureActiveWorkspaceRevisions();
             _activeSemanticAnalysisSettings = semanticSettings;
+            _activeRegionalSegmentationSettings = regionalSegmentationSettings;
+            _activeRegionMergeSettings = regionMergeSettings;
             _activeBoundaryAnalysisSettings = boundarySettings;
             _activeBackgroundSuppressionSettings = backgroundSettings;
+            _selectedRegionalRegionId = null;
+            _regionalOverlayModeComboBox.SelectedItem = RegionDiagnosticOverlayMode.None;
+            RefreshRegionalDiagnostics();
 
             UpdateSourcePreviewSelection();
             _resultImageView.Source = null;
@@ -3970,6 +4294,7 @@ public partial class MainWindow : Window
                 previousSourcePreview?.Dispose();
                 previousOverlayPreview?.Dispose();
                 previousSemanticOverlayPreview?.Dispose();
+                previousRegionalOverlayPreview?.Dispose();
                 previousResultPreview?.Dispose();
             }
             else
@@ -4039,6 +4364,39 @@ public partial class MainWindow : Window
     {
         Bitmap? previousPreview = _semanticOverlayPreviewBitmap;
         _semanticOverlayPreviewBitmap = null;
+        previousPreview?.Dispose();
+        UpdateSourcePreviewSelection();
+    }
+
+    private void ReplaceRegionalOverlayPreview(SkiaImage regionalOverlay)
+    {
+        Bitmap preview = CreateAvaloniaBitmap(regionalOverlay);
+        Bitmap? previousPreview = _regionalOverlayPreviewBitmap;
+        bool adopted = false;
+
+        try
+        {
+            adopted = true;
+            _regionalOverlayPreviewBitmap = preview;
+            UpdateSourcePreviewSelection();
+        }
+        finally
+        {
+            if (adopted)
+            {
+                previousPreview?.Dispose();
+            }
+            else
+            {
+                preview.Dispose();
+            }
+        }
+    }
+
+    private void ClearRegionalOverlayPreview()
+    {
+        Bitmap? previousPreview = _regionalOverlayPreviewBitmap;
+        _regionalOverlayPreviewBitmap = null;
         previousPreview?.Dispose();
         UpdateSourcePreviewSelection();
     }
@@ -4181,14 +4539,60 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ReadSelectedRegionalOverlayMode() != RegionDiagnosticOverlayMode.None
+            && _regionalOverlayPreviewBitmap is not null)
+        {
+            _sourceImageView.Source = _regionalOverlayPreviewBitmap;
+            return;
+        }
+
         SceneBoundaryOverlayMode mode = ReadSelectedAnalysisOverlayMode();
         _sourceImageView.Source = mode == SceneBoundaryOverlayMode.CombinedDetail
             ? _detailOverlayPreviewBitmap ?? _sourcePreviewBitmap
             : _semanticOverlayPreviewBitmap ?? _detailOverlayPreviewBitmap ?? _sourcePreviewBitmap;
     }
 
+    private void RefreshRegionalDiagnostics()
+    {
+        RegionSegmentationResult? segmentation = _regionalSegmentationResult;
+        if (segmentation is null)
+        {
+            _regionalDiagnosticsText.Text = "No regional segmentation available.";
+            _selectedRegionalRegionText.Text = "Click the source preview to inspect a SLIC region.";
+            return;
+        }
+
+        SegmentationDiagnostics diagnostics = segmentation.Diagnostics;
+        string hierarchyCounts = string.Join(
+            " → ",
+            segmentation.Hierarchy.Levels.Select(level => level.ParentRegionCount.ToString("N0", CultureInfo.CurrentCulture)));
+        _regionalDiagnosticsText.Text =
+            $"{diagnostics.FinalRegionCount:N0} connected regions · {segmentation.Adjacency.Edges.Count:N0} adjacencies · "
+            + $"hierarchy {hierarchyCounts} · {diagnostics.IterationCount:N0} iterations"
+            + (diagnostics.Converged ? " · converged" : " · iteration limit")
+            + $" · repaired {diagnostics.DisconnectedComponentsRepaired:N0}, merged {diagnostics.UndersizedComponentsMerged:N0}.";
+
+        if (_selectedRegionalRegionId is not int regionId
+            || regionId < 0
+            || regionId >= segmentation.Regions.Count)
+        {
+            _selectedRegionalRegionText.Text = "Click the source preview to inspect a SLIC region.";
+            return;
+        }
+
+        ImageRegion region = segmentation.Regions[regionId];
+        RegionVisualDescriptors descriptors = region.Descriptors;
+        _selectedRegionalRegionText.Text =
+            $"Region {region.Id:N0}: {region.PixelCount:N0} px ({region.NormalizedArea:P2}), "
+            + $"bounds {region.Bounds.Left:N0},{region.Bounds.Top:N0}–{region.Bounds.Right:N0},{region.Bounds.Bottom:N0}; "
+            + $"L*a*b* {descriptors.MeanLightness:0.0}, {descriptors.MeanA:0.0}, {descriptors.MeanB:0.0}; "
+            + $"texture {descriptors.TextureEnergy:0.000}, edges {descriptors.EdgeDensity:P1}, "
+            + $"compactness {descriptors.Compactness:0.000}, orientation {RadiansToDegrees(descriptors.DominantOrientationRadians):0.0}°.";
+    }
+
     private void RefreshRegionVisuals(string? selectedRegionId = null)
     {
+        RefreshRegionalDiagnostics();
         selectedRegionId ??= GetSelectedRegion()?.Id;
         string? selectedSemanticRegionId = GetSelectedSemanticRegion()?.Id;
         string? selectedCorrectionId = GetSelectedSemanticCorrection()?.Id;
@@ -4284,7 +4688,7 @@ public partial class MainWindow : Window
 
         _semanticRegionCountText.Text = items.Length switch
         {
-            0 => "No semantic subjects detected",
+            0 => "No regional role candidates",
             1 => "1 semantic region detected",
             _ => $"{items.Length:N0} semantic regions detected"
         };
@@ -4344,8 +4748,8 @@ public partial class MainWindow : Window
         }
 
         _semanticCorrectionCountText.Text = items.Length == 1
-            ? "1 semantic correction"
-            : $"{items.Length:N0} semantic corrections";
+            ? "1 region-role override"
+            : $"{items.Length:N0} region-role overrides";
     }
 
     private void RefreshRegionList(string? selectedRegionId)
@@ -4467,8 +4871,31 @@ public partial class MainWindow : Window
         PopulateRegionEditorControls(null);
     }
 
+    private void ClearAllOverlaySelectionsExceptRegional()
+    {
+        _suppressRegionSelectionChange = true;
+        _suppressSemanticRegionSelectionChange = true;
+        _suppressSemanticCorrectionSelectionChange = true;
+        try
+        {
+            _regionListBox.SelectedIndex = -1;
+            _semanticRegionListBox.SelectedIndex = -1;
+            _semanticCorrectionListBox.SelectedIndex = -1;
+        }
+        finally
+        {
+            _suppressRegionSelectionChange = false;
+            _suppressSemanticRegionSelectionChange = false;
+            _suppressSemanticCorrectionSelectionChange = false;
+        }
+
+        PopulateRegionEditorControls(null);
+    }
+
     private void ClearAllOverlaySelections()
     {
+        _selectedRegionalRegionId = null;
+        RefreshRegionalDiagnostics();
         _suppressRegionSelectionChange = true;
         _suppressSemanticRegionSelectionChange = true;
         _suppressSemanticCorrectionSelectionChange = true;
@@ -4714,6 +5141,8 @@ public partial class MainWindow : Window
             || _analysisSourceIdentity == Guid.Empty
             || _activeDetailAnalysisSettings is null
             || _activeSemanticAnalysisSettings is null
+            || _activeRegionalSegmentationSettings is null
+            || _activeRegionMergeSettings is null
             || _activeBoundaryAnalysisSettings is null
             || _activeBackgroundSuppressionSettings is null
             || !double.IsFinite(_activeDetailRegionTransitionWidth))
@@ -4732,7 +5161,9 @@ public partial class MainWindow : Window
             _activeBoundaryAnalysisSettings,
             _activeBackgroundSuppressionSettings,
             _workspace.DetailRegionRevision,
-            _workspace.SemanticCorrectionRevision);
+            _workspace.SemanticCorrectionRevision,
+            _activeRegionalSegmentationSettings,
+            _activeRegionMergeSettings);
         _analysisCoordinator.TryRetagCurrent(currentKey, replacementKey);
     }
 
@@ -4751,23 +5182,30 @@ public partial class MainWindow : Window
     }
 
 
-    private static bool SemanticAnalysisSettingsEqual(
-        SemanticAnalysisSettings? first,
-        SemanticAnalysisSettings second)
+    private static bool RegionalSegmentationSettingsEqual(
+        RegionSegmentationSettings? first,
+        RegionSegmentationSettings second)
     {
         return first is not null
             && first.Enabled == second.Enabled
-            && first.OverallInfluence == second.OverallInfluence
-            && first.SaliencyWeight == second.SaliencyWeight
-            && first.SubjectWeight == second.SubjectWeight
-            && first.SilhouetteWeight == second.SilhouetteWeight
-            && first.FocalWeight == second.FocalWeight
-            && first.SubjectThreshold == second.SubjectThreshold
-            && first.MinimumSubjectAreaRatio == second.MinimumSubjectAreaRatio
-            && first.MaximumSubjects == second.MaximumSubjects
-            && first.CenterBias == second.CenterBias
-            && first.SmoothingRadius == second.SmoothingRadius
-            && first.BoundaryRadius == second.BoundaryRadius;
+            && first.TargetRegionSize == second.TargetRegionSize
+            && first.Compactness == second.Compactness
+            && first.PreBlurSigma == second.PreBlurSigma
+            && first.MaximumIterations == second.MaximumIterations
+            && first.ConvergenceTolerance == second.ConvergenceTolerance;
+    }
+
+    private static bool RegionMergeSettingsEqual(
+        RegionMergeSettings? first,
+        RegionMergeSettings second)
+    {
+        return first is not null
+            && first.IntermediateTargetRatio == second.IntermediateTargetRatio
+            && first.BroadMassTargetRatio == second.BroadMassTargetRatio
+            && first.IntermediateMaximumCost == second.IntermediateMaximumCost
+            && first.BroadMassMaximumCost == second.BroadMassMaximumCost
+            && first.StrongBoundaryThreshold == second.StrongBoundaryThreshold
+            && first.MaximumParentAreaFraction == second.MaximumParentAreaFraction;
     }
 
     private static bool BoundaryAnalysisSettingsEqual(
@@ -4898,6 +5336,12 @@ public partial class MainWindow : Window
             _detailedWidthTextBox,
             _backgroundWidthTextBox,
             _regionTransitionWidthTextBox,
+            _regionalTargetSizeTextBox,
+            _regionalCompactnessTextBox,
+            _regionalPreBlurSigmaTextBox,
+            _regionalMaximumIterationsTextBox,
+            _regionalConvergenceToleranceTextBox,
+            _regionalMergeIntensityTextBox,
             _semanticInfluenceTextBox,
             _semanticSaliencyWeightTextBox,
             _semanticSubjectWeightTextBox,
@@ -4964,6 +5408,7 @@ public partial class MainWindow : Window
 
         CheckBox[] checkBoxes =
         [
+            _enableRegionalSegmentationCheckBox,
             _enableSemanticAnalysisCheckBox,
             _enableBoundaryAnalysisCheckBox,
             _enableBoundaryPaintingCheckBox,
@@ -5134,6 +5579,7 @@ public partial class MainWindow : Window
         _sourcePreviewBitmap?.Dispose();
         _detailOverlayPreviewBitmap?.Dispose();
         _semanticOverlayPreviewBitmap?.Dispose();
+        _regionalOverlayPreviewBitmap?.Dispose();
         _resultPreviewBitmap?.Dispose();
 
         _sourceImage = null;
@@ -5142,10 +5588,12 @@ public partial class MainWindow : Window
         _sourcePreviewBitmap = null;
         _detailOverlayPreviewBitmap = null;
         _semanticOverlayPreviewBitmap = null;
+        _regionalOverlayPreviewBitmap = null;
         _resultPreviewBitmap = null;
         _automaticDetailMap = null;
         _composedDetailMap = null;
         _semanticAnalysisResult = null;
+        _regionalSegmentationResult = null;
         _sceneBoundaryAnalysisResult = null;
         _backgroundSuppressionResult = null;
         _previewStrokePlan = null;
@@ -5157,6 +5605,8 @@ public partial class MainWindow : Window
         _activeDetailRegionRevision = -1L;
         _activeSemanticCorrectionRevision = -1L;
         _activeSemanticAnalysisSettings = null;
+        _activeRegionalSegmentationSettings = null;
+        _activeRegionMergeSettings = null;
         _activeBoundaryAnalysisSettings = null;
         _activeBackgroundSuppressionSettings = null;
         _analysisCoordinator.Invalidate();

@@ -135,4 +135,25 @@ public sealed class RegionLabelMapTests
 
         Assert.Equal(TwoPixelsPerRegion, map.CountPixelsByRegion());
     }
+
+    [Fact]
+    public void CreateAcceptsSignedAssignmentBufferAndCopiesIt()
+    {
+        int[] labels = { 0, 0, 1, 1 };
+        RegionLabelMap map = RegionLabelMap.Create(new ImageSize(2, 2), 2, labels);
+
+        labels[0] = 1;
+
+        Assert.Equal(RegionLabelStorageKind.Compact, map.StorageKind);
+        Assert.Equal(0u, map[0, 0]);
+    }
+
+    [Fact]
+    public void CreateRejectsNegativeSignedLabel()
+    {
+        Assert.Throws<ArgumentException>(() => RegionLabelMap.Create(
+            new ImageSize(2, 2),
+            2,
+            new int[] { 0, -1, 1, 1 }));
+    }
 }

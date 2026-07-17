@@ -3,6 +3,7 @@ using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
 using FlowPainter.Application.PrimitiveGeneration;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Application.Workloads;
 using FlowPainter.Domain.Detail;
 using FlowPainter.Domain.Hybrid;
@@ -51,6 +52,7 @@ public sealed class HybridPlanComposer
             densityMap,
             detailMap,
             boundaryAnalysis: null,
+            regionalSegmentation: null,
             backgroundSuppression: null,
             seed,
             flowSettings,
@@ -78,6 +80,7 @@ public sealed class HybridPlanComposer
             densityMap,
             detailMap,
             boundaryAnalysis,
+            regionalSegmentation: null,
             backgroundSuppression: null,
             seed,
             flowSettings,
@@ -106,6 +109,68 @@ public sealed class HybridPlanComposer
             densityMap,
             backgroundSuppression.EffectiveDetailMap,
             boundaryAnalysis,
+            regionalSegmentation: null,
+            backgroundSuppression,
+            seed,
+            flowSettings,
+            primitiveSettings,
+            hybridSettings,
+            progress,
+            cancellationToken);
+    }
+
+    public HybridPlan CreatePlan(
+        IRgbaPixelSource source,
+        StrokeDensityMap densityMap,
+        DetailMap detailMap,
+        SceneBoundaryAnalysisResult boundaryAnalysis,
+        RegionSegmentationResult regionalSegmentation,
+        ulong seed,
+        FlowPainterSettings flowSettings,
+        PrimitiveGenerationSettings primitiveSettings,
+        HybridGenerationSettings hybridSettings,
+        IProgress<HybridPlanningProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(boundaryAnalysis);
+        ArgumentNullException.ThrowIfNull(regionalSegmentation);
+        return CreatePlanCore(
+            source,
+            densityMap,
+            detailMap,
+            boundaryAnalysis,
+            regionalSegmentation,
+            backgroundSuppression: null,
+            seed,
+            flowSettings,
+            primitiveSettings,
+            hybridSettings,
+            progress,
+            cancellationToken);
+    }
+
+    public HybridPlan CreatePlan(
+        IRgbaPixelSource source,
+        StrokeDensityMap densityMap,
+        BackgroundSuppressionResult backgroundSuppression,
+        SceneBoundaryAnalysisResult boundaryAnalysis,
+        RegionSegmentationResult regionalSegmentation,
+        ulong seed,
+        FlowPainterSettings flowSettings,
+        PrimitiveGenerationSettings primitiveSettings,
+        HybridGenerationSettings hybridSettings,
+        IProgress<HybridPlanningProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(backgroundSuppression);
+        ArgumentNullException.ThrowIfNull(boundaryAnalysis);
+        ArgumentNullException.ThrowIfNull(regionalSegmentation);
+        return CreatePlanCore(
+            source,
+            densityMap,
+            backgroundSuppression.EffectiveDetailMap,
+            boundaryAnalysis,
+            regionalSegmentation,
             backgroundSuppression,
             seed,
             flowSettings,
@@ -120,6 +185,7 @@ public sealed class HybridPlanComposer
         StrokeDensityMap densityMap,
         DetailMap detailMap,
         SceneBoundaryAnalysisResult? boundaryAnalysis,
+        RegionSegmentationResult? regionalSegmentation,
         BackgroundSuppressionResult? backgroundSuppression,
         ulong seed,
         FlowPainterSettings flowSettings,
@@ -139,6 +205,14 @@ public sealed class HybridPlanComposer
             throw new ArgumentException("The source, density map and detail map must have identical dimensions.");
         }
 
+        if (regionalSegmentation is not null
+            && source.Size != regionalSegmentation.Labels.Size)
+        {
+            throw new ArgumentException(
+                "The source and regional segmentation must have identical dimensions.",
+                nameof(regionalSegmentation));
+        }
+
         WorkloadBudgetPolicy.EnsureGenerationWithinBudget(
             GenerationWorkEstimator.EstimateHybrid(
                 source.Size,
@@ -156,10 +230,16 @@ public sealed class HybridPlanComposer
         BoundaryGuidanceField? boundaryGuidance = boundaryAnalysis is null
             || !flowSettings.BoundaryPainting.Enabled
                 ? null
-                : BoundaryGuidanceField.Create(
-                    boundaryAnalysis,
-                    flowSettings.BoundaryPainting,
-                    cancellationToken);
+                : regionalSegmentation is null
+                    ? BoundaryGuidanceField.Create(
+                        boundaryAnalysis,
+                        flowSettings.BoundaryPainting,
+                        cancellationToken)
+                    : BoundaryGuidanceField.Create(
+                        boundaryAnalysis,
+                        regionalSegmentation,
+                        flowSettings.BoundaryPainting,
+                        cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report(new HybridPlanningProgress(HybridPlanningStage.Preparing, 0d, "Preparing hybrid plan."));
@@ -201,8 +281,11 @@ public sealed class HybridPlanComposer
                     HybridPlanningStage.PlanningFlowStrokes,
                     0.45d + (value.Fraction * 0.30d),
                     $"Planning primitive-guided strokes {value.CompletedStrokes:N0} / {value.TotalStrokes:N0}.")));
-        StrokePlan flowPlan = backgroundSuppression is not null
-            && flowSettings.BackgroundSuppression.Enabled
+        StrokePlan flowPlan;
+        if (backgroundSuppression is not null
+            && flowSettings.BackgroundSuppression.Enabled)
+        {
+            flowPlan = boundaryGuidance is null || regionalSegmentation is null
                 ? flowPlanner.CreatePlan(
                     source,
                     densityMap,
@@ -212,24 +295,51 @@ public sealed class HybridPlanComposer
                     baseFlowSettings,
                     flowProgress,
                     cancellationToken)
-                : boundaryGuidance is null
-                    ? flowPlanner.CreatePlan(
-                        source,
-                        densityMap,
-                        detailMap,
-                        seed ^ FlowSeedSalt,
-                        baseFlowSettings,
-                        flowProgress,
-                        cancellationToken)
-                    : flowPlanner.CreatePlan(
-                        source,
-                        densityMap,
-                        detailMap,
-                        boundaryGuidance,
-                        seed ^ FlowSeedSalt,
-                        baseFlowSettings,
-                        flowProgress,
-                        cancellationToken);
+                : flowPlanner.CreateRegionalPlan(
+                    source,
+                    densityMap,
+                    backgroundSuppression,
+                    boundaryGuidance,
+                    seed ^ FlowSeedSalt,
+                    baseFlowSettings,
+                    flowProgress,
+                    cancellationToken);
+        }
+        else if (boundaryGuidance is null)
+        {
+            flowPlan = flowPlanner.CreatePlan(
+                source,
+                densityMap,
+                detailMap,
+                seed ^ FlowSeedSalt,
+                baseFlowSettings,
+                flowProgress,
+                cancellationToken);
+        }
+        else if (regionalSegmentation is null)
+        {
+            flowPlan = flowPlanner.CreatePlan(
+                source,
+                densityMap,
+                detailMap,
+                boundaryGuidance,
+                seed ^ FlowSeedSalt,
+                baseFlowSettings,
+                flowProgress,
+                cancellationToken);
+        }
+        else
+        {
+            flowPlan = flowPlanner.CreateRegionalPlan(
+                source,
+                densityMap,
+                detailMap,
+                boundaryGuidance,
+                seed ^ FlowSeedSalt,
+                baseFlowSettings,
+                flowProgress,
+                cancellationToken);
+        }
 
         DetailInfluenceSettings refinementDetail = new(
             Math.Min(20d, flowSettings.DetailInfluence.PlacementBias + hybridSettings.RefinementDetailBias),
@@ -252,8 +362,11 @@ public sealed class HybridPlanComposer
                     HybridPlanningStage.PlanningRefinementStrokes,
                     0.75d + (value.Fraction * 0.25d),
                     $"Planning detail refinement {value.CompletedStrokes:N0} / {value.TotalStrokes:N0}.")));
-        StrokePlan refinementPlan = backgroundSuppression is not null
-            && flowSettings.BackgroundSuppression.Enabled
+        StrokePlan refinementPlan;
+        if (backgroundSuppression is not null
+            && flowSettings.BackgroundSuppression.Enabled)
+        {
+            refinementPlan = boundaryGuidance is null || regionalSegmentation is null
                 ? flowPlanner.CreatePlan(
                     source,
                     densityMap,
@@ -263,24 +376,51 @@ public sealed class HybridPlanComposer
                     refinementSettings,
                     refinementProgress,
                     cancellationToken)
-                : boundaryGuidance is null
-                    ? flowPlanner.CreatePlan(
-                        source,
-                        densityMap,
-                        detailMap,
-                        seed ^ RefinementSeedSalt,
-                        refinementSettings,
-                        refinementProgress,
-                        cancellationToken)
-                    : flowPlanner.CreatePlan(
-                        source,
-                        densityMap,
-                        detailMap,
-                        boundaryGuidance,
-                        seed ^ RefinementSeedSalt,
-                        refinementSettings,
-                        refinementProgress,
-                        cancellationToken);
+                : flowPlanner.CreateRegionalPlan(
+                    source,
+                    densityMap,
+                    backgroundSuppression,
+                    boundaryGuidance,
+                    seed ^ RefinementSeedSalt,
+                    refinementSettings,
+                    refinementProgress,
+                    cancellationToken);
+        }
+        else if (boundaryGuidance is null)
+        {
+            refinementPlan = flowPlanner.CreatePlan(
+                source,
+                densityMap,
+                detailMap,
+                seed ^ RefinementSeedSalt,
+                refinementSettings,
+                refinementProgress,
+                cancellationToken);
+        }
+        else if (regionalSegmentation is null)
+        {
+            refinementPlan = flowPlanner.CreatePlan(
+                source,
+                densityMap,
+                detailMap,
+                boundaryGuidance,
+                seed ^ RefinementSeedSalt,
+                refinementSettings,
+                refinementProgress,
+                cancellationToken);
+        }
+        else
+        {
+            refinementPlan = flowPlanner.CreateRegionalPlan(
+                source,
+                densityMap,
+                detailMap,
+                boundaryGuidance,
+                seed ^ RefinementSeedSalt,
+                refinementSettings,
+                refinementProgress,
+                cancellationToken);
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report(new HybridPlanningProgress(HybridPlanningStage.Completed, 1d, "Hybrid plan completed."));

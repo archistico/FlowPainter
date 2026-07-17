@@ -4,6 +4,7 @@ using FlowPainter.Application.Detail;
 using FlowPainter.Domain.Brushes;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.Semantics;
+using FlowPainter.Application.Segmentation;
 using FlowPainter.Domain.Geometry;
 using FlowPainter.Domain.Images;
 using FlowPainter.Domain.Strokes;
@@ -42,7 +43,9 @@ public sealed class FlowPainterSettings
         SemanticAnalysisSettings? semanticAnalysis = null,
         SceneBoundaryAnalysisSettings? boundaryAnalysis = null,
         BoundaryPaintingSettings? boundaryPainting = null,
-        BackgroundSuppressionSettings? backgroundSuppression = null)
+        BackgroundSuppressionSettings? backgroundSuppression = null,
+        RegionSegmentationSettings? regionalSegmentation = null,
+        RegionMergeSettings? regionMerge = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(strokeCount, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(strokeCount, MaximumStrokeCount);
@@ -112,6 +115,8 @@ public sealed class FlowPainterSettings
         BoundaryAnalysis = boundaryAnalysis ?? new SceneBoundaryAnalysisSettings();
         BoundaryPainting = boundaryPainting ?? new BoundaryPaintingSettings();
         BackgroundSuppression = backgroundSuppression ?? new BackgroundSuppressionSettings();
+        RegionalSegmentation = regionalSegmentation ?? new RegionSegmentationSettings();
+        RegionMerge = regionMerge ?? new RegionMergeSettings();
     }
 
     public FlowFieldSettings Field { get; }
@@ -149,6 +154,10 @@ public sealed class FlowPainterSettings
     public BoundaryPaintingSettings BoundaryPainting { get; }
 
     public BackgroundSuppressionSettings BackgroundSuppression { get; }
+
+    public RegionSegmentationSettings RegionalSegmentation { get; }
+
+    public RegionMergeSettings RegionMerge { get; }
 
     private static void ValidateFinitePositive(double value, string parameterName)
     {

@@ -10,13 +10,13 @@ The planned engine combines:
 - automatic structural fields and manually edited artistic roles;
 - hybrid rendering in which broad masses, protected boundaries and focal regions receive different treatment.
 
-## Current validated baseline: M13.4.4
+## Current validated baseline: M14.8 (1,024 tests)
 
-**Current milestone:** M14.1 — Regional segmentation contracts — READY FOR VALIDATION
+**Current milestone:** M15.1 — Regional boundary field — READY FOR VALIDATION
 
-M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved plan for high-resolution PNG/JPEG export. M6.1 adds synchronized zoom and pan for direct source/result comparison. M7 separates stroke geometry from material rendering and adds four deterministic procedural brush families. M8 adds deterministic generic subject, silhouette and focal-area analysis through a replaceable semantic-provider boundary. M9 adds a deterministic geometric-primitive optimizer with resolution-independent raster and SVG output. M10 combines primitive colour masses, primitive-derived flow deformation and a detail-biased brush refinement pass in a third deterministic hybrid mode. M11 added multiscale scene-boundary analysis, important-edge classification, background confidence, uncertainty and a contour-tangent direction field. M12 uses that evidence to align strokes with important contours, resist silhouette crossings, preserve corners and reinforce subject boundaries without drawing a mechanical outline. M13 counterbalances positive importance with explicit background suppression, preserving subjects and uncertain transitions while simplifying confident background. M13.2 softens manual detail-region borders so rectangular editing controls do not leave visible seams in the painting. M13.3 adds direct click selection, deletion and persistent non-destructive semantic corrections for primary subject, subject, background and ignored detections. The 2026-07-16 audit corrections brought the baseline to 755 passing tests. M13.4.1 then added complete presentation dirty tracking and guarded Save / Discard / Cancel navigation; it was validated with all 765 tests passing. M13.4.2 introduced shared memory/work budgets, mode-aware final-render estimates, future SLIC memory reservation, bounded encoded input and planner-level pre-allocation rejection; it was validated with all 782 tests passing. M13.4.3 routes every local project, preset, preview, raster, SVG and recent-item destination through atomic sibling-file commits; it was validated with all 790 tests passing. M13.4.4 extracts analysis execution, immutable cache keys, revision tracking, detached results, recomposition and transactional stale-result rejection into a non-UI `AnalysisCoordinator`; it was validated with all 804 tests passing. M14.1 introduces the immutable regional-segmentation contracts, compact `UInt16`/`UInt32` label storage, region/adjacency/hierarchy values, diagnostics, progress and exact SLIC memory/work estimation; 59 new contract cases bring the expected suite to 863 pending local validation. The semantic subsystem remains part of the current schema-11 compatibility baseline, but future automatic segmentation is planned around deterministic SLIC regions rather than SAM, ONNX or any machine-learning provider.
+M0 established the solution and domain foundation. M1 characterized the original planner. M2 added local imaging and SkiaSharp rendering. M3 introduced configurable deterministic flow fields. M4 added the first importance-map workflow. M5 added persistent projects and an application-level editing workspace. M6 separates preview from final output and reuses the approved plan for high-resolution PNG/JPEG export. M6.1 adds synchronized zoom and pan for direct source/result comparison. M7 separates stroke geometry from material rendering and adds four deterministic procedural brush families. M8 adds deterministic generic subject, silhouette and focal-area analysis through a replaceable semantic-provider boundary. M9 adds a deterministic geometric-primitive optimizer with resolution-independent raster and SVG output. M10 combines primitive colour masses, primitive-derived flow deformation and a detail-biased brush refinement pass in a third deterministic hybrid mode. M11 added multiscale scene-boundary analysis, important-edge classification, background confidence, uncertainty and a contour-tangent direction field. M12 uses that evidence to align strokes with important contours, resist silhouette crossings, preserve corners and reinforce subject boundaries without drawing a mechanical outline. M13 counterbalances positive importance with explicit background suppression, preserving subjects and uncertain transitions while simplifying confident background. M13.2 softens manual detail-region borders so rectangular editing controls do not leave visible seams in the painting. M13.3 adds direct click selection, deletion and persistent non-destructive semantic corrections for primary subject, subject, background and ignored detections. The 2026-07-16 audit corrections brought the baseline to 755 passing tests. M13.4.1 then added complete presentation dirty tracking and guarded Save / Discard / Cancel navigation; it was validated with all 765 tests passing. M13.4.2 introduced shared memory/work budgets, mode-aware final-render estimates, future SLIC memory reservation, bounded encoded input and planner-level pre-allocation rejection; it was validated with all 782 tests passing. M13.4.3 routes every local project, preset, preview, raster, SVG and recent-item destination through atomic sibling-file commits; it was validated with all 790 tests passing. M13.4.4 extracts analysis execution, immutable cache keys, revision tracking, detached results, recomposition and transactional stale-result rejection into a non-UI `AnalysisCoordinator`; it was validated with all 804 tests passing. M14.1 introduces the immutable regional-segmentation contracts, compact 16-/32-bit label storage, region/adjacency/hierarchy values, diagnostics, progress and exact SLIC memory/work estimation; it was validated with all 863 tests passing. M14.2 added the first deterministic CIELAB SLIC analyzer, optional Gaussian smoothing, local assignment/update iterations, compact result publication, cancellation/progress coverage and the supplied multi-resolution application icon; it was validated with all 882 tests passing. M14.3 repairs disconnected labels, merges undersized adjacent components deterministically, reports region-size distributions and adds mean-colour and boundary diagnostic rendering; it was validated with all 907 tests passing. M14.4 calculates deterministic geometry, CIELAB statistics, texture energy, edge density and dominant regional tangent descriptors; it was validated with all 920 tests passing. M14.5 constructs the complete Region Adjacency Graph with exact shared-boundary lengths, CIELAB gradient statistics, colour/texture differences, continuity, prevailing tangents and normalized boundary strength; it was validated with all 940 tests passing. M14.6 adds deterministic intermediate and broad-mass merging, strong-edge protection, recomputed aggregate costs and traceable parent/child mappings; it was validated with all 964 tests passing. M14.7 made SLIC segmentation, regional descriptors, the RAG, hierarchy and generalized manual roles the active analysis path for Flow, Primitive and Hybrid; it was validated with all 998 tests passing. M14.8 added direct SLIC/merge controls, diagnostic overlays and inspection, project schema 12, preset schema 9 and direct persistence of generalized region-role overrides; it was validated with all 1,024 tests passing. M15.1 derives a continuous regional boundary field from SLIC labels and the RAG, blends distance, strength, normal and tangent with the validated M11–M12 guidance policy and adds regional Flow/Hybrid planner paths. Twenty-five new cases bring the expected suite to 1,049 pending local validation.
 
-Implemented and validated through M13.4.4, plus M14.1 pending validation:
+Implemented and validated through M14.8, plus M15.1 pending validation:
 
 - local PNG, JPEG, WebP and BMP loading;
 - hard decoded-size limit of 10,000 × 10,000 RGBA;
@@ -47,7 +47,7 @@ Implemented and validated through M13.4.4, plus M14.1 pending validation:
 - background-confidence and uncertainty maps with silhouette protection;
 - normalized tangent direction field and diagnostic direction overlay;
 - replaceable `ISceneBoundaryAnalyzer` provider boundary;
-- derived `BoundaryGuidanceField` with tangent, influence, hardness, silhouette and corner signals;
+- derived `BoundaryGuidanceField` with scene and regional distance, strength, normal, tangent, influence, hardness, contour and corner signals;
 - progressive tangent alignment near important contours;
 - deterministic crossing deflection and optional hard-boundary termination;
 - contour-driven detail reinforcement without an artificial outline;
@@ -83,16 +83,16 @@ Implemented and validated through M13.4.4, plus M14.1 pending validation:
 - project-title dirty indicator and persisted-control tracking distinct from transient viewport/overlay state;
 - shared 2 GiB peak-memory admission policy for analysis and final export;
 - mode-aware Flow, Primitive and Hybrid output-buffer estimates;
-- explicit current-analysis and future SLIC proxy-memory reserves;
+- explicit current-analysis, descriptor and adjacency-aware SLIC proxy-memory reserves;
 - planner-level Flow segment, primitive scoring and primitive pixel-evaluation budgets;
 - bounded 256 MiB encoded-image input with cancellation-aware streaming;
 - final output up to 10,000 × 10,000 with preserved aspect ratio;
 - cached preview `StrokePlan` reused unchanged for final rasterization;
 - synchronized source/result zoom with the mouse wheel and pan with the middle mouse button;
 - combined analysis/render memory estimate, risk indication and supported/blocked status before allocation;
-- project schema 11 with compatibility for schemas 1–10;
-- flow-preset schema 8 with compatibility for schemas 1–7;
-- 804 validated automated test cases across Domain, Application, Imaging and Rendering;
+- project schema 12 with compatibility for schemas 1–11;
+- flow-preset schema 9 with compatibility for schemas 1–8;
+- 920 validated automated test cases across Domain, Application, Imaging and Rendering;
 - atomic sibling-file commits for projects, presets, previews, raster exports, SVG exports and recent items;
 - preservation of an existing destination when serialization, encoding or cancellation fails;
 - non-UI `AnalysisCoordinator` with detached full-analysis and manual-region recomposition results;
@@ -100,9 +100,21 @@ Implemented and validated through M13.4.4, plus M14.1 pending validation:
 - monotonic analysis generations with cancellation/failure preservation and stale-result rejection;
 - transactional UI adoption only after overlay creation and current-key verification;
 - immutable M14.1 regional-segmentation contracts with compact label-map storage, graph/hierarchy validation and deterministic estimates;
-- 863 expected cases after M14.1, pending local build/test validation.
+- deterministic M14.2 SLIC clustering with CIELAB conversion, optional Gaussian pre-smoothing, local search, convergence, cancellation and monotonic progress;
+- deterministic M14.3 four-neighbour connectivity repair, undersized-component merging, size diagnostics and on-demand mean-colour/boundary previews;
+- deterministic M14.4 area, bounds, centroid, perimeter, compactness, CIELAB, texture, edge-density and tangent descriptors;
+- deterministic M14.5 adjacency with exact shared-boundary counts, perceptual contrast, continuity, tangent and boundary-strength evidence;
+- deterministic M14.6 fine/intermediate/broad hierarchy with aggregate merge costs, strong-edge protection and parent/child traceability;
+- active M14.7 SLIC regional-analysis pipeline shared by Flow, Primitive and Hybrid;
+- generalized `RegionRoleOverride` migration for schema-11 subject, focal, background and ignored decisions;
+- fixed regional detail composition independent of retired semantic-analysis settings;
+- regional/shared-boundary evidence forwarded into the validated scene-boundary analyzer;
+- compact signed-assignment publication without a second full-size staging map;
+- embedded multi-resolution FlowPainter icon for the Avalonia window, executable and publish output;
+- 1,024 validated cases through M14.8;
+- 1,049 expected cases after M15.1, pending local build/test validation.
 
-M8–M13.3 remain the validated historical path currently implemented by the application. New development does not extend class-aware or model-backed recognition. M13.4 first hardens state, memory, persistence and analysis orchestration; M14 then introduces deterministic SLIC superpixels, regional descriptors, a Region Adjacency Graph and hierarchical merging. M14.7 will replace the active automatic semantic contribution while preserving older project schemas and converting manual semantic decisions into generalized region-role overrides.
+M8–M13.3 remain a validated historical and schema-compatibility subsystem. New development does not extend class-aware or model-backed recognition. M13.4 hardened state, memory, persistence and analysis orchestration; M14.1–M14.6 introduced deterministic SLIC superpixels, regional descriptors, a Region Adjacency Graph and hierarchical merging. M14.7 replaced the active automatic semantic contribution. M14.8 exposed the regional controls and diagnostics and persists reusable SLIC/merge settings plus image-specific role overrides without storing derived label maps. M15.1 begins region-guided rendering by deriving a continuous boundary field from the SLIC/RAG structure.
 
 ## Requirements
 
@@ -146,13 +158,13 @@ dotnet run --project src/FlowPainter.App/FlowPainter.App.csproj
 Then:
 
 1. choose **Open image**, or **Open project** for an existing `*.flowpainter.json` file;
-2. inspect the combined detail heat map, semantic overlays, important boundaries, background confidence or tangent directions;
+2. inspect the combined detail heat map, regional compatibility overlays, important boundaries, background confidence or tangent directions;
 3. tune Scene boundaries settings and use **Reanalyze detail + subjects + boundaries** when required;
 4. configure **Boundary-aware painting** and **Background suppression**, or start with Balanced, Strong silhouette or Loose background;
 5. compare Background confidence, Background suppression, Background protection and Artistic detail overlays;
-6. click a detected semantic rectangle and correct it as primary subject, subject, background or ignored detection when required;
+6. review or edit persisted schema-11 role corrections; automatic semantic detections are no longer generated by the active pipeline;
 7. promote a detected region to painterly focus/critical detail, or drag to create `IncreaseDetail` / `ReduceDetail` regions;
-8. click a manual region or semantic correction to select it, then edit it or press `Delete`;
+8. click a manual detail region or legacy role correction to select it, then edit it or press `Delete`;
 9. choose Draft, Standard or High and use **Rebuild preview** when required;
 10. choose **FlowPainting**, **GeometricPrimitives** or **Hybrid** as the generative engine;
 11. for flow painting, choose SolidRound, SoftRound, Flat or Bristle and edit deterministic material parameters;
@@ -166,7 +178,7 @@ Then:
 19. choose **Export final** to rasterize the approved stroke, primitive or hybrid plan;
 20. in primitive mode, choose **Export SVG** for resolution-independent vector output.
 
-Manual detail regions and semantic corrections belong to projects, not presets. Project schema 11 stores normalized detail/correction geometry, soft-region transition width, composition order, the current legacy semantic analysis settings, scene-boundary analysis, boundary-painting and background-suppression policies, final-output settings, brush material, selected engine, primitive settings and hybrid composition settings; schema-1 through schema-10 files remain readable. SLIC settings and region-role migration will enter only with the future M14 persistence milestone.
+Manual detail regions and generalized role overrides belong to projects, not presets. Project schema 12 stores normalized detail/role geometry, SLIC and merge settings, soft transitions, boundary/background policies, final-output settings and all generative settings; schemas 1–11 remain readable. Preset schema 9 stores reusable SLIC and merge parameters but never image-specific role overrides or derived label maps.
 
 ## Documentation
 
@@ -196,3 +208,11 @@ Milestone-specific documents:
 - [`docs/M13_4_4_ANALYSIS_ORCHESTRATION.md`](docs/M13_4_4_ANALYSIS_ORCHESTRATION.md)
 - [`docs/M14_SLIC_REGIONAL_SEGMENTATION.md`](docs/M14_SLIC_REGIONAL_SEGMENTATION.md) — approved implementation plan
 - [`docs/M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md`](docs/M14_1_REGIONAL_SEGMENTATION_CONTRACTS.md)
+- [`docs/M14_2_DETERMINISTIC_SLIC_IMPLEMENTATION.md`](docs/M14_2_DETERMINISTIC_SLIC_IMPLEMENTATION.md)
+- [`docs/M14_3_CONNECTIVITY_AND_DIAGNOSTICS.md`](docs/M14_3_CONNECTIVITY_AND_DIAGNOSTICS.md)
+- [`docs/M14_4_REGIONAL_DESCRIPTORS.md`](docs/M14_4_REGIONAL_DESCRIPTORS.md)
+- [`docs/M14_5_REGION_ADJACENCY_GRAPH.md`](docs/M14_5_REGION_ADJACENCY_GRAPH.md)
+- [`docs/M14_6_HIERARCHICAL_MERGE.md`](docs/M14_6_HIERARCHICAL_MERGE.md)
+- [`docs/M14_7_ACTIVE_PIPELINE_MIGRATION.md`](docs/M14_7_ACTIVE_PIPELINE_MIGRATION.md)
+- [`docs/M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md`](docs/M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md)
+- [`docs/M15_1_REGIONAL_BOUNDARY_FIELD.md`](docs/M15_1_REGIONAL_BOUNDARY_FIELD.md)

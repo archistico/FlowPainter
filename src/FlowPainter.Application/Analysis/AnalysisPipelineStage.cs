@@ -4,8 +4,8 @@ public enum AnalysisPipelineStage
 {
     Preparing,
     StructuralDetail,
-    SemanticImportance,
-    SemanticCorrections,
+    RegionalSegmentation,
+    RegionRoles,
     SceneBoundaries,
     AutomaticDetail,
     ManualRegions,

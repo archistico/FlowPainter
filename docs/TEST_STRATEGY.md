@@ -15,7 +15,7 @@ Fast tests with no filesystem, UI, network or native dependencies:
 - angle calculations;
 - detail-map invariants and uniform construction;
 - manual-region and schema-11 semantic-correction invariants;
-- planned M14 label-map, region, adjacency and hierarchy invariants;
+- validated M14 label-map, region, adjacency, hierarchy and generalized-role invariants;
 - deterministic random sequences;
 - stroke-plan validation;
 - primitive geometry, kind flags and immutable primitive-plan validation;
@@ -29,10 +29,10 @@ Use pure in-memory data:
 - project-session clean bypass and Save / Discard / Cancel decisions;
 - presentation edit notification with and without an active source;
 - structural detail analysis;
-- semantic settings, progress and result invariants;
-- deterministic saliency, generic-subject, silhouette and focal maps;
-- structural/semantic map composition, semantic-correction composition and cancellation;
-- legacy semantic persistence defaults and future region-role migration;
+- historical semantic settings, progress and result invariants;
+- historical deterministic saliency, generic-subject, silhouette and focal maps;
+- historical structural/semantic composition plus active regional composition and cancellation;
+- legacy semantic persistence defaults and active runtime region-role migration;
 - edge, colour-contrast and smoothing behaviour;
 - automatic/manual detail composition;
 - viewport-to-normalized coordinate conversion and overlay hit-testing/cycling;
@@ -44,7 +44,7 @@ Use pure in-memory data:
 - boundary termination, opacity, progress and cancellation;
 - preset schema migration and JSON round trips;
 - memory and work estimates;
-- planned deterministic SLIC assignment, connectivity, descriptors, adjacency and hierarchical merge;
+- deterministic SLIC assignment, connectivity, descriptors, adjacency, hierarchical merge and active orchestration;
 - primitive settings, masks, colour estimation, local scoring and deterministic hill climbing;
 - detail-aware primitive placement, size, error weighting and search budget;
 - schema-5 project and workspace persistence for primitive mode;
@@ -193,14 +193,21 @@ dotnet test FlowPainter.sln -c Release --collect:"XPlat Code Coverage"
 
 ## Current suite
 
-The current validated repository contains **782** cases:
+The current validated repository contains **998** cases:
 
-- 115 Domain;
-- 590 Application;
+- 154 Domain;
+- 767 Application;
 - 27 Imaging.Skia;
 - 50 Rendering.Skia.
 
-M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases established 765. M13.4.2 added 14 Application and 3 Imaging.Skia cases and was validated at **782**. M13.4.3 added 8 Application persistence cases, reaching 790. M13.4.4 added 14 Application analysis-lifecycle cases and was validated at **804**. M14.1 adds 30 Domain and 29 Application contract cases, for an expected total of **863** pending local validation.
+M14.8 added 26 validated cases, producing the 1,024-case baseline:
+
+- 154 Domain;
+- 789 Application;
+- 31 Imaging.Skia;
+- 50 Rendering.Skia.
+
+M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases established 765. M13.4.2 added 14 Application and 3 Imaging.Skia cases and was validated at **782**. M13.4.3 added 8 Application persistence cases, reaching 790. M13.4.4 added 14 Application analysis-lifecycle cases and was validated at **804**. M14.1 added 30 Domain and 29 Application contract cases and was validated at **863**. M14.2 added 17 Application algorithm cases and 2 Domain signed-label cases and was validated at **882**. M14.3 added 25 Application topology/diagnostic cases and was validated at **907**. M14.4 added 13 Application descriptor cases and was validated at **920**. M14.5 added 20 Domain/Application adjacency cases and was validated at **940**. M14.6 added 2 Domain and 22 Application hierarchy cases and was validated at **964**. M14.7 added 4 Domain and 30 Application migration cases and was validated at **998**. M14.8 added 22 Application and 4 Imaging.Skia cases and was validated at **1,024**. M15.1 adds 25 Application cases, for an expected total of **1,049** pending local validation.
 
 
 ## M11 scene-boundary tests
@@ -343,13 +350,13 @@ M13.4.4 validates:
 - value-based cache keys for equivalent source, dimensions, analysis settings and workspace revisions;
 - cache invalidation when source identity, settings or revisions change;
 - defensive copying of mutable detail-region and semantic-correction collections;
-- complete detached structural, semantic, boundary, automatic, manual and background-suppression output;
+- complete detached structural, regional, compatibility, boundary, automatic, manual and background-suppression output;
 - monotonic stage progress through pipeline completion;
 - cancellation and analyzer failure preserving the previously adopted result;
 - transactional publication only after the caller adoption callback succeeds;
 - rejection of older generations and mismatched expected keys;
 - callback failure leaving the coordinator cache unpublished;
-- manual-region/background recomposition reusing valid automatic maps without analyzer reruns;
+- manual-region/background recomposition reusing valid segmentation, regional and automatic maps without analyzer reruns;
 - cache-key retagging after candidate project/image adoption;
 - explicit invalidation clearing current state and rejecting pending results.
 
@@ -357,21 +364,22 @@ These fourteen focused Application cases established the validated **804**-case 
 
 ## M14 SLIC regional-segmentation tests
 
-M14 is validated incrementally. M14.1 contributes **59** focused tests (30 Domain and 29 Application), raising the expected suite from 804 to **863**:
-
+M14 is validated incrementally. M14.1 contributed **59** focused tests (30 Domain and 29 Application) and established the validated **863**-case baseline. M14.2 contributed **19** additional cases and was validated at **882**. M14.3 contributed **25** additional Application cases and was validated at **907**. M14.4 contributed **13** additional Application cases and was validated at **920**. M14.5 contributed **20** Domain/Application cases and was validated at **940**. M14.6 contributed **24** additional cases and was validated at **964**. M14.7 contributed **34** additional cases and was validated at **998**. M14.8 contributed **26** additional cases and was validated at **1,024**:
 
 - **M14.1:** contract ranges, `UInt16`/`UInt32` storage boundaries, row/index access, defensive ownership, region-area consistency, graph symmetry, monotonic hierarchy, progress and exact memory/work estimates;
-- **M14.2:** deterministic SLIC results, local assignment bounds, convergence, cancellation and progress;
-- **M14.3:** connected labels, minimum-region repair, compact relabelling and complete coverage;
-- **M14.4:** analytically verifiable colour, luminance, area, centroid, bounds, perimeter and orientation descriptors;
-- **M14.5:** symmetric adjacency, exact shared-boundary counts and boundary-strength normalization;
-- **M14.6:** deterministic merge costs, protected strong edges and traceable hierarchy;
-- **M14.7:** Flow, Primitive and Hybrid consume the SLIC path while legacy projects preserve manual intent;
-- **M14.8:** project/preset migration, settings round trip, overlay diagnostics and cache invalidation.
+- **M14.2:** deterministic uniform/colour fixtures, source immutability, sRGB/Lab path, optional Gaussian smoothing, local assignment, convergence, iteration bounds, cancellation, monotonic progress, alpha compositing, compact signed-label publication and pre-sampling budget rejection;
+- **M14.3:** connected labels, deterministic minimum-region repair, compact relabelling, complete coverage, size-distribution diagnostics, mean-colour preview, boundary overlay, cancellation and revised memory estimates;
+- **M14.4:** analytically verifiable area, bounds, centroid, straight/stepped digital perimeter, compactness, CIELAB means/variances, alpha compositing, internal texture energy, edge density, tangent orientation, cancellation, immutability and descriptor-aware memory estimates;
+- **M14.5:** symmetric ordered neighbourhoods, complete graph validation, exact shared-boundary counts, CIELAB gradient/colour evidence, texture difference, tangent continuity, normalized strength, cancellation and adjacency-aware memory estimates;
+- **M14.6:** validated settings/cost contracts, adjacent-only merging, protected aggregate strong edges, recomputed costs, deterministic tie breaking, compact parent/child traceability, cancellation, hierarchy progress and revised memory estimates;
+- **M14.7:** generalized role contracts, all schema-11 correction mappings, regional structure/focus/background composition, RAG boundary rasterization, soft role precedence, fixed regional detail influence, compatibility-only legacy maps, region-aware boundary forwarding, SLIC/merge cache identity, semantic-setting retirement, detached active orchestration and recomposition reuse;
+- **M14.8:** segmentation enable/default behaviour, merge-intensity mapping, project/preset schema migration and round trips, hierarchy/strong-boundary diagnostic rendering, Skia diagnostic conversion, cancellation, ownership and cache invalidation;
+- **M15.1:** regional-field settings, distance propagation, RAG strength/tangent transfer, side-aware normals, strong/soft transitions, deterministic tie breaking, empty/cancelled fields, scene-guidance blending, contour reinforcement and Flow/Hybrid planner integration.
 
-## M15–M17 future validation
+## M15–M17 validation
 
-- M15 compares stroke/primitive budgets across hierarchy levels and verifies smooth transitions, boundary alignment and stage ordering;
+- M15.1 verifies the continuous regional boundary field and raises the expected suite from 1,024 to 1,049;
+- later M15 steps compare stroke/primitive budgets across hierarchy levels and verify smooth transitions, boundary alignment and stage ordering;
 - M16 tests merge/split/role commands, undo/redo, local resegmentation and compatibility-preserving region overrides;
 - M17 owns controlled high-resolution, native-memory, incremental-cache, packaging and startup smoke suites.
 

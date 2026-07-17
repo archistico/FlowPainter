@@ -1,6 +1,7 @@
 using FlowPainter.Application.Boundaries;
 using FlowPainter.Application.FlowPainting.Fields;
 using FlowPainter.Application.FlowPainting.Planning;
+using FlowPainter.Application.Tests.Boundaries;
 using FlowPainter.Domain.Boundaries;
 using FlowPainter.Domain.Color;
 using FlowPainter.Domain.Detail;
@@ -177,6 +178,28 @@ public sealed class BoundaryAwareFlowPainterPlannerTests
         StrokePlan second = planner.CreatePlan(image, density, detail, boundaries, 99UL, settings);
 
         AssertStrokePlansEqual(first, second);
+    }
+
+    [Fact]
+    public void RegionalBoundaryOverloadPublishesRegionalPlannerVersion()
+    {
+        RgbaImage image = CreateUniformImage(8, 8);
+        DetailMap detail = DetailMap.CreateUniform(image.Size, 0.5f);
+        StrokeDensityMap density = StrokeDensityMap.CreateUniform(image.Size, 8d);
+        FlowPainterSettings settings = CreateSettings(new BoundaryPaintingSettings(
+            enabled: true,
+            alignmentRadius: 2));
+
+        StrokePlan plan = new FlowPainterPlanner(new ConstantFieldFactory(0d)).CreatePlan(
+            image,
+            density,
+            detail,
+            SceneBoundaryAnalysisResult.CreateEmpty(image.Size),
+            RegionalBoundaryTestFactory.CreateVerticalSplit(8, 8, 4, 0.85d),
+            18UL,
+            settings);
+
+        Assert.Equal(FlowPainterPlanner.RegionalBoundaryPlannerVersion, plan.PlannerVersion);
     }
 
     [Fact]

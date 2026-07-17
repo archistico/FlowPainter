@@ -82,6 +82,35 @@ public sealed class RegionSegmentationResultTests
             CreateDiagnostics()));
     }
 
+
+    [Fact]
+    public void ConstructorRejectsIncompleteAdjacency()
+    {
+        RegionLabelMap labels = CreateLabels();
+
+        Assert.Throws<ArgumentException>(() => new RegionSegmentationResult(
+            labels,
+            CreateRegions(),
+            RegionAdjacencyGraph.CreateEmpty(2),
+            RegionHierarchy.CreateIdentity(2),
+            CreateDiagnostics()));
+    }
+
+    [Fact]
+    public void ConstructorRejectsIncorrectSharedBoundaryLength()
+    {
+        RegionLabelMap labels = CreateLabels();
+        RegionAdjacency[] edges = [new RegionAdjacency(0, 1, 1)];
+        RegionAdjacencyGraph adjacency = new(2, edges);
+
+        Assert.Throws<ArgumentException>(() => new RegionSegmentationResult(
+            labels,
+            CreateRegions(),
+            adjacency,
+            RegionHierarchy.CreateIdentity(2),
+            CreateDiagnostics()));
+    }
+
     [Fact]
     public void ConstructorRejectsHierarchyRegionCountMismatch()
     {
@@ -106,6 +135,18 @@ public sealed class RegionSegmentationResultTests
             CreateGraph(),
             RegionHierarchy.CreateIdentity(2),
             new SegmentationDiagnostics(0, false, 0d, 3, 3)));
+        Assert.Throws<ArgumentException>(() => new RegionSegmentationResult(
+            labels,
+            CreateRegions(),
+            CreateGraph(),
+            RegionHierarchy.CreateIdentity(2),
+            new SegmentationDiagnostics(
+                0,
+                false,
+                0d,
+                2,
+                2,
+                regionSizes: new RegionSizeDistribution(1, 3, 2d, 1d))));
     }
 
     private static RegionSegmentationResult CreateValidResult()
