@@ -291,6 +291,41 @@ Local detail also interpolates:
 
 No-map calls preserve the M3 random sequence and `flow-field-v1` plan version. Detail-map calls produce `flow-field-detail-v1` plans.
 
+
+## Planned staged rendering after M15.2
+
+M15.2 changes local geometry inside one accepted stroke plan; it does not yet define a painterly pass order. M15.3 will add a separate orchestration layer rather than embedding pass decisions inside `SkiaStrokePlanRenderer`.
+
+The planned boundary is:
+
+```text
+Regional/detail/boundary analysis
+        ↓
+FlowPassAllocator
+        ↓
+StagedFlowPlan
+├── BroadMass StrokePlan
+├── RegionalStructure StrokePlan
+├── BoundaryReinforcement StrokePlan
+└── FineDetail StrokePlan
+        ↓
+Staged renderer / high-resolution exporter
+```
+
+`FlowPainterPlanner` remains responsible for deterministic stroke geometry within a pass. The allocator owns budget conservation, stage-specific settings, seed derivation and ordering. Rendering remains a projection of immutable plans and must not infer artistic roles from pixels.
+
+M15.4 will apply the same separation to primitives: a coarse-to-fine allocator composes ordered `PrimitivePlan` stages while `PrimitivePlanOptimizer` continues to optimize one explicitly bounded stage. M15.5 then introduces an engine-neutral artistic-allocation result so Flow, Primitive and Hybrid do not independently reinterpret the same SLIC hierarchy.
+
+Key constraints:
+
+- planning roles may be discrete, but their spatial influence must remain continuous;
+- pass budgets must be fixed before expensive allocation begins;
+- each pass has a deterministic seed derived from the project seed and stable pass identifier;
+- preview, final raster and SVG consume the same accepted plan objects;
+- compatibility paths remain available until the staged paths have passed regression and manual visual validation;
+- advanced editing in M16 persists user intent, not full derived label maps;
+- high-resolution refinement in M17 is restricted to measured boundary bands or invalidated regions.
+
 ## Resolution independence
 
 Every region, path and future primitive is stored in normalized source-image coordinates. `UniformImageViewport` maps between the letterboxed Avalonia viewport and normalized image space. Preview and final rendering remain projections of the same data.

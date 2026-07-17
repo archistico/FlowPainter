@@ -1,47 +1,37 @@
 # Validation checklist
 
-## M15.2 High-detail local stroke policy
+## Current validated baseline — M15.2
 
-Status: **READY FOR VALIDATION**  
-Validated baseline: **M15.1 — 1,049 tests**  
-Expected automated suite: **1,071 cases** (1,049 validated baseline + 22 new Application cases).
+Status: **DONE**  
+Validated automated suite: **1,071 cases**.
 
-Run:
+The user confirmed:
 
-```bash
-dotnet build -c Release
-dotnet test -c Release --no-build
-```
-
-Manual acceptance is defined in [`M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md`](M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md).
-
-## Current validated baseline — M15.1
-
-- restore succeeds;
+- restore and build complete successfully;
 - all nine projects build with zero warnings and zero errors;
-- all **1,049** test cases pass with zero failures and zero skips;
-- project schema 12 and preset schema 9 remain the M15.1 validated persistence baseline;
-- M13.4 state, memory, persistence and analysis-orchestration safeguards remain validated;
-- M14.1–M14.6 contracts, deterministic SLIC, connectivity, descriptors, RAG and hierarchy remain accepted;
-- M14.7 active SLIC orchestration and generalized roles remain accepted;
-- M14.8 regional controls, diagnostics, inspection and backward-compatible persistence are accepted;
-- Domain and Application remain free of Avalonia, SkiaSharp, LibNoiseCore, machine-learning runtimes, external SLIC packages and model files.
+- all **1,071** tests pass with zero failures and zero skips;
+- project schema 13 and preset schema 10 round-trip the M15.2 local-stroke policy;
+- continuous length, width, segment, curvature, tangent-alignment and crossing-resistance policies are accepted;
+- M13.4 safety work, the complete M14 SLIC pipeline and the M15.1 regional boundary field remain regression-covered;
+- Domain and Application remain free of Avalonia, SkiaSharp, machine-learning runtimes and external SLIC packages.
 
-M13.3 plus audit corrections established 755 cases. M13.4.1 reached 765, M13.4.2 reached 782, M13.4.3 reached 790 and M13.4.4 reached 804. M14.1 reached 863, M14.2 reached 882, M14.3 reached 907, M14.4 reached 920, M14.5 reached 940, M14.6 reached 964, M14.7 reached 998 and M14.8 was validated at **1,024** and M15.1 at **1,049**.
+M13.3 plus audit corrections established 755 cases. M13.4.1 reached 765, M13.4.2 reached 782, M13.4.3 reached 790 and M13.4.4 reached 804. M14.1 reached 863, M14.2 reached 882, M14.3 reached 907, M14.4 reached 920, M14.5 reached 940, M14.6 reached 964, M14.7 reached 998, M14.8 reached 1,024, M15.1 reached 1,049 and M15.2 reached **1,071**.
 
-## Next validation target — M15.2 High-detail local stroke policy
+## Next validation target — M15.3 Staged Flow rendering
 
-M15.1 is fully validated. M15.2 exit checks are:
+Detailed implementation and manual acceptance plan: [`M15_3_STAGED_FLOW_RENDERING.md`](M15_3_STAGED_FLOW_RENDERING.md).
 
-- detailed areas use shorter and thinner marks through continuous multipliers;
-- local segment count increases deterministically and remains capped by the supported maximum;
-- curve freedom interpolates continuously and remains bounded;
-- zero detail preserves the validated M12/M15.1 boundary response;
-- detailed areas progressively strengthen tangent alignment and crossing resistance;
-- no-detail plans retain the original v1 identity and sequence;
-- project schema 13 and preset schema 10 round-trip the new controls and migrate older documents;
-- work estimation reserves the worst-case local segment count;
-- build has zero warnings/errors and all 1,071 tests pass.
+The final test count will be set when the implementation is complete. Required exit checks are already fixed:
+
+- one immutable staged Flow plan contains Broad mass, Regional structure, Boundary reinforcement and Fine detail passes in that order;
+- the sum of per-pass stroke budgets equals the accepted total Flow budget;
+- per-pass seeds are deterministic, independent and reproducible from the project seed;
+- preview and final export rasterize the same staged plan rather than replanning;
+- cancellation and progress are monotonic across pass planning and rendering;
+- M13.4 work-admission limits account for total and per-pass work before allocation;
+- disabling staged rendering preserves the accepted M15.2 single-pass plan and output identity;
+- no pass creates hard regional seams or mechanical contour outlines;
+- build has zero warnings/errors and the complete suite passes.
 
 The first Windows build of M5.1 identified nine compile/analyzer findings unrelated to the scrollbar layout change:
 

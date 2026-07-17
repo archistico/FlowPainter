@@ -282,7 +282,7 @@ Thirty-four focused Domain/Application cases were validated, raising the suite f
 
 ## M14.8 — UI and persistence
 
-**Status: READY FOR VALIDATION**
+**Status: DONE — validated with 1,024 tests**
 
 Detailed specification: [`M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md`](M14_8_REGIONAL_UI_SETTINGS_AND_PERSISTENCE.md).
 
@@ -312,4 +312,4 @@ Persistence policy:
 - project schemas 1–11 and preset schemas 1–8 remain readable;
 - obsolete semantic tuning values remain hidden and round-trippable only for compatibility.
 
-Twenty-six focused Application/Imaging cases raise the expected suite from the validated 998 baseline to 1,024.
+Twenty-six focused Application/Imaging cases raised the validated suite from 998 to 1,024.

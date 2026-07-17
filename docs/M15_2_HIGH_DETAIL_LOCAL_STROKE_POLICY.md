@@ -1,8 +1,8 @@
 # M15.2 — High-detail local stroke policy
 
-**Status:** READY FOR VALIDATION  
+**Status:** DONE — validated with 1,071 tests  
 **Baseline:** M15.1 validated with 1,049 tests  
-**Expected suite:** 1,071 tests
+**Validated suite:** 1,071 tests
 
 ## Objective
 
@@ -58,6 +58,10 @@ Endpoint interpolation returns the configured background and detail values exact
 4. Increase tangent/crossing boosts and verify important boundaries are followed more strongly, with no visible rectangular or regional seam.
 5. Set segment and curve multipliers to 100% and boosts to 0%; verify the previous policy is recovered.
 6. Save/reopen a project and preset and confirm all six values round-trip.
+
+## Validation result
+
+The user confirmed that the solution compiles and all **1,071 tests pass**. M15.2 is therefore the accepted baseline for M15.3.
 
 ## Exit criteria
 

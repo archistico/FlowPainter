@@ -207,8 +207,54 @@ M14.8 added 26 validated cases, producing the 1,024-case baseline:
 - 31 Imaging.Skia;
 - 50 Rendering.Skia.
 
-M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases established 765. M13.4.2 added 14 Application and 3 Imaging.Skia cases and was validated at **782**. M13.4.3 added 8 Application persistence cases, reaching 790. M13.4.4 added 14 Application analysis-lifecycle cases and was validated at **804**. M14.1 added 30 Domain and 29 Application contract cases and was validated at **863**. M14.2 added 17 Application algorithm cases and 2 Domain signed-label cases and was validated at **882**. M14.3 added 25 Application topology/diagnostic cases and was validated at **907**. M14.4 added 13 Application descriptor cases and was validated at **920**. M14.5 added 20 Domain/Application adjacency cases and was validated at **940**. M14.6 added 2 Domain and 22 Application hierarchy cases and was validated at **964**. M14.7 added 4 Domain and 30 Application migration cases and was validated at **998**. M14.8 added 22 Application and 4 Imaging.Skia cases and was validated at **1,024**. M15.1 added 25 Application cases and was validated at **1,049**. M15.2 adds 22 Application cases, for an expected total of **1,071** pending local validation.
+M13.3 plus the audit remediation reached 755 cases. Ten M13.4.1 Application cases established 765. M13.4.2 added 14 Application and 3 Imaging.Skia cases and was validated at **782**. M13.4.3 added 8 Application persistence cases, reaching 790. M13.4.4 added 14 Application analysis-lifecycle cases and was validated at **804**. M14.1 added 30 Domain and 29 Application contract cases and was validated at **863**. M14.2 added 17 Application algorithm cases and 2 Domain signed-label cases and was validated at **882**. M14.3 added 25 Application topology/diagnostic cases and was validated at **907**. M14.4 added 13 Application descriptor cases and was validated at **920**. M14.5 added 20 Domain/Application adjacency cases and was validated at **940**. M14.6 added 2 Domain and 22 Application hierarchy cases and was validated at **964**. M14.7 added 4 Domain and 30 Application migration cases and was validated at **998**. M14.8 added 22 Application and 4 Imaging.Skia cases and was validated at **1,024**. M15.1 added 25 Application cases and was validated at **1,049**. M15.2 added 22 Application cases and was validated at **1,071**.
 
+
+## Planned M15.3–M17 coverage
+
+The next milestones must extend the suite without replacing the accepted M15.2 behavioural tests.
+
+### M15.3 staged Flow rendering
+
+Tests will cover:
+
+- immutable pass identity and fixed Broad/Structure/Boundary/Detail order;
+- exact budget conservation and deterministic remainder assignment;
+- per-pass seed derivation independent of pass execution order;
+- stage-specific placement/detail/boundary constraints;
+- compatibility mode recovering the accepted M15.2 single-pass plan;
+- preview/final plan reuse, progress, cancellation and work estimation;
+- renderer compositing order and representative-pixel assertions without fragile full-image goldens.
+
+### M15.4 primitive coarse-to-fine rendering
+
+Tests will cover:
+
+- primitive-stage contracts and ordered immutable publication;
+- stage-specific size and hierarchy eligibility;
+- primitive-budget conservation and deterministic candidate ordering;
+- strong-boundary rejection/penalty for broad candidates;
+- raster/SVG ordering and Hybrid reuse of the same primitive hierarchy;
+- bounded work estimation before candidate generation.
+
+### M15.5 unified artistic hierarchy
+
+Tests will cover:
+
+- deterministic classification from regional evidence and manual roles;
+- role precedence and compatibility migration;
+- monotonic Flow/Primitive/Hybrid budget allocation by artistic level;
+- continuous transition fields around discrete roles;
+- cross-engine use of the same immutable allocation result;
+- invariance to obsolete semantic-analysis settings.
+
+### M16 advanced regional editing
+
+Tests will be organized around command objects rather than Avalonia handlers: hierarchy-aware selection, compact persisted overrides, local split/resegmentation isolation, mask/barrier composition, undo/redo reversibility, cache invalidation scopes and partial-regeneration eligibility.
+
+### M17 high-resolution and release
+
+Tests will cover proxy/source coordinate invariants, narrow-band refinement, cache-key correctness, deterministic parallel reductions, memory-budget enforcement, autosave/recovery atomicity, publish artifact smoke checks and measured large-image stress fixtures. Expensive 10K certification tests may remain opt-in, but smaller deterministic equivalents must run in CI.
 
 ## M11 scene-boundary tests
 
@@ -380,7 +426,7 @@ M14 is validated incrementally. M14.1 contributed **59** focused tests (30 Domai
 ## M15–M17 validation
 
 - M15.1 verified the continuous regional boundary field at 1,049 tests;
-- M15.2 raises the expected suite from 1,049 to 1,071;
+- M15.2 was validated at 1,071 tests;
 - later M15 steps compare stroke/primitive budgets across hierarchy levels and verify smooth transitions, boundary alignment and stage ordering;
 - M16 tests merge/split/role commands, undo/redo, local resegmentation and compatibility-preserving region overrides;
 - M17 owns controlled high-resolution, native-memory, incremental-cache, packaging and startup smoke suites.

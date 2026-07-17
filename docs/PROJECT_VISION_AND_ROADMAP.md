@@ -2,8 +2,8 @@
 
 **Document status:** living specification
 **Last updated:** 2026-07-17
-**Current validated baseline:** M14.6 — Hierarchical regional merge (964 tests)
-**Current milestone:** M15.2 — High-detail local stroke policy — READY FOR VALIDATION
+**Current validated baseline:** M15.2 — High-detail local stroke policy (1,071 tests)
+**Next milestone:** M15.3 — Staged Flow rendering — PLANNED
 **Rule:** update this document in the same change set that alters scope, architecture or milestone status.
 
 ## 1. Product vision
@@ -911,7 +911,7 @@ Exit criteria:
 
 ### M15 — Region-guided painterly rendering
 
-**Status: IN PROGRESS — M15.1 validated; M15.2 ready for validation**
+**Status: IN PROGRESS — M15.1 and M15.2 validated; M15.3 next**
 
 #### M15.1 — Regional boundary field
 
@@ -929,7 +929,7 @@ Detailed validation plan: [`M15_1_REGIONAL_BOUNDARY_FIELD.md`](M15_1_REGIONAL_BO
 
 #### M15.2 — High-detail local stroke policy
 
-**Status: READY FOR VALIDATION**
+**Status: DONE — validated with 1,071 tests**
 
 Detailed validation plan: [`M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md`](M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md).
 
@@ -938,57 +938,81 @@ Detailed validation plan: [`M15_2_HIGH_DETAIL_LOCAL_STROKE_POLICY.md`](M15_2_HIG
 - stronger tangent alignment and crossing resistance near important boundaries;
 - continuous interpolation of density, length, width, segmentation and curvature;
 - project schema 13 and preset schema 10 persist the reusable policy;
-- 22 new Application cases raise the expected suite from 1,049 to 1,071.
+- 22 new Application cases raised the validated suite from 1,049 to 1,071.
 
 #### M15.3 — Staged Flow rendering
 
-- broad base masses first;
-- regional structure second;
-- important contours third;
-- fine local detail last;
-- independent deterministic budgets and seeds with preview/final plan reuse.
+**Status: NEXT**
+
+Detailed implementation plan: [`M15_3_STAGED_FLOW_RENDERING.md`](M15_3_STAGED_FLOW_RENDERING.md).
+
+- introduce an immutable four-pass Flow plan: Broad mass, Regional structure, Boundary reinforcement and Fine detail;
+- derive deterministic per-pass seeds from the project seed without consuming one shared mutable random sequence;
+- assign explicit pass budgets whose sum equals the accepted Flow stroke budget;
+- constrain each pass with the already validated detail, hierarchy and regional-boundary fields;
+- render and export the same accepted staged plan at preview and final resolution;
+- keep the existing single-pass path as a compatibility mode until staged output is validated;
+- test ordering, budget conservation, deterministic seed partitioning, cancellation, work admission and no-detail compatibility.
 
 #### M15.4 — Primitive coarse-to-fine rendering
 
-- large diffuse forms for broad masses;
-- medium primitives for regional structure;
-- small forms for protected and focal regions;
-- one hierarchy shared with Flow and Hybrid refinement.
+**Status: PLANNED — depends on M15.3 contracts**
+
+Detailed implementation plan: [`M15_4_PRIMITIVE_COARSE_TO_FINE.md`](M15_4_PRIMITIVE_COARSE_TO_FINE.md).
+
+- introduce broad, structural and detail primitive stages driven by hierarchy level and artistic evidence;
+- use large diffuse forms for broad masses, medium forms for regional structure and small forms only where detail/protection warrants them;
+- conserve the accepted primitive budget across stages and reject impossible workloads before optimization;
+- preserve one immutable ordered plan for raster, SVG and Hybrid reuse;
+- prevent strong boundaries from being lost by broad primitive candidates;
+- test stage-specific size ranges, budget conservation, deterministic ordering, SVG layer order and Hybrid interoperability.
 
 #### M15.5 — Unified artistic hierarchy
 
-- Broad mass → Supporting region → Protected region → Focal region → Critical detail;
-- coordinated stroke, primitive, colour and boundary budgets;
-- roles derived from SLIC scale, structural evidence and manual intent rather than class labels;
-- quantitative tests proving deliberate resource allocation without abrupt seams.
+**Status: PLANNED — depends on M15.3 and M15.4**
+
+Detailed implementation plan: [`M15_5_UNIFIED_ARTISTIC_HIERARCHY.md`](M15_5_UNIFIED_ARTISTIC_HIERARCHY.md).
+
+- define one engine-independent artistic classification: Broad mass → Supporting region → Protected region → Focal region → Critical detail;
+- derive classification from SLIC hierarchy, detail, boundary evidence, contrast and manual roles rather than object classes;
+- publish one immutable budget-allocation field consumed by Flow, Primitive and Hybrid;
+- coordinate mark density, mark size, colour simplification, boundary protection and optimization effort;
+- use continuous influence bands around role transitions so discrete planning roles do not create visible seams;
+- add quantitative tests for monotonic resource allocation and cross-engine consistency.
 
 ### M16 — Advanced regional editing
 
-**Status: PLANNED**
+**Status: PLANNED — begins only after the M15 rendering model is stable**
 
-- select a fine SLIC region or one of its hierarchical ancestors;
-- merge, split, exclude or locally resegment regions;
-- assign subject, background, focus, protected and ignored roles;
-- evolve `SemanticCorrectionRegion` into a generalized compatibility-preserving region-role override;
-- brush-painted increase/reduce detail masks;
-- manual barriers and false-boundary erasing;
-- polygonal and freehand masks;
-- locked areas, partial regeneration and before/after comparison;
-- undo/redo command history.
+Detailed implementation plan: [`M16_ADVANCED_REGIONAL_EDITING.md`](M16_ADVANCED_REGIONAL_EDITING.md).
+
+Planned order:
+
+1. **M16.1 — Hierarchy-aware selection:** select a fine region or any ancestor and inspect inherited descriptors/roles.
+2. **M16.2 — Persistent role and topology overrides:** merge, exclude and assign generalized background/support/protected/focal/critical roles.
+3. **M16.3 — Local split and resegmentation:** split a selected region or run bounded local SLIC without changing unrelated labels.
+4. **M16.4 — Freehand artistic masks and barriers:** paint increase/reduce detail, draw protected barriers and erase false boundaries.
+5. **M16.5 — Command history and partial regeneration:** undo/redo, locked areas, invalidation scopes and before/after comparison.
+
+Derived SLIC label maps remain reproducible data, while user edits are persisted as compact source-relative operations and overrides.
 
 ### M17 — High resolution, optimization, packaging and release
 
-**Status: PLANNED**
+**Status: PLANNED — follows functional completion of M15 and M16**
 
-- global proxy segmentation with projection to source resolution;
-- high-resolution border refinement and optional local SLIC in complex areas;
-- overlap-aware tiling only if measurements prove it necessary;
-- incremental caches and partial reanalysis;
-- controlled 10,000 × 10,000 stress suite;
-- managed/native memory and CPU profiling;
-- deterministic parallelization where safe;
-- autosave and recovery;
-- Windows/Linux packaging, publish profiles, end-user documentation and release checklist.
+Detailed implementation plan: [`M17_HIGH_RESOLUTION_OPTIMIZATION_RELEASE.md`](M17_HIGH_RESOLUTION_OPTIMIZATION_RELEASE.md).
+
+Planned order:
+
+1. **M17.1 — Source-resolution boundary refinement:** project proxy regions and refine only narrow boundary bands.
+2. **M17.2 — Incremental analysis and partial caches:** reuse segmentation, descriptors, hierarchy and plans by precise revision scope.
+3. **M17.3 — Measured performance work:** profile managed/native memory and CPU before introducing deterministic parallelism or tiling.
+4. **M17.4 — Recovery:** autosave, crash recovery and validation of atomic restore paths.
+5. **M17.5 — Release engineering:** controlled 10,000 × 10,000 stress suite, Windows/Linux publish profiles, packaging, user documentation and release checklist.
+
+Overlap-aware tiling and local high-resolution SLIC remain conditional: they will be introduced only if profiling proves proxy projection plus boundary refinement insufficient.
+
+The approved dependency order and non-goals are summarized in [`NEXT_STEPS_AFTER_M15_2.md`](NEXT_STEPS_AFTER_M15_2.md).
 
 ## 9. Milestone discipline
 

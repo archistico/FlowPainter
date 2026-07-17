@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted and implemented by M13.4.4, pending local build/test validation.
+Accepted and validated by M13.4.4 with 804 tests. The active analysis contents were subsequently extended by M14.7, while the detached/adoption transaction remains authoritative.
 
 ## Context
 
